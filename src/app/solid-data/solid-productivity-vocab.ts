@@ -4,9 +4,11 @@ export const SOLID_PRODUCTIVITY_NS = 'https://super-productivity.com/ns#';
 export const SOLID_PRODUCTIVITY_TASK_TYPE = 'SuperProductivityTask';
 export const SOLID_PRODUCTIVITY_PROJECT_TYPE = 'SuperProductivityProject';
 export const SOLID_PRODUCTIVITY_TAG_TYPE = 'SuperProductivityTag';
+export const SOLID_PRODUCTIVITY_NOTE_TYPE = 'SuperProductivityNote';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
+export const SOLID_PRODUCTIVITY_NOTES_CONTAINER = 'super-productivity/notes';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -16,6 +18,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     tasks: SOLID_PRODUCTIVITY_TASKS_CONTAINER,
     projects: SOLID_PRODUCTIVITY_PROJECTS_CONTAINER,
     tags: SOLID_PRODUCTIVITY_TAGS_CONTAINER,
+    notes: SOLID_PRODUCTIVITY_NOTES_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -31,6 +34,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     [SOLID_PRODUCTIVITY_TAG_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}Tag`,
       container: 'tags',
+      defaultStatus: 'open',
+    },
+    [SOLID_PRODUCTIVITY_NOTE_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}Note`,
+      container: 'notes',
       defaultStatus: 'open',
     },
   },
@@ -101,4 +109,16 @@ export const SP_TAG = {
   theme: `${SOLID_PRODUCTIVITY_NS}theme`,
   advancedCfg: `${SOLID_PRODUCTIVITY_NS}advancedCfg`,
   icon: `${SOLID_PRODUCTIVITY_NS}icon`,
+} as const;
+
+export const SP_NOTE = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  projectId: `${SOLID_PRODUCTIVITY_NS}projectId`,
+  isPinnedToToday: `${SOLID_PRODUCTIVITY_NS}isPinnedToToday`,
+  content: `${SOLID_PRODUCTIVITY_NS}content`,
+  imgUrl: `${SOLID_PRODUCTIVITY_NS}imgUrl`,
+  isLock: `${SOLID_PRODUCTIVITY_NS}isLock`,
+  backgroundColor: `${SOLID_PRODUCTIVITY_NS}backgroundColor`,
+  created: `${SOLID_PRODUCTIVITY_NS}created`,
+  modified: `${SOLID_PRODUCTIVITY_NS}modified`,
 } as const;
