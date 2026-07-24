@@ -7,6 +7,7 @@ import type {
 } from '@solid-intents/runtime';
 import {
   SOLID_PRODUCTIVITY_LAYOUT,
+  SOLID_PRODUCTIVITY_APP_STATE_TYPE,
   SOLID_PRODUCTIVITY_NOTE_TYPE,
   SOLID_PRODUCTIVITY_PROJECT_TYPE,
   SOLID_PRODUCTIVITY_TAG_TYPE,
@@ -37,6 +38,10 @@ export class SolidRuntimeService {
 
   get noteProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_NOTE_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_NOTE_TYPE];
+  }
+
+  get appStateProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_APP_STATE_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_APP_STATE_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {

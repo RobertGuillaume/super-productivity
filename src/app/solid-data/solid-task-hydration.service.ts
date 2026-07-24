@@ -20,6 +20,8 @@ import { Tag } from '../features/tag/tag.model';
 import { initialTagState, tagAdapter } from '../features/tag/store/tag.reducer';
 import { AppDataComplete, MODEL_CONFIGS } from '../op-log/model/model-config';
 import { loadAllData } from '../root-store/meta/load-all-data.action';
+import { SolidAppState } from './solid-app-state.mapper';
+import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -32,19 +34,22 @@ export class SolidTaskHydrationService {
   private readonly projectRepository = inject(SolidProjectRepository);
   private readonly tagRepository = inject(SolidTagRepository);
   private readonly noteRepository = inject(SolidNoteRepository);
+  private readonly appStateRepository = inject(SolidAppStateRepository);
 
   async hydrateStore(): Promise<void> {
-    const [tasks, projects, tags, notes] = await Promise.all([
+    const [tasks, projects, tags, notes, appState] = await Promise.all([
       this.taskRepository.loadTasks(),
       this.projectRepository.loadProjects(),
       this.tagRepository.loadTags(),
       this.noteRepository.loadNotes(),
+      this.appStateRepository.loadAppState(),
     ]);
     const appDataComplete = createSolidAppData({
       tasks,
       projects,
       tags,
       notes,
+      appState,
     });
 
     this.store.dispatch(loadAllData({ appDataComplete }));
@@ -61,12 +66,20 @@ export const createSolidAppData = (input: {
   projects: readonly Project[];
   tags: readonly Tag[];
   notes: readonly Note[];
+  appState?: SolidAppState | null;
 }): AppDataComplete => {
   const appDataComplete = Object.fromEntries(
     Object.entries(MODEL_CONFIGS).map(([key, config]) => [key, config.defaultData]),
   ) as AppDataComplete;
-  const projects = ensureInboxProject(input.projects);
-  const tags = ensureTodayTag(input.tags);
+  const projects = applyProjectOrder(
+    ensureInboxProject(input.projects),
+    input.appState?.projectOrder ?? [],
+  );
+  const tags = applyOrder(ensureTodayTag(input.tags), input.appState?.tagOrder ?? []);
+  const noteTodayOrder = applyNoteTodayOrder(
+    input.notes,
+    input.appState?.noteTodayOrder ?? [],
+  );
 
   return {
     ...appDataComplete,
@@ -75,9 +88,7 @@ export const createSolidAppData = (input: {
     tag: tagAdapter.setAll(tags, initialTagState),
     note: noteAdapter.setAll([...input.notes], {
       ...initialNoteState,
-      todayOrder: input.notes
-        .filter((note) => note.isPinnedToToday)
-        .map((note) => note.id),
+      todayOrder: noteTodayOrder,
     }),
   };
 };
@@ -89,3 +100,43 @@ const ensureInboxProject = (projects: readonly Project[]): Project[] =>
 
 const ensureTodayTag = (tags: readonly Tag[]): Tag[] =>
   tags.some((tag) => tag.id === TODAY_TAG.id) ? [...tags] : [TODAY_TAG, ...tags];
+
+const applyProjectOrder = (
+  projects: readonly Project[],
+  projectOrder: readonly string[],
+): Project[] => {
+  const inbox = projects.find((project) => project.id === INBOX_PROJECT.id);
+  const otherProjects = projects.filter((project) => project.id !== INBOX_PROJECT.id);
+  const sortedProjects = applyOrder(otherProjects, projectOrder);
+
+  return inbox ? [inbox, ...sortedProjects] : sortedProjects;
+};
+
+const applyNoteTodayOrder = (
+  notes: readonly Note[],
+  noteTodayOrder: readonly string[],
+): string[] => {
+  const pinnedNoteIds = new Set(
+    notes.filter((note) => note.isPinnedToToday).map((note) => note.id),
+  );
+  const orderedPinnedNoteIds = noteTodayOrder.filter((id) => pinnedNoteIds.has(id));
+  const missingPinnedNoteIds = [...pinnedNoteIds].filter(
+    (id) => !orderedPinnedNoteIds.includes(id),
+  );
+
+  return [...orderedPinnedNoteIds, ...missingPinnedNoteIds];
+};
+
+const applyOrder = <T extends { id: string }>(
+  items: readonly T[],
+  order: readonly string[],
+): T[] => {
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+  const orderedItems = order
+    .map((id) => itemsById.get(id))
+    .filter((item): item is T => !!item);
+  const orderedItemIds = new Set(orderedItems.map((item) => item.id));
+  const unorderedItems = items.filter((item) => !orderedItemIds.has(item.id));
+
+  return [...orderedItems, ...unorderedItems];
+};

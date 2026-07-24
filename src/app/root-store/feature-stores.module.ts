@@ -94,6 +94,7 @@ import { AppStateEffects } from './app-state/app-state.effects';
 import { appStateFeature } from './app-state/app-state.reducer';
 import { PluginHooksEffects } from '../plugins/plugin-hooks.effects';
 import { OperationLogEffects } from '../op-log/capture/operation-log.effects';
+import { SolidAppStatePersistenceEffects } from '../solid-data/solid-app-state-persistence.effects';
 import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistence.effects';
 import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
 import { SolidTagPersistenceEffects } from '../solid-data/solid-tag-persistence.effects';
@@ -119,6 +120,7 @@ import {
     EffectsModule.forFeature([SolidProjectPersistenceEffects]),
     EffectsModule.forFeature([SolidTagPersistenceEffects]),
     EffectsModule.forFeature([SolidNotePersistenceEffects]),
+    EffectsModule.forFeature([SolidAppStatePersistenceEffects]),
 
     StoreModule.forFeature(appStateFeature),
     EffectsModule.forFeature([AppStateEffects]),

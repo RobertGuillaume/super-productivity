@@ -7,6 +7,8 @@ import { Project } from '../features/project/project.model';
 import { DEFAULT_TAG, TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { loadAllData } from '../root-store/meta/load-all-data.action';
+import { SOLID_APP_STATE_ID, SolidAppState } from './solid-app-state.mapper';
+import { SolidAppStateRepository } from './solid-app-state.repository';
 import {
   createSolidAppData,
   SolidTaskHydrationService,
@@ -45,6 +47,13 @@ describe('SolidTaskHydrationService', () => {
     created: 1710000000200,
     modified: 1710000000300,
   };
+  const appState: SolidAppState = {
+    id: SOLID_APP_STATE_ID,
+    projectOrder: ['project-2', 'project-1'],
+    tagOrder: ['tag-2', TODAY_TAG.id, 'tag-1'],
+    noteTodayOrder: ['note-2', 'note-1'],
+    updated: 1710000000400,
+  };
 
   it('creates app data from Solid tasks, projects, and existing model defaults', () => {
     const appData = createSolidAppData({
@@ -68,6 +77,46 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.reminders).toEqual([]);
   });
 
+  it('applies Solid app-state ordering while preserving missing entities', () => {
+    const project2: Project = {
+      ...project,
+      id: 'project-2',
+    };
+    const project3: Project = {
+      ...project,
+      id: 'project-3',
+    };
+    const tag2: Tag = {
+      ...tag,
+      id: 'tag-2',
+    };
+    const note2: Note = {
+      ...note,
+      id: 'note-2',
+    };
+    const note3: Note = {
+      ...note,
+      id: 'note-3',
+    };
+
+    const appData = createSolidAppData({
+      tasks: [task],
+      projects: [project, project3, project2],
+      tags: [tag, tag2],
+      notes: [note, note3, note2],
+      appState,
+    });
+
+    expect(appData.project.ids).toEqual([
+      INBOX_PROJECT.id,
+      'project-2',
+      'project-1',
+      'project-3',
+    ]);
+    expect(appData.tag.ids).toEqual(['tag-2', TODAY_TAG.id, 'tag-1']);
+    expect(appData.note.todayOrder).toEqual(['note-2', 'note-1', 'note-3']);
+  });
+
   it('dispatches loadAllData with Solid task, project, tag, and note data', async () => {
     const store = jasmine.createSpyObj<Store>('Store', ['dispatch']);
     const taskRepository = jasmine.createSpyObj<SolidTaskRepository>(
@@ -85,10 +134,15 @@ describe('SolidTaskHydrationService', () => {
       'SolidNoteRepository',
       ['loadNotes'],
     );
+    const appStateRepository = jasmine.createSpyObj<SolidAppStateRepository>(
+      'SolidAppStateRepository',
+      ['loadAppState'],
+    );
     taskRepository.loadTasks.and.resolveTo([task]);
     projectRepository.loadProjects.and.resolveTo([project]);
     tagRepository.loadTags.and.resolveTo([tag]);
     noteRepository.loadNotes.and.resolveTo([note]);
+    appStateRepository.loadAppState.and.resolveTo(appState);
 
     TestBed.configureTestingModule({
       providers: [
@@ -97,6 +151,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidProjectRepository, useValue: projectRepository },
         { provide: SolidTagRepository, useValue: tagRepository },
         { provide: SolidNoteRepository, useValue: noteRepository },
+        { provide: SolidAppStateRepository, useValue: appStateRepository },
       ],
     });
 
@@ -117,5 +172,6 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.note.ids).toEqual(['note-1']);
     expect(action.appDataComplete.note.entities['note-1']).toEqual(note);
     expect(action.appDataComplete.note.todayOrder).toEqual(['note-1']);
+    expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
   });
 });

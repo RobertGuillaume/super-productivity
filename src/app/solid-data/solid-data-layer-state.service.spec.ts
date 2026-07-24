@@ -127,6 +127,17 @@ describe('SolidDataLayerStateService', () => {
     expect(
       service.ownsPersistentAction({
         ...action,
+        type: ActionType.PROJECT_UPDATE_ORDER,
+        meta: {
+          ...action.meta,
+          entityType: 'PROJECT',
+          opType: OpType.Move,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
         type: ActionType.PROJECT_ARCHIVE,
         meta: {
           ...action.meta,
@@ -160,11 +171,33 @@ describe('SolidDataLayerStateService', () => {
     expect(
       service.ownsPersistentAction({
         ...action,
+        type: ActionType.TAG_UPDATE_ORDER,
+        meta: {
+          ...action.meta,
+          entityType: 'TAG',
+          opType: OpType.Move,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
         type: ActionType.TAG_DELETE,
         meta: {
           ...action.meta,
           entityType: 'TAG',
           opType: OpType.Delete,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: ActionType.NOTE_UPDATE_ORDER,
+        meta: {
+          ...action.meta,
+          entityType: 'NOTE',
+          opType: OpType.Move,
         },
       }),
     ).toBe(true);
