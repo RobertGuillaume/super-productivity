@@ -3,6 +3,7 @@ import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
 import { isSolidDataLayerEnabled } from './solid-data-layer-feature-flag';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES } from './solid-work-context-action-types';
 
 @Injectable({ providedIn: 'root' })
 export class SolidDataLayerStateService {
@@ -33,6 +34,7 @@ export class SolidDataLayerStateService {
     ActionType.TASK_SHARED_UPDATE_MULTIPLE,
     ActionType.TASK_SHARED_DELETE,
     ActionType.TASK_SHARED_DELETE_MULTIPLE,
+    ...SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES,
   ]);
 
   isActive(): boolean {
