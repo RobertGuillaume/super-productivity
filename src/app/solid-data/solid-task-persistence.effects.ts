@@ -32,26 +32,66 @@ export class SolidTaskPersistenceEffects {
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
           from(this.solidTaskRepository.saveTask(action.task)).pipe(
-            catchError((error) => {
-              Log.err('SolidTaskPersistenceEffects: failed to persist task create', {
-                name: (error as Error | undefined)?.name,
-              });
-              this.snackService.open({
-                type: 'ERROR',
-                msg: T.F.SYNC.S.PERSIST_FAILED,
-                actionStr: T.PS.RELOAD,
-                actionFn: (): void => {
-                  window.location.reload();
-                },
-                config: {
-                  duration: 0,
-                },
-              });
-              return EMPTY;
-            }),
+            catchError((error) => this.handlePersistenceError(error)),
           ),
         ),
       ),
     { dispatch: false },
   );
+
+  persistTaskDelete$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        filter(
+          (
+            action,
+          ): action is
+            | (ReturnType<typeof TaskSharedActions.deleteTask> & PersistentAction)
+            | (ReturnType<typeof TaskSharedActions.deleteTasks> & PersistentAction) =>
+            (action.type === ActionType.TASK_SHARED_DELETE ||
+              action.type === ActionType.TASK_SHARED_DELETE_MULTIPLE) &&
+            !(action as PersistentAction).meta?.isRemote,
+        ),
+        filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
+        concatMap((action) =>
+          from(this.deleteTasksForAction(action)).pipe(
+            catchError((error) => this.handlePersistenceError(error)),
+          ),
+        ),
+      ),
+    { dispatch: false },
+  );
+
+  private async deleteTasksForAction(
+    action:
+      | ReturnType<typeof TaskSharedActions.deleteTask>
+      | ReturnType<typeof TaskSharedActions.deleteTasks>,
+  ): Promise<void> {
+    const taskIds =
+      action.type === ActionType.TASK_SHARED_DELETE
+        ? [action.task.id, ...action.task.subTasks.map((task) => task.id)]
+        : action.taskIds;
+
+    await Promise.all(
+      taskIds.map((taskId) => this.solidTaskRepository.deleteTask(taskId)),
+    );
+  }
+
+  private handlePersistenceError(error: unknown): typeof EMPTY {
+    Log.err('SolidTaskPersistenceEffects: failed to persist task change', {
+      name: (error as Error | undefined)?.name,
+    });
+    this.snackService.open({
+      type: 'ERROR',
+      msg: T.F.SYNC.S.PERSIST_FAILED,
+      actionStr: T.PS.RELOAD,
+      actionFn: (): void => {
+        window.location.reload();
+      },
+      config: {
+        duration: 0,
+      },
+    });
+    return EMPTY;
+  }
 }

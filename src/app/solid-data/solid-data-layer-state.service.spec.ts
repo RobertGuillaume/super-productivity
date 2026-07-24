@@ -73,6 +73,18 @@ describe('SolidDataLayerStateService', () => {
     expect(
       service.ownsPersistentAction({
         ...action,
+        type: TaskSharedActions.deleteTask.type,
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: TaskSharedActions.deleteTasks.type,
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
         type: '[Task Shared] updateTask',
         meta: {
           ...action.meta,

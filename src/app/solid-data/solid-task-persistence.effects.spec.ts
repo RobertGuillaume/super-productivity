@@ -32,7 +32,7 @@ describe('SolidTaskPersistenceEffects', () => {
     );
     solidTaskRepository = jasmine.createSpyObj<SolidTaskRepository>(
       'SolidTaskRepository',
-      ['saveTask'],
+      ['deleteTask', 'saveTask'],
     );
     snackService = jasmine.createSpyObj<SnackService>('SnackService', ['open']);
 
@@ -92,6 +92,36 @@ describe('SolidTaskPersistenceEffects', () => {
     subscription.unsubscribe();
   });
 
+  it('persists single task deletes and their subtasks to Solid', async () => {
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidTaskRepository.deleteTask.and.resolveTo();
+    const effects = TestBed.inject(SolidTaskPersistenceEffects);
+    const subscription = effects.persistTaskDelete$.subscribe();
+
+    actions$.next(createDeleteTaskAction());
+    await Promise.resolve();
+
+    expect(solidTaskRepository.deleteTask).toHaveBeenCalledWith('task-1');
+    expect(solidTaskRepository.deleteTask).toHaveBeenCalledWith('sub-task-1');
+    expect(solidTaskRepository.deleteTask).toHaveBeenCalledTimes(2);
+    subscription.unsubscribe();
+  });
+
+  it('persists bulk task deletes to Solid', async () => {
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidTaskRepository.deleteTask.and.resolveTo();
+    const effects = TestBed.inject(SolidTaskPersistenceEffects);
+    const subscription = effects.persistTaskDelete$.subscribe();
+
+    actions$.next(TaskSharedActions.deleteTasks({ taskIds: ['task-1', 'task-2'] }));
+    await Promise.resolve();
+
+    expect(solidTaskRepository.deleteTask).toHaveBeenCalledWith('task-1');
+    expect(solidTaskRepository.deleteTask).toHaveBeenCalledWith('task-2');
+    expect(solidTaskRepository.deleteTask).toHaveBeenCalledTimes(2);
+    subscription.unsubscribe();
+  });
+
   const createAddTaskAction = (): ReturnType<typeof TaskSharedActions.addTask> =>
     TaskSharedActions.addTask({
       task,
@@ -99,5 +129,21 @@ describe('SolidTaskPersistenceEffects', () => {
       workContextType: WorkContextType.PROJECT,
       isAddToBacklog: false,
       isAddToBottom: false,
+    });
+
+  const createDeleteTaskAction = (): ReturnType<typeof TaskSharedActions.deleteTask> =>
+    TaskSharedActions.deleteTask({
+      task: {
+        ...task,
+        subTasks: [
+          {
+            ...DEFAULT_TASK,
+            id: 'sub-task-1',
+            title: 'Subtask',
+            projectId: INBOX_PROJECT.id,
+            created: 1710000000100,
+          },
+        ],
+      },
     });
 });

@@ -7,6 +7,11 @@ import { SolidRuntimeService } from './solid-runtime.service';
 @Injectable({ providedIn: 'root' })
 export class SolidDataLayerStateService {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly solidOwnedActionTypes = new Set<string>([
+    ActionType.TASK_SHARED_ADD,
+    ActionType.TASK_SHARED_DELETE,
+    ActionType.TASK_SHARED_DELETE_MULTIPLE,
+  ]);
 
   isActive(): boolean {
     return (
@@ -16,6 +21,6 @@ export class SolidDataLayerStateService {
   }
 
   ownsPersistentAction(action: PersistentAction): boolean {
-    return this.isActive() && action.type === ActionType.TASK_SHARED_ADD;
+    return this.isActive() && this.solidOwnedActionTypes.has(action.type);
   }
 }
