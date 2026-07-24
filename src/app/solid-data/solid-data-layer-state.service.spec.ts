@@ -168,5 +168,38 @@ describe('SolidDataLayerStateService', () => {
         },
       }),
     ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: ActionType.NOTE_ADD,
+        meta: {
+          ...action.meta,
+          entityType: 'NOTE',
+          opType: OpType.Create,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: ActionType.NOTE_UPDATE,
+        meta: {
+          ...action.meta,
+          entityType: 'NOTE',
+          opType: OpType.Update,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: ActionType.NOTE_DELETE,
+        meta: {
+          ...action.meta,
+          entityType: 'NOTE',
+          opType: OpType.Delete,
+        },
+      }),
+    ).toBe(true);
   });
 });
