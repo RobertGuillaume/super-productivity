@@ -8,6 +8,7 @@ import { UserProfileService } from '../../features/user-profile/user-profile.ser
 import { OperationLogHydratorService } from '../../op-log/persistence/operation-log-hydrator.service';
 import { OpLog } from '../log';
 import { SolidStartupService } from '../../solid-data/solid-startup.service';
+import { SolidTaskHydrationService } from '../../solid-data/solid-task-hydration.service';
 
 @Injectable({ providedIn: 'root' })
 export class DataInitService {
@@ -16,6 +17,7 @@ export class DataInitService {
   private _userProfileService = inject(UserProfileService);
   private _operationLogHydratorService = inject(OperationLogHydratorService);
   private _solidStartupService = inject(SolidStartupService);
+  private _solidTaskHydrationService = inject(SolidTaskHydrationService);
 
   private _isAllDataLoadedInitially$: Observable<boolean> = from(this.reInit()).pipe(
     mapTo(true),
@@ -50,7 +52,12 @@ export class DataInitService {
       await this._userProfileService.initialize();
     }
 
-    await this._solidStartupService.bootIfEnabled();
+    const solidAuthState = await this._solidStartupService.bootIfEnabled();
+
+    if (solidAuthState?.status === 'authenticated') {
+      await this._solidTaskHydrationService.hydrateStore();
+      return;
+    }
 
     // Hydrate from Operation Log (which handles migration from legacy if needed)
     await this._operationLogHydratorService.hydrateStore();
