@@ -42,11 +42,17 @@ export class SolidTaskRepository {
       return solidThingToTask(created);
     }
 
-    const updated = await this.solidRuntime.client.things.update(
+    const plan = this.solidRuntime.client.writes.planUpdate(
       existingThing.uri,
       taskToSolidChanges(task),
     );
-    return solidThingToTask(updated);
+    const commit = await this.solidRuntime.client.writes.commit(plan);
+
+    if (commit.kind !== 'thing.update') {
+      throw new Error(`Expected Solid task update commit, received ${commit.kind}`);
+    }
+
+    return solidThingToTask(commit.result);
   }
 
   async deleteTask(taskId: string): Promise<void> {

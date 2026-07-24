@@ -11,25 +11,23 @@ Rules for this integration:
 
 ## Open Gaps
 
-### Deterministic Thing URIs
-
-- Found while mapping Super Productivity tasks to Solid Things.
-- `CreateThingInput` supports a target container but does not expose an explicit Thing URI/resource name for the RDF subject.
-- Super Productivity entities already have stable ids that should ideally produce stable, inspectable pod URLs such as `/super-productivity/tasks/<task-id>`.
-- Current local approach: store the Super Productivity id as an RDF fact and query by that id before update/delete.
-- Impact: task resources are Solid-native, but their pod URL is runtime-generated rather than app-deterministic.
-
-### Replace Semantics For RDF Properties
-
-- Found while designing task updates.
-- The public `things.update()` API accepts `properties` and `links`, and the runtime writes those facts, but there is no public API for "replace this predicate's current values with these values" or "delete this predicate value".
-- Super Productivity task updates need replacement semantics for fields such as `title`, `isDone`, `timeEstimate`, planned dates, tags, and subtask ordering.
-- Current local approach: keep update calls going through `things.update()` and avoid writing local Solid/SPARQL patch code in this fork.
-- Impact: create/read/delete can be Solid-native immediately; production-safe updates need runtime-level replace/delete support or a runtime-provided write profile for replacement.
-
 ### Local File Dependency Bundling
 
 - Found while running Angular/Karma bundling against the app that imports `@solid-intents/runtime` from `file:../solid-runtime/packages/runtime`.
 - The local runtime package exposes its dependency list, but Angular's bundler failed to resolve runtime imports such as `n3`, `soukai`, `soukai-solid`, `rdf-validate-shacl`, and Inrupt packages from the symlinked package.
 - Current local approach: declare the runtime's dependencies explicitly in this app package so the app can bundle the runtime.
-- Impact: app builds can proceed, but consumers of the local runtime need extra dependency declarations that a published package may not require.
+- Impact: this appears to be a local `file:` development bundler workaround, not an intended runtime consumer contract for a published package.
+
+## Resolved By Runtime
+
+### Deterministic Thing Resource Names
+
+- Found while mapping Super Productivity tasks to Solid Things.
+- Runtime now supports `target.resourceName`, so Super Productivity can create task resources from stable app ids while still storing the stable id as an RDF property and querying by it.
+- App integration: task creates pass `resourceName: task.id` through `@solid-intents/runtime`.
+
+### Replace Semantics For RDF Properties
+
+- Found while designing task updates.
+- Runtime now supports `replaceProperties`, `replaceLinks`, `deleteProperties`, and `deleteLinks` on `things.update()`, plus planned update writes via `runtime.writes.planUpdate(uri, changes)`.
+- App integration: task updates use `replaceProperties` for scalar/set replacement and `deleteProperties` with empty arrays for optional values that have been cleared.

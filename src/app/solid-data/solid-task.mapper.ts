@@ -16,6 +16,7 @@ import {
 } from '../features/tasks/task.model';
 import {
   RDF_JSON_DATATYPE,
+  SOLID_PRODUCTIVITY_TASKS_CONTAINER,
   SOLID_PRODUCTIVITY_TASK_TYPE,
   SP_TASK,
 } from './solid-productivity-vocab';
@@ -25,6 +26,10 @@ export const taskToSolidCreateInput = (
   profile: ThingWriteProfile,
 ): CreateThingInput => ({
   profile,
+  target: {
+    containerUri: profile.target?.containerUri ?? SOLID_PRODUCTIVITY_TASKS_CONTAINER,
+    resourceName: task.id,
+  },
   title: task.title,
   facets: {
     title: task.title,
@@ -36,10 +41,20 @@ export const taskToSolidCreateInput = (
 export const taskToSolidChanges = (task: Task): ThingChanges => ({
   title: task.title,
   status: task.isDone ? 'done' : 'open',
-  properties: taskToSolidProperties(task),
+  replaceProperties: taskToSolidReplacementProperties(task),
+  deleteProperties: taskToSolidDeleteProperties(task),
 });
 
-export const taskToSolidProperties = (task: Task): ThingRdfPropertyInput => {
+export const taskToSolidProperties = (task: Task): ThingRdfPropertyInput =>
+  buildTaskSolidProperties(task, { includeEmptyArrays: false });
+
+const taskToSolidReplacementProperties = (task: Task): ThingRdfPropertyInput =>
+  buildTaskSolidProperties(task, { includeEmptyArrays: true });
+
+const buildTaskSolidProperties = (
+  task: Task,
+  options: { includeEmptyArrays: boolean },
+): ThingRdfPropertyInput => {
   const properties: Record<string, readonly ThingRdfPropertyValue[]> = {};
 
   addLiteral(properties, SP_TASK.id, task.id);
@@ -48,8 +63,12 @@ export const taskToSolidProperties = (task: Task): ThingRdfPropertyInput => {
   addLiteral(properties, SP_TASK.created, task.created);
   addLiteral(properties, SP_TASK.timeSpent, task.timeSpent);
   addLiteral(properties, SP_TASK.timeEstimate, task.timeEstimate);
-  addArray(properties, SP_TASK.subTaskId, task.subTaskIds);
-  addArray(properties, SP_TASK.tagId, task.tagIds);
+  addArray(properties, SP_TASK.subTaskId, task.subTaskIds, {
+    includeEmpty: options.includeEmptyArrays,
+  });
+  addArray(properties, SP_TASK.tagId, task.tagIds, {
+    includeEmpty: options.includeEmptyArrays,
+  });
   addJson(properties, SP_TASK.attachments, task.attachments);
   addJson(properties, SP_TASK.timeSpentOnDay, task.timeSpentOnDay);
 
@@ -75,6 +94,39 @@ export const taskToSolidProperties = (task: Task): ThingRdfPropertyInput => {
   addOptionalLiteral(properties, SP_TASK.issuePoints, task.issuePoints);
   addOptionalJson(properties, SP_TASK.issueTimeTracked, task.issueTimeTracked);
   addOptionalJson(properties, SP_TASK.issueLastSyncedValues, task.issueLastSyncedValues);
+
+  return properties;
+};
+
+const taskToSolidDeleteProperties = (task: Task): ThingRdfPropertyInput => {
+  const properties: Record<string, readonly ThingRdfPropertyValue[]> = {};
+
+  deleteAbsentLiteral(properties, SP_TASK.modified, task.modified);
+  deleteAbsentLiteral(properties, SP_TASK.doneOn, task.doneOn);
+  deleteAbsentLiteral(properties, SP_TASK.parentId, task.parentId);
+  deleteAbsentLiteral(properties, SP_TASK.dueWithTime, task.dueWithTime);
+  deleteAbsentLiteral(properties, SP_TASK.dueDay, task.dueDay);
+  deleteAbsentLiteral(properties, SP_TASK.hasPlannedTime, task.hasPlannedTime);
+  deleteAbsentLiteral(properties, SP_TASK.deadlineDay, task.deadlineDay);
+  deleteAbsentLiteral(properties, SP_TASK.deadlineWithTime, task.deadlineWithTime);
+  deleteAbsentLiteral(properties, SP_TASK.deadlineRemindAt, task.deadlineRemindAt);
+  deleteAbsentLiteral(properties, SP_TASK.remindAt, task.remindAt);
+  deleteAbsentLiteral(properties, SP_TASK.reminderId, task.reminderId);
+  deleteAbsentLiteral(properties, SP_TASK.repeatCfgId, task.repeatCfgId);
+  deleteAbsentLiteral(properties, SP_TASK.hideSubTasksMode, task._hideSubTasksMode);
+  deleteAbsentLiteral(properties, SP_TASK.issueId, task.issueId);
+  deleteAbsentLiteral(properties, SP_TASK.issueProviderId, task.issueProviderId);
+  deleteAbsentLiteral(properties, SP_TASK.issueType, task.issueType);
+  deleteAbsentLiteral(properties, SP_TASK.issueWasUpdated, task.issueWasUpdated);
+  deleteAbsentLiteral(properties, SP_TASK.issueLastUpdated, task.issueLastUpdated);
+  deleteAbsentLiteral(properties, SP_TASK.issueAttachmentNr, task.issueAttachmentNr);
+  deleteAbsentLiteral(properties, SP_TASK.issueTimeTracked, task.issueTimeTracked);
+  deleteAbsentLiteral(properties, SP_TASK.issuePoints, task.issuePoints);
+  deleteAbsentLiteral(
+    properties,
+    SP_TASK.issueLastSyncedValues,
+    task.issueLastSyncedValues,
+  );
 
   return properties;
 };
@@ -153,8 +205,9 @@ const addArray = (
   properties: Record<string, readonly ThingRdfPropertyValue[]>,
   predicate: string,
   values: readonly string[],
+  options: { includeEmpty?: boolean } = {},
 ): void => {
-  if (values.length > 0) {
+  if (values.length > 0 || options.includeEmpty === true) {
     properties[predicate] = values;
   }
 };
@@ -178,6 +231,16 @@ const addOptionalJson = (
 ): void => {
   if (value !== null && value !== undefined) {
     addJson(properties, predicate, value);
+  }
+};
+
+const deleteAbsentLiteral = (
+  properties: Record<string, readonly ThingRdfPropertyValue[]>,
+  predicate: string,
+  value: unknown,
+): void => {
+  if (value === null || value === undefined) {
+    properties[predicate] = [];
   }
 };
 

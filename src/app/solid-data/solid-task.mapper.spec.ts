@@ -1,7 +1,11 @@
 import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { SP_TASK } from './solid-productivity-vocab';
-import { solidThingToTask, taskToSolidCreateInput } from './solid-task.mapper';
+import {
+  solidThingToTask,
+  taskToSolidChanges,
+  taskToSolidCreateInput,
+} from './solid-task.mapper';
 
 describe('solidTask.mapper', () => {
   const today = '2026-07-24';
@@ -33,9 +37,30 @@ describe('solidTask.mapper', () => {
     });
 
     expect(input.title).toBe(task.title);
+    expect(input.target).toEqual({
+      containerUri: 'https://pod.example/super-productivity/tasks/',
+      resourceName: 'task-1',
+    });
     expect(input.facets?.status).toBe('done');
     expect(input.properties?.[SP_TASK.id]).toEqual(['task-1']);
     expect(input.properties?.[SP_TASK.tagId]).toEqual(['tag-1', 'tag-2']);
+  });
+
+  it('maps task updates to replacement and deletion RDF changes', () => {
+    const changes = taskToSolidChanges({
+      ...task,
+      subTaskIds: [],
+      tagIds: [],
+      dueDay: undefined,
+      reminderId: null,
+    });
+
+    expect(changes.properties).toBeUndefined();
+    expect(changes.replaceProperties?.[SP_TASK.id]).toEqual(['task-1']);
+    expect(changes.replaceProperties?.[SP_TASK.subTaskId]).toEqual([]);
+    expect(changes.replaceProperties?.[SP_TASK.tagId]).toEqual([]);
+    expect(changes.deleteProperties?.[SP_TASK.dueDay]).toEqual([]);
+    expect(changes.deleteProperties?.[SP_TASK.reminderId]).toEqual([]);
   });
 
   it('round-trips the core task fields through RDF properties', () => {
