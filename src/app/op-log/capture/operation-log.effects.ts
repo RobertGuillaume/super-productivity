@@ -38,6 +38,7 @@ import {
 } from './operation-capture.meta-reducer';
 import { ClientIdService } from '../../core/util/client-id.service';
 import { SuperSyncStatusService } from '../sync/super-sync-status.service';
+import { SolidDataLayerStateService } from '../../solid-data/solid-data-layer-state.service';
 
 interface WriteOperationOptions {
   callerHoldsOperationLogLock?: boolean;
@@ -92,6 +93,7 @@ export class OperationLogEffects implements DeferredLocalActionsPort {
   private operationCaptureService = inject(OperationCaptureService);
   private immediateUploadService = inject(ImmediateUploadService);
   private superSyncStatusService = inject(SuperSyncStatusService);
+  private solidDataLayerState = inject(SolidDataLayerStateService);
 
   /**
    * Effect that persists local user actions to the operation log.
@@ -118,7 +120,8 @@ export class OperationLogEffects implements DeferredLocalActionsPort {
           (action): action is PersistentAction =>
             isPersistentAction(action) &&
             !action.meta.isRemote &&
-            !isDeferredAction(action),
+            !isDeferredAction(action) &&
+            !this.solidDataLayerState.ownsPersistentAction(action),
         ),
         // concatMap for sequential, ordered processing (one write at a time).
         concatMap((action) => this.writeOperationFromEffect(action)),
