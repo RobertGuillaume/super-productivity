@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
-import { OpType } from '../op-log/core/operation.types';
+import { ActionType, OpType } from '../op-log/core/operation.types';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { WorkContextType } from '../features/work-context/work-context.model';
@@ -48,7 +48,7 @@ describe('SolidDataLayerStateService', () => {
     expect(service.isActive()).toBe(true);
   });
 
-  it('owns task create actions only while active', () => {
+  it('owns Solid-backed task write actions only while active', () => {
     const service = TestBed.inject(SolidDataLayerStateService);
     const task: Task = {
       ...DEFAULT_TASK,
@@ -85,12 +85,22 @@ describe('SolidDataLayerStateService', () => {
     expect(
       service.ownsPersistentAction({
         ...action,
-        type: '[Task Shared] updateTask',
+        type: ActionType.TASK_SHARED_UPDATE,
         meta: {
           ...action.meta,
           opType: OpType.Update,
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: ActionType.TASK_SHARED_UPDATE_MULTIPLE,
+        meta: {
+          ...action.meta,
+          opType: OpType.Update,
+        },
+      }),
+    ).toBe(true);
   });
 });

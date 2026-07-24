@@ -9,6 +9,8 @@ export class SolidDataLayerStateService {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly solidOwnedActionTypes = new Set<string>([
     ActionType.TASK_SHARED_ADD,
+    ActionType.TASK_SHARED_UPDATE,
+    ActionType.TASK_SHARED_UPDATE_MULTIPLE,
     ActionType.TASK_SHARED_DELETE,
     ActionType.TASK_SHARED_DELETE_MULTIPLE,
   ]);

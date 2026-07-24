@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { Action } from '@ngrx/store';
-import { Subject } from 'rxjs';
+import { Action, Store } from '@ngrx/store';
+import { of, Subject } from 'rxjs';
 import { SnackService } from '../core/snack/snack.service';
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
+import { selectTasksById } from '../features/tasks/store/task.selectors';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { ALL_ACTIONS } from '../util/local-actions.token';
@@ -16,6 +17,7 @@ describe('SolidTaskPersistenceEffects', () => {
   let solidDataLayerState: jasmine.SpyObj<SolidDataLayerStateService>;
   let solidTaskRepository: jasmine.SpyObj<SolidTaskRepository>;
   let snackService: jasmine.SpyObj<SnackService>;
+  let store: jasmine.SpyObj<Store>;
   const task: Task = {
     ...DEFAULT_TASK,
     id: 'task-1',
@@ -35,6 +37,7 @@ describe('SolidTaskPersistenceEffects', () => {
       ['deleteTask', 'saveTask'],
     );
     snackService = jasmine.createSpyObj<SnackService>('SnackService', ['open']);
+    store = jasmine.createSpyObj<Store>('Store', ['select']);
 
     TestBed.configureTestingModule({
       providers: [
@@ -43,6 +46,7 @@ describe('SolidTaskPersistenceEffects', () => {
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidTaskRepository, useValue: solidTaskRepository },
         { provide: SnackService, useValue: snackService },
+        { provide: Store, useValue: store },
       ],
     });
   });
@@ -75,6 +79,85 @@ describe('SolidTaskPersistenceEffects', () => {
     await Promise.resolve();
 
     expect(solidTaskRepository.saveTask).not.toHaveBeenCalled();
+    subscription.unsubscribe();
+  });
+
+  it('persists task updates to Solid with the full post-reducer task', async () => {
+    const updatedTask: Task = {
+      ...task,
+      title: 'Updated in store',
+    };
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidTaskRepository.saveTask.and.resolveTo(updatedTask);
+    store.select.and.returnValue(of([updatedTask]));
+    const effects = TestBed.inject(SolidTaskPersistenceEffects);
+    const subscription = effects.persistTaskUpdate$.subscribe();
+
+    actions$.next(
+      TaskSharedActions.updateTask({
+        task: {
+          id: task.id,
+          changes: {
+            title: updatedTask.title,
+          },
+        },
+      }),
+    );
+    await Promise.resolve();
+
+    expect(store.select).toHaveBeenCalledTimes(1);
+    expect(store.select.calls.mostRecent().args as unknown[]).toEqual([
+      selectTasksById,
+      {
+        ids: ['task-1'],
+      },
+    ]);
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(updatedTask);
+    subscription.unsubscribe();
+  });
+
+  it('persists bulk task updates to Solid', async () => {
+    const secondTask: Task = {
+      ...task,
+      id: 'task-2',
+      title: 'Second task',
+    };
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidTaskRepository.saveTask.and.resolveTo(task);
+    store.select.and.returnValue(of([task, secondTask]));
+    const effects = TestBed.inject(SolidTaskPersistenceEffects);
+    const subscription = effects.persistTaskUpdate$.subscribe();
+
+    actions$.next(
+      TaskSharedActions.updateTasks({
+        tasks: [
+          {
+            id: 'task-1',
+            changes: {
+              isDone: true,
+            },
+          },
+          {
+            id: 'task-2',
+            changes: {
+              title: 'Second task',
+            },
+          },
+        ],
+      }),
+    );
+    await Promise.resolve();
+
+    expect(store.select).toHaveBeenCalledTimes(1);
+    expect(store.select.calls.mostRecent().args as unknown[]).toEqual([
+      selectTasksById,
+      {
+        ids: ['task-1', 'task-2'],
+      },
+    ]);
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledWith(task);
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledWith(secondTask);
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledTimes(2);
     subscription.unsubscribe();
   });
 
