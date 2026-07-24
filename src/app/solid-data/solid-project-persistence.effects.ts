@@ -22,6 +22,12 @@ import { ActionType } from '../op-log/core/operation.types';
 import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import {
+  isSolidProjectTaskOrderAction,
+  projectIdForSolidProjectTaskOrderAction,
+  SolidProjectTaskOrderAction,
+  SOLID_PROJECT_TASK_ORDER_ACTION_TYPES,
+} from './solid-project-task-order-action-types';
 import { SolidProjectRepository } from './solid-project.repository';
 
 type SolidProjectUpdateAction =
@@ -31,7 +37,8 @@ type SolidProjectUpdateAction =
   | ReturnType<typeof unarchiveProject>
   | ReturnType<typeof completeProject>
   | ReturnType<typeof reopenProject>
-  | ReturnType<typeof toggleHideFromMenu>;
+  | ReturnType<typeof toggleHideFromMenu>
+  | SolidProjectTaskOrderAction;
 
 @Injectable()
 export class SolidProjectPersistenceEffects {
@@ -93,6 +100,10 @@ export class SolidProjectPersistenceEffects {
       return action.projectId;
     }
 
+    if (isSolidProjectTaskOrderAction(action)) {
+      return projectIdForSolidProjectTaskOrderAction(action);
+    }
+
     return action.id;
   }
 
@@ -123,6 +134,7 @@ const SOLID_PROJECT_UPDATE_ACTION_TYPES = new Set<string>([
   ActionType.PROJECT_COMPLETE,
   ActionType.PROJECT_REOPEN,
   ActionType.PROJECT_TOGGLE_HIDE,
+  ...SOLID_PROJECT_TASK_ORDER_ACTION_TYPES,
 ]);
 
 const isSolidProjectUpdateAction = (

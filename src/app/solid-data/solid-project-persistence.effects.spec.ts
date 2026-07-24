@@ -7,6 +7,8 @@ import { Project } from '../features/project/project.model';
 import {
   addProject,
   archiveProject,
+  moveProjectTaskToBacklogList,
+  moveProjectTaskToRegularListAuto,
   updateProject,
 } from '../features/project/store/project.actions';
 import { selectProjectById } from '../features/project/store/project.selectors';
@@ -139,6 +141,68 @@ describe('SolidProjectPersistenceEffects', () => {
       },
     ]);
     expect(solidProjectRepository.saveProject).toHaveBeenCalledOnceWith(archivedProject);
+    subscription.unsubscribe();
+  });
+
+  it('persists project task-list moves with the full post-reducer project', async () => {
+    const movedProject: Project = {
+      ...project,
+      taskIds: ['task-2'],
+      backlogTaskIds: ['task-1'],
+    };
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidProjectRepository.saveProject.and.resolveTo(movedProject);
+    store.select.and.returnValue(of(movedProject));
+    const effects = TestBed.inject(SolidProjectPersistenceEffects);
+    const subscription = effects.persistProjectUpdate$.subscribe();
+
+    actions$.next(
+      moveProjectTaskToBacklogList({
+        taskId: 'task-1',
+        afterTaskId: null,
+        workContextId: 'project-1',
+      }),
+    );
+    await Promise.resolve();
+
+    expect(store.select.calls.mostRecent().args as unknown[]).toEqual([
+      selectProjectById,
+      {
+        id: 'project-1',
+      },
+    ]);
+    expect(solidProjectRepository.saveProject).toHaveBeenCalledOnceWith(movedProject);
+    subscription.unsubscribe();
+  });
+
+  it('persists auto project task-list moves by project id', async () => {
+    const movedProject: Project = {
+      ...project,
+      taskIds: ['task-1', 'task-2'],
+      backlogTaskIds: [],
+    };
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidProjectRepository.saveProject.and.resolveTo(movedProject);
+    store.select.and.returnValue(of(movedProject));
+    const effects = TestBed.inject(SolidProjectPersistenceEffects);
+    const subscription = effects.persistProjectUpdate$.subscribe();
+
+    actions$.next(
+      moveProjectTaskToRegularListAuto({
+        taskId: 'task-1',
+        projectId: 'project-1',
+        isMoveToTop: true,
+      }),
+    );
+    await Promise.resolve();
+
+    expect(store.select.calls.mostRecent().args as unknown[]).toEqual([
+      selectProjectById,
+      {
+        id: 'project-1',
+      },
+    ]);
+    expect(solidProjectRepository.saveProject).toHaveBeenCalledOnceWith(movedProject);
     subscription.unsubscribe();
   });
 });

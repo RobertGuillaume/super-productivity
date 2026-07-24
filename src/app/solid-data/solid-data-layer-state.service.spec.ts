@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
 import { ActionType, OpType } from '../op-log/core/operation.types';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
+import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { moveTaskInTodayList } from '../features/work-context/store/work-context-meta.actions';
@@ -244,6 +245,15 @@ describe('SolidDataLayerStateService', () => {
           workContextId: 'project-1',
           src: 'UNDONE',
           target: 'UNDONE',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        moveProjectTaskToBacklogList({
+          taskId: 'task-1',
+          afterTaskId: null,
+          workContextId: 'project-1',
         }) as PersistentAction,
       ),
     ).toBe(true);
