@@ -2,7 +2,9 @@ import type { RuntimeLayoutInput } from '@solid-intents/runtime';
 
 export const SOLID_PRODUCTIVITY_NS = 'https://super-productivity.com/ns#';
 export const SOLID_PRODUCTIVITY_TASK_TYPE = 'SuperProductivityTask';
+export const SOLID_PRODUCTIVITY_PROJECT_TYPE = 'SuperProductivityProject';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
+export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -10,11 +12,17 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
   namespace: SOLID_PRODUCTIVITY_NS,
   containers: {
     tasks: SOLID_PRODUCTIVITY_TASKS_CONTAINER,
+    projects: SOLID_PRODUCTIVITY_PROJECTS_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}Task`,
       container: 'tasks',
+      defaultStatus: 'open',
+    },
+    [SOLID_PRODUCTIVITY_PROJECT_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}Project`,
+      container: 'projects',
       defaultStatus: 'open',
     },
   },
@@ -53,4 +61,24 @@ export const SP_TASK = {
   issueTimeTracked: `${SOLID_PRODUCTIVITY_NS}issueTimeTracked`,
   issuePoints: `${SOLID_PRODUCTIVITY_NS}issuePoints`,
   issueLastSyncedValues: `${SOLID_PRODUCTIVITY_NS}issueLastSyncedValues`,
+} as const;
+
+export const SP_PROJECT = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  title: `${SOLID_PRODUCTIVITY_NS}title`,
+  isArchived: `${SOLID_PRODUCTIVITY_NS}isArchived`,
+  isDone: `${SOLID_PRODUCTIVITY_NS}isDone`,
+  doneOn: `${SOLID_PRODUCTIVITY_NS}doneOn`,
+  isHiddenFromMenu: `${SOLID_PRODUCTIVITY_NS}isHiddenFromMenu`,
+  isEnableBacklog: `${SOLID_PRODUCTIVITY_NS}isEnableBacklog`,
+  taskId: `${SOLID_PRODUCTIVITY_NS}taskId`,
+  backlogTaskId: `${SOLID_PRODUCTIVITY_NS}backlogTaskId`,
+  noteId: `${SOLID_PRODUCTIVITY_NS}noteId`,
+  theme: `${SOLID_PRODUCTIVITY_NS}theme`,
+  advancedCfg: `${SOLID_PRODUCTIVITY_NS}advancedCfg`,
+  issueIntegrationCfgs: `${SOLID_PRODUCTIVITY_NS}issueIntegrationCfgs`,
+  icon: `${SOLID_PRODUCTIVITY_NS}icon`,
+  created: `${SOLID_PRODUCTIVITY_NS}created`,
+  updated: `${SOLID_PRODUCTIVITY_NS}updated`,
+  folderId: `${SOLID_PRODUCTIVITY_NS}folderId`,
 } as const;

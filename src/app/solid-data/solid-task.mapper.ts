@@ -1,11 +1,8 @@
 import type {
   CreateThingInput,
-  RdfLiteralValue,
-  RdfValue,
   Thing,
   ThingChanges,
   ThingRdfPropertyInput,
-  ThingRdfPropertyValue,
   ThingWriteProfile,
 } from '@solid-intents/runtime';
 import {
@@ -15,11 +12,26 @@ import {
   TaskCopy,
 } from '../features/tasks/task.model';
 import {
-  RDF_JSON_DATATYPE,
   SOLID_PRODUCTIVITY_TASKS_CONTAINER,
   SOLID_PRODUCTIVITY_TASK_TYPE,
   SP_TASK,
 } from './solid-productivity-vocab';
+import {
+  addArray,
+  addJson,
+  addLiteral,
+  addOptionalJson,
+  addOptionalLiteral,
+  booleanProp,
+  deleteAbsentValue,
+  jsonProp,
+  numberOrNullProp,
+  numberProp,
+  SolidRdfPropertyMap,
+  stringArrayProp,
+  stringOrNullProp,
+  stringProp,
+} from './solid-rdf.mapper-helpers';
 
 export const taskToSolidCreateInput = (
   task: Task,
@@ -55,7 +67,7 @@ const buildTaskSolidProperties = (
   task: Task,
   options: { includeEmptyArrays: boolean },
 ): ThingRdfPropertyInput => {
-  const properties: Record<string, readonly ThingRdfPropertyValue[]> = {};
+  const properties: SolidRdfPropertyMap = {};
 
   addLiteral(properties, SP_TASK.id, task.id);
   addLiteral(properties, SP_TASK.projectId, task.projectId);
@@ -99,30 +111,30 @@ const buildTaskSolidProperties = (
 };
 
 const taskToSolidDeleteProperties = (task: Task): ThingRdfPropertyInput => {
-  const properties: Record<string, readonly ThingRdfPropertyValue[]> = {};
+  const properties: SolidRdfPropertyMap = {};
 
-  deleteAbsentLiteral(properties, SP_TASK.modified, task.modified);
-  deleteAbsentLiteral(properties, SP_TASK.doneOn, task.doneOn);
-  deleteAbsentLiteral(properties, SP_TASK.parentId, task.parentId);
-  deleteAbsentLiteral(properties, SP_TASK.dueWithTime, task.dueWithTime);
-  deleteAbsentLiteral(properties, SP_TASK.dueDay, task.dueDay);
-  deleteAbsentLiteral(properties, SP_TASK.hasPlannedTime, task.hasPlannedTime);
-  deleteAbsentLiteral(properties, SP_TASK.deadlineDay, task.deadlineDay);
-  deleteAbsentLiteral(properties, SP_TASK.deadlineWithTime, task.deadlineWithTime);
-  deleteAbsentLiteral(properties, SP_TASK.deadlineRemindAt, task.deadlineRemindAt);
-  deleteAbsentLiteral(properties, SP_TASK.remindAt, task.remindAt);
-  deleteAbsentLiteral(properties, SP_TASK.reminderId, task.reminderId);
-  deleteAbsentLiteral(properties, SP_TASK.repeatCfgId, task.repeatCfgId);
-  deleteAbsentLiteral(properties, SP_TASK.hideSubTasksMode, task._hideSubTasksMode);
-  deleteAbsentLiteral(properties, SP_TASK.issueId, task.issueId);
-  deleteAbsentLiteral(properties, SP_TASK.issueProviderId, task.issueProviderId);
-  deleteAbsentLiteral(properties, SP_TASK.issueType, task.issueType);
-  deleteAbsentLiteral(properties, SP_TASK.issueWasUpdated, task.issueWasUpdated);
-  deleteAbsentLiteral(properties, SP_TASK.issueLastUpdated, task.issueLastUpdated);
-  deleteAbsentLiteral(properties, SP_TASK.issueAttachmentNr, task.issueAttachmentNr);
-  deleteAbsentLiteral(properties, SP_TASK.issueTimeTracked, task.issueTimeTracked);
-  deleteAbsentLiteral(properties, SP_TASK.issuePoints, task.issuePoints);
-  deleteAbsentLiteral(
+  deleteAbsentValue(properties, SP_TASK.modified, task.modified);
+  deleteAbsentValue(properties, SP_TASK.doneOn, task.doneOn);
+  deleteAbsentValue(properties, SP_TASK.parentId, task.parentId);
+  deleteAbsentValue(properties, SP_TASK.dueWithTime, task.dueWithTime);
+  deleteAbsentValue(properties, SP_TASK.dueDay, task.dueDay);
+  deleteAbsentValue(properties, SP_TASK.hasPlannedTime, task.hasPlannedTime);
+  deleteAbsentValue(properties, SP_TASK.deadlineDay, task.deadlineDay);
+  deleteAbsentValue(properties, SP_TASK.deadlineWithTime, task.deadlineWithTime);
+  deleteAbsentValue(properties, SP_TASK.deadlineRemindAt, task.deadlineRemindAt);
+  deleteAbsentValue(properties, SP_TASK.remindAt, task.remindAt);
+  deleteAbsentValue(properties, SP_TASK.reminderId, task.reminderId);
+  deleteAbsentValue(properties, SP_TASK.repeatCfgId, task.repeatCfgId);
+  deleteAbsentValue(properties, SP_TASK.hideSubTasksMode, task._hideSubTasksMode);
+  deleteAbsentValue(properties, SP_TASK.issueId, task.issueId);
+  deleteAbsentValue(properties, SP_TASK.issueProviderId, task.issueProviderId);
+  deleteAbsentValue(properties, SP_TASK.issueType, task.issueType);
+  deleteAbsentValue(properties, SP_TASK.issueWasUpdated, task.issueWasUpdated);
+  deleteAbsentValue(properties, SP_TASK.issueLastUpdated, task.issueLastUpdated);
+  deleteAbsentValue(properties, SP_TASK.issueAttachmentNr, task.issueAttachmentNr);
+  deleteAbsentValue(properties, SP_TASK.issueTimeTracked, task.issueTimeTracked);
+  deleteAbsentValue(properties, SP_TASK.issuePoints, task.issuePoints);
+  deleteAbsentValue(
     properties,
     SP_TASK.issueLastSyncedValues,
     task.issueLastSyncedValues,
@@ -183,119 +195,6 @@ export const solidTaskQuery = {
   type: SOLID_PRODUCTIVITY_TASK_TYPE,
 } as const;
 
-const addLiteral = (
-  properties: Record<string, readonly ThingRdfPropertyValue[]>,
-  predicate: string,
-  value: ThingRdfPropertyValue,
-): void => {
-  properties[predicate] = [value];
-};
-
-const addOptionalLiteral = (
-  properties: Record<string, readonly ThingRdfPropertyValue[]>,
-  predicate: string,
-  value: ThingRdfPropertyValue | null | undefined,
-): void => {
-  if (value !== null && value !== undefined) {
-    addLiteral(properties, predicate, value);
-  }
-};
-
-const addArray = (
-  properties: Record<string, readonly ThingRdfPropertyValue[]>,
-  predicate: string,
-  values: readonly string[],
-  options: { includeEmpty?: boolean } = {},
-): void => {
-  if (values.length > 0 || options.includeEmpty === true) {
-    properties[predicate] = values;
-  }
-};
-
-const addJson = (
-  properties: Record<string, readonly ThingRdfPropertyValue[]>,
-  predicate: string,
-  value: unknown,
-): void => {
-  addLiteral(properties, predicate, {
-    kind: 'literal',
-    value: JSON.stringify(value),
-    datatype: RDF_JSON_DATATYPE,
-  });
-};
-
-const addOptionalJson = (
-  properties: Record<string, readonly ThingRdfPropertyValue[]>,
-  predicate: string,
-  value: unknown,
-): void => {
-  if (value !== null && value !== undefined) {
-    addJson(properties, predicate, value);
-  }
-};
-
-const deleteAbsentLiteral = (
-  properties: Record<string, readonly ThingRdfPropertyValue[]>,
-  predicate: string,
-  value: unknown,
-): void => {
-  if (value === null || value === undefined) {
-    properties[predicate] = [];
-  }
-};
-
-const literalProps = (thing: Thing, predicate: string): RdfLiteralValue[] =>
-  thing.property(predicate).filter(isLiteralValue);
-
-const stringProp = (thing: Thing, predicate: string): string | undefined => {
-  const value = literalProps(thing, predicate)[0]?.value;
-  return typeof value === 'string' ? value : undefined;
-};
-
-const stringOrNullProp = (thing: Thing, predicate: string): string | null | undefined => {
-  const value = stringProp(thing, predicate);
-  return value === undefined ? undefined : value;
-};
-
-const stringArrayProp = (thing: Thing, predicate: string): string[] =>
-  literalProps(thing, predicate)
-    .map((value) => value.value)
-    .filter((value): value is string => typeof value === 'string');
-
-const numberProp = (thing: Thing, predicate: string): number | undefined => {
-  const value = literalProps(thing, predicate)[0]?.value;
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  return undefined;
-};
-
-const numberOrNullProp = (thing: Thing, predicate: string): number | null | undefined => {
-  const value = numberProp(thing, predicate);
-  return value === undefined ? undefined : value;
-};
-
-const booleanProp = (thing: Thing, predicate: string): boolean | undefined => {
-  const value = literalProps(thing, predicate)[0]?.value;
-  if (typeof value === 'boolean') return value;
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  return undefined;
-};
-
-const jsonProp = <T>(thing: Thing, predicate: string): T | undefined => {
-  const raw = stringProp(thing, predicate);
-  if (raw === undefined) return undefined;
-
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return undefined;
-  }
-};
-
 const hideSubTasksModeProp = (
   thing: Thing,
   predicate: string,
@@ -305,6 +204,3 @@ const hideSubTasksModeProp = (
     ? value
     : undefined;
 };
-
-const isLiteralValue = (value: RdfValue): value is RdfLiteralValue =>
-  value.kind === 'literal';

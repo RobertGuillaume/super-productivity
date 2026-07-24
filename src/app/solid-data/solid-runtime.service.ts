@@ -7,6 +7,7 @@ import type {
 } from '@solid-intents/runtime';
 import {
   SOLID_PRODUCTIVITY_LAYOUT,
+  SOLID_PRODUCTIVITY_PROJECT_TYPE,
   SOLID_PRODUCTIVITY_TASK_TYPE,
 } from './solid-productivity-vocab';
 import { SOLID_RUNTIME } from './solid-runtime.token';
@@ -22,6 +23,10 @@ export class SolidRuntimeService {
 
   get taskProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_TASK_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_TASK_TYPE];
+  }
+
+  get projectProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_PROJECT_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_PROJECT_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
