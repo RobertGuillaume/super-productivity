@@ -2,11 +2,13 @@ import { TestBed } from '@angular/core/testing';
 import { Store } from '@ngrx/store';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { INBOX_PROJECT } from '../features/project/project.const';
+import { Project } from '../features/project/project.model';
 import { loadAllData } from '../root-store/meta/load-all-data.action';
 import {
-  createSolidTaskAppData,
+  createSolidAppData,
   SolidTaskHydrationService,
 } from './solid-task-hydration.service';
+import { SolidProjectRepository } from './solid-project.repository';
 import { SolidTaskRepository } from './solid-task.repository';
 
 describe('SolidTaskHydrationService', () => {
@@ -17,28 +19,45 @@ describe('SolidTaskHydrationService', () => {
     projectId: INBOX_PROJECT.id,
     created: 1710000000000,
   };
+  const project: Project = {
+    ...INBOX_PROJECT,
+    id: 'project-1',
+    title: 'Solid project',
+    taskIds: ['task-1'],
+  };
 
-  it('creates app data from Solid tasks and existing model defaults', () => {
-    const appData = createSolidTaskAppData([task]);
+  it('creates app data from Solid tasks, projects, and existing model defaults', () => {
+    const appData = createSolidAppData({
+      tasks: [task],
+      projects: [project],
+    });
 
     expect(appData.task.ids).toEqual(['task-1']);
     expect(appData.task.entities['task-1']).toEqual(task);
+    expect(appData.project.ids).toEqual([INBOX_PROJECT.id, 'project-1']);
     expect(appData.project.entities[INBOX_PROJECT.id]).toEqual(INBOX_PROJECT);
+    expect(appData.project.entities['project-1']).toEqual(project);
     expect(appData.reminders).toEqual([]);
   });
 
-  it('dispatches loadAllData with Solid task data', async () => {
+  it('dispatches loadAllData with Solid task and project data', async () => {
     const store = jasmine.createSpyObj<Store>('Store', ['dispatch']);
     const taskRepository = jasmine.createSpyObj<SolidTaskRepository>(
       'SolidTaskRepository',
       ['loadTasks'],
     );
+    const projectRepository = jasmine.createSpyObj<SolidProjectRepository>(
+      'SolidProjectRepository',
+      ['loadProjects'],
+    );
     taskRepository.loadTasks.and.resolveTo([task]);
+    projectRepository.loadProjects.and.resolveTo([project]);
 
     TestBed.configureTestingModule({
       providers: [
         { provide: Store, useValue: store },
         { provide: SolidTaskRepository, useValue: taskRepository },
+        { provide: SolidProjectRepository, useValue: projectRepository },
       ],
     });
 
@@ -52,5 +71,7 @@ describe('SolidTaskHydrationService', () => {
     expect(action.type).toBe(loadAllData.type);
     expect(action.appDataComplete.task.ids).toEqual(['task-1']);
     expect(action.appDataComplete.task.entities['task-1']).toEqual(task);
+    expect(action.appDataComplete.project.ids).toEqual([INBOX_PROJECT.id, 'project-1']);
+    expect(action.appDataComplete.project.entities['project-1']).toEqual(project);
   });
 });
