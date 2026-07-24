@@ -99,6 +99,7 @@ import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistenc
 import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
 import { SolidTagPersistenceEffects } from '../solid-data/solid-tag-persistence.effects';
 import { SolidTaskPersistenceEffects } from '../solid-data/solid-task-persistence.effects';
+import { SolidTodayPersistenceEffects } from '../solid-data/solid-today-persistence.effects';
 import { SolidWorkContextPersistenceEffects } from '../solid-data/solid-work-context-persistence.effects';
 import { IssueTwoWaySyncEffects } from '../features/issue/two-way-sync/issue-two-way-sync.effects';
 import {
@@ -123,6 +124,7 @@ import {
     EffectsModule.forFeature([SolidNotePersistenceEffects]),
     EffectsModule.forFeature([SolidAppStatePersistenceEffects]),
     EffectsModule.forFeature([SolidWorkContextPersistenceEffects]),
+    EffectsModule.forFeature([SolidTodayPersistenceEffects]),
 
     StoreModule.forFeature(appStateFeature),
     EffectsModule.forFeature([AppStateEffects]),

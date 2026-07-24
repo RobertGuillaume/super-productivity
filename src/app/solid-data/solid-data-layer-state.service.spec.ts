@@ -257,5 +257,14 @@ describe('SolidDataLayerStateService', () => {
         }) as PersistentAction,
       ),
     ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.planTasksForToday({
+          taskIds: ['task-1'],
+          today: '2026-07-24',
+          startOfNextDayDiffMs: 0,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
   });
 });
