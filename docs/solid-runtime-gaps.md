@@ -26,3 +26,10 @@ Rules for this integration:
 - Super Productivity task updates need replacement semantics for fields such as `title`, `isDone`, `timeEstimate`, planned dates, tags, and subtask ordering.
 - Current local approach: keep update calls going through `things.update()` and avoid writing local Solid/SPARQL patch code in this fork.
 - Impact: create/read/delete can be Solid-native immediately; production-safe updates need runtime-level replace/delete support or a runtime-provided write profile for replacement.
+
+### Local File Dependency Bundling
+
+- Found while running Angular/Karma bundling against the app that imports `@solid-intents/runtime` from `file:../solid-runtime/packages/runtime`.
+- The local runtime package exposes its dependency list, but Angular's bundler failed to resolve runtime imports such as `n3`, `soukai`, `soukai-solid`, `rdf-validate-shacl`, and Inrupt packages from the symlinked package.
+- Current local approach: declare the runtime's dependencies explicitly in this app package so the app can bundle the runtime.
+- Impact: app builds can proceed, but consumers of the local runtime need extra dependency declarations that a published package may not require.

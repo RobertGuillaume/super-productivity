@@ -7,6 +7,7 @@ import { DataInitStateService } from './data-init-state.service';
 import { UserProfileService } from '../../features/user-profile/user-profile.service';
 import { OperationLogHydratorService } from '../../op-log/persistence/operation-log-hydrator.service';
 import { OpLog } from '../log';
+import { SolidStartupService } from '../../solid-data/solid-startup.service';
 
 @Injectable({ providedIn: 'root' })
 export class DataInitService {
@@ -14,6 +15,7 @@ export class DataInitService {
   private _dataInitStateService = inject(DataInitStateService);
   private _userProfileService = inject(UserProfileService);
   private _operationLogHydratorService = inject(OperationLogHydratorService);
+  private _solidStartupService = inject(SolidStartupService);
 
   private _isAllDataLoadedInitially$: Observable<boolean> = from(this.reInit()).pipe(
     mapTo(true),
@@ -47,6 +49,8 @@ export class DataInitService {
       // Only initialize profile system if explicitly enabled
       await this._userProfileService.initialize();
     }
+
+    await this._solidStartupService.bootIfEnabled();
 
     // Hydrate from Operation Log (which handles migration from legacy if needed)
     await this._operationLogHydratorService.hydrateStore();
