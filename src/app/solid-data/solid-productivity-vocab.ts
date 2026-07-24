@@ -3,8 +3,10 @@ import type { RuntimeLayoutInput } from '@solid-intents/runtime';
 export const SOLID_PRODUCTIVITY_NS = 'https://super-productivity.com/ns#';
 export const SOLID_PRODUCTIVITY_TASK_TYPE = 'SuperProductivityTask';
 export const SOLID_PRODUCTIVITY_PROJECT_TYPE = 'SuperProductivityProject';
+export const SOLID_PRODUCTIVITY_TAG_TYPE = 'SuperProductivityTag';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
+export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -13,6 +15,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
   containers: {
     tasks: SOLID_PRODUCTIVITY_TASKS_CONTAINER,
     projects: SOLID_PRODUCTIVITY_PROJECTS_CONTAINER,
+    tags: SOLID_PRODUCTIVITY_TAGS_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -23,6 +26,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     [SOLID_PRODUCTIVITY_PROJECT_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}Project`,
       container: 'projects',
+      defaultStatus: 'open',
+    },
+    [SOLID_PRODUCTIVITY_TAG_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}Tag`,
+      container: 'tags',
       defaultStatus: 'open',
     },
   },
@@ -81,4 +89,16 @@ export const SP_PROJECT = {
   created: `${SOLID_PRODUCTIVITY_NS}created`,
   updated: `${SOLID_PRODUCTIVITY_NS}updated`,
   folderId: `${SOLID_PRODUCTIVITY_NS}folderId`,
+} as const;
+
+export const SP_TAG = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  title: `${SOLID_PRODUCTIVITY_NS}title`,
+  color: `${SOLID_PRODUCTIVITY_NS}color`,
+  created: `${SOLID_PRODUCTIVITY_NS}created`,
+  updated: `${SOLID_PRODUCTIVITY_NS}updated`,
+  taskId: `${SOLID_PRODUCTIVITY_NS}taskId`,
+  theme: `${SOLID_PRODUCTIVITY_NS}theme`,
+  advancedCfg: `${SOLID_PRODUCTIVITY_NS}advancedCfg`,
+  icon: `${SOLID_PRODUCTIVITY_NS}icon`,
 } as const;

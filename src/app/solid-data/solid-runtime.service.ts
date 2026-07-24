@@ -8,6 +8,7 @@ import type {
 import {
   SOLID_PRODUCTIVITY_LAYOUT,
   SOLID_PRODUCTIVITY_PROJECT_TYPE,
+  SOLID_PRODUCTIVITY_TAG_TYPE,
   SOLID_PRODUCTIVITY_TASK_TYPE,
 } from './solid-productivity-vocab';
 import { SOLID_RUNTIME } from './solid-runtime.token';
@@ -27,6 +28,10 @@ export class SolidRuntimeService {
 
   get projectProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_PROJECT_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_PROJECT_TYPE];
+  }
+
+  get tagProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_TAG_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_TAG_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
