@@ -48,7 +48,7 @@ describe('SolidDataLayerStateService', () => {
     expect(service.isActive()).toBe(true);
   });
 
-  it('owns Solid-backed task write actions only while active', () => {
+  it('owns Solid-backed write actions only while active', () => {
     const service = TestBed.inject(SolidDataLayerStateService);
     const task: Task = {
       ...DEFAULT_TASK,
@@ -98,6 +98,39 @@ describe('SolidDataLayerStateService', () => {
         type: ActionType.TASK_SHARED_UPDATE_MULTIPLE,
         meta: {
           ...action.meta,
+          opType: OpType.Update,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: ActionType.PROJECT_ADD,
+        meta: {
+          ...action.meta,
+          entityType: 'PROJECT',
+          opType: OpType.Create,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: ActionType.PROJECT_UPDATE,
+        meta: {
+          ...action.meta,
+          entityType: 'PROJECT',
+          opType: OpType.Update,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction({
+        ...action,
+        type: ActionType.PROJECT_ARCHIVE,
+        meta: {
+          ...action.meta,
+          entityType: 'PROJECT',
           opType: OpType.Update,
         },
       }),

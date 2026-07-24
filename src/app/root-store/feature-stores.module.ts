@@ -94,6 +94,7 @@ import { AppStateEffects } from './app-state/app-state.effects';
 import { appStateFeature } from './app-state/app-state.reducer';
 import { PluginHooksEffects } from '../plugins/plugin-hooks.effects';
 import { OperationLogEffects } from '../op-log/capture/operation-log.effects';
+import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
 import { SolidTaskPersistenceEffects } from '../solid-data/solid-task-persistence.effects';
 import { IssueTwoWaySyncEffects } from '../features/issue/two-way-sync/issue-two-way-sync.effects';
 import {
@@ -113,6 +114,7 @@ import {
   imports: [
     EffectsModule.forFeature([OperationLogEffects]),
     EffectsModule.forFeature([SolidTaskPersistenceEffects]),
+    EffectsModule.forFeature([SolidProjectPersistenceEffects]),
 
     StoreModule.forFeature(appStateFeature),
     EffectsModule.forFeature([AppStateEffects]),
