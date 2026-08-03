@@ -268,6 +268,25 @@ describe('SolidDataLayerStateService', () => {
       ),
     ).toBe(true);
     expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.applyShortSyntax({
+          task,
+          taskChanges: {
+            title: 'Updated',
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.batchUpdateForProject({
+          projectId: 'project-1',
+          operations: [],
+          createdTaskIds: {},
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
       service.ownsPersistentAction({
         ...action,
         type: ActionType.PROJECT_ADD,

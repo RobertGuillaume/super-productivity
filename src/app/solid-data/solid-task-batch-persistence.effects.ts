@@ -1,0 +1,113 @@
+import { inject, Injectable } from '@angular/core';
+import { createEffect } from '@ngrx/effects';
+import { Store } from '@ngrx/store';
+import { BatchTaskDelete } from '@super-productivity/plugin-api';
+import { EMPTY, forkJoin, from } from 'rxjs';
+import { catchError, concatMap, filter, take } from 'rxjs/operators';
+import { SnackService } from '../core/snack/snack.service';
+import { Log } from '../core/log';
+import { Project } from '../features/project/project.model';
+import { selectAllProjects } from '../features/project/store/project.selectors';
+import { Section } from '../features/section/section.model';
+import { selectAllSections } from '../features/section/store/section.selectors';
+import { Tag } from '../features/tag/tag.model';
+import { selectAllTags } from '../features/tag/store/tag.reducer';
+import { Task } from '../features/tasks/task.model';
+import { selectAllTasks } from '../features/tasks/store/task.selectors';
+import { PersistentAction } from '../op-log/core/persistent-action.interface';
+import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
+import { T } from '../t.const';
+import { ALL_ACTIONS } from '../util/local-actions.token';
+import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { SolidProjectRepository } from './solid-project.repository';
+import { SolidSectionRepository } from './solid-section.repository';
+import { SolidTagRepository } from './solid-tag.repository';
+import {
+  isSolidTaskBatchAction,
+  SolidTaskBatchAction,
+} from './solid-task-batch-action-types';
+import { SolidTaskRepository } from './solid-task.repository';
+
+@Injectable()
+export class SolidTaskBatchPersistenceEffects {
+  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly store = inject(Store);
+  private readonly solidDataLayerState = inject(SolidDataLayerStateService);
+  private readonly solidProjectRepository = inject(SolidProjectRepository);
+  private readonly solidSectionRepository = inject(SolidSectionRepository);
+  private readonly solidTagRepository = inject(SolidTagRepository);
+  private readonly solidTaskRepository = inject(SolidTaskRepository);
+  private readonly snackService = inject(SnackService);
+
+  persistTaskBatch$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        filter(
+          (action): action is SolidTaskBatchAction & PersistentAction =>
+            isSolidTaskBatchAction(action) &&
+            !(action as PersistentAction).meta?.isRemote,
+        ),
+        filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
+        concatMap((action) =>
+          forkJoin({
+            projects: this.store.select(selectAllProjects).pipe(take(1)),
+            sections: this.store.select(selectAllSections).pipe(take(1)),
+            tags: this.store.select(selectAllTags).pipe(take(1)),
+            tasks: this.store.select(selectAllTasks).pipe(take(1)),
+          }).pipe(
+            concatMap(({ projects, sections, tags, tasks }) =>
+              from(this.persistBatch(action, tasks, projects, tags, sections)),
+            ),
+            catchError((error) => this.handlePersistenceError(error)),
+          ),
+        ),
+      ),
+    { dispatch: false },
+  );
+
+  private async persistBatch(
+    action: SolidTaskBatchAction,
+    tasks: readonly Task[],
+    projects: readonly Project[],
+    tags: readonly Tag[],
+    sections: readonly Section[],
+  ): Promise<void> {
+    await Promise.all([
+      ...this.deletedTaskIdsForAction(action).map((taskId) =>
+        this.solidTaskRepository.deleteTask(taskId),
+      ),
+      ...tasks.map((task) => this.solidTaskRepository.saveTask(task)),
+      ...projects.map((project) => this.solidProjectRepository.saveProject(project)),
+      ...tags.map((tag) => this.solidTagRepository.saveTag(tag)),
+      ...sections.map((section) => this.solidSectionRepository.saveSection(section)),
+    ]);
+  }
+
+  private deletedTaskIdsForAction(action: SolidTaskBatchAction): string[] {
+    if (action.type !== TaskSharedActions.batchUpdateForProject.type) {
+      return [];
+    }
+
+    return action.operations
+      .filter((operation): operation is BatchTaskDelete => operation.type === 'delete')
+      .map((operation) => operation.taskId);
+  }
+
+  private handlePersistenceError(error: unknown): typeof EMPTY {
+    Log.err('SolidTaskBatchPersistenceEffects: failed to persist task batch mutation', {
+      name: (error as Error | undefined)?.name,
+    });
+    this.snackService.open({
+      type: 'ERROR',
+      msg: T.F.SYNC.S.PERSIST_FAILED,
+      actionStr: T.PS.RELOAD,
+      actionFn: (): void => {
+        window.location.reload();
+      },
+      config: {
+        duration: 0,
+      },
+    });
+    return EMPTY;
+  }
+}

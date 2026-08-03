@@ -6,6 +6,7 @@ import { SolidRuntimeService } from './solid-runtime.service';
 import { SOLID_PROJECT_DELETE_ACTION_TYPES } from './solid-project-delete-action-types';
 import { SOLID_PROJECT_TASK_ORDER_ACTION_TYPES } from './solid-project-task-order-action-types';
 import { SOLID_SECTION_ACTION_TYPES } from './solid-section-action-types';
+import { SOLID_TASK_BATCH_ACTION_TYPES } from './solid-task-batch-action-types';
 import { SOLID_TASK_TAG_ACTION_TYPES } from './solid-task-tag-action-types';
 import { SOLID_TASK_PROJECT_MOVE_ACTION_TYPES } from './solid-task-project-move-action-types';
 import { SOLID_TASK_SCHEDULING_ACTION_TYPES } from './solid-task-scheduling-action-types';
@@ -45,6 +46,7 @@ export class SolidDataLayerStateService {
     ...SOLID_PROJECT_DELETE_ACTION_TYPES,
     ...SOLID_PROJECT_TASK_ORDER_ACTION_TYPES,
     ...SOLID_SECTION_ACTION_TYPES,
+    ...SOLID_TASK_BATCH_ACTION_TYPES,
     ...SOLID_TASK_DEADLINE_ACTION_TYPES,
     ...SOLID_TASK_PROJECT_MOVE_ACTION_TYPES,
     ...SOLID_TASK_SCHEDULING_ACTION_TYPES,
