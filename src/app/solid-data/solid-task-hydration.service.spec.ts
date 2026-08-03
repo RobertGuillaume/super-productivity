@@ -4,8 +4,10 @@ import { Note } from '../features/note/note.model';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { Project } from '../features/project/project.model';
+import { Section } from '../features/section/section.model';
 import { DEFAULT_TAG, TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
+import { WorkContextType } from '../features/work-context/work-context.model';
 import { loadAllData } from '../root-store/meta/load-all-data.action';
 import { SOLID_APP_STATE_ID, SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
@@ -15,6 +17,7 @@ import {
 } from './solid-task-hydration.service';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidProjectRepository } from './solid-project.repository';
+import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
 
@@ -47,6 +50,14 @@ describe('SolidTaskHydrationService', () => {
     created: 1710000000200,
     modified: 1710000000300,
   };
+  const section: Section = {
+    id: 'section-1',
+    contextId: 'project-1',
+    contextType: WorkContextType.PROJECT,
+    title: 'Solid section',
+    isExpanded: true,
+    taskIds: ['task-1'],
+  };
   const appState: SolidAppState = {
     id: SOLID_APP_STATE_ID,
     projectOrder: ['project-2', 'project-1'],
@@ -61,6 +72,7 @@ describe('SolidTaskHydrationService', () => {
       projects: [project],
       tags: [tag],
       notes: [note],
+      sections: [section],
     });
 
     expect(appData.task.ids).toEqual(['task-1']);
@@ -74,6 +86,8 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.note.ids).toEqual(['note-1']);
     expect(appData.note.entities['note-1']).toEqual(note);
     expect(appData.note.todayOrder).toEqual(['note-1']);
+    expect(appData.section.ids).toEqual(['section-1']);
+    expect(appData.section.entities['section-1']).toEqual(section);
     expect(appData.reminders).toEqual([]);
   });
 
@@ -104,6 +118,7 @@ describe('SolidTaskHydrationService', () => {
       projects: [project, project3, project2],
       tags: [tag, tag2],
       notes: [note, note3, note2],
+      sections: [section],
       appState,
     });
 
@@ -115,9 +130,10 @@ describe('SolidTaskHydrationService', () => {
     ]);
     expect(appData.tag.ids).toEqual(['tag-2', TODAY_TAG.id, 'tag-1']);
     expect(appData.note.todayOrder).toEqual(['note-2', 'note-1', 'note-3']);
+    expect(appData.section.ids).toEqual(['section-1']);
   });
 
-  it('dispatches loadAllData with Solid task, project, tag, and note data', async () => {
+  it('dispatches loadAllData with Solid task, project, tag, note, and section data', async () => {
     const store = jasmine.createSpyObj<Store>('Store', ['dispatch']);
     const taskRepository = jasmine.createSpyObj<SolidTaskRepository>(
       'SolidTaskRepository',
@@ -134,6 +150,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidNoteRepository',
       ['loadNotes'],
     );
+    const sectionRepository = jasmine.createSpyObj<SolidSectionRepository>(
+      'SolidSectionRepository',
+      ['loadSections'],
+    );
     const appStateRepository = jasmine.createSpyObj<SolidAppStateRepository>(
       'SolidAppStateRepository',
       ['loadAppState'],
@@ -142,6 +162,7 @@ describe('SolidTaskHydrationService', () => {
     projectRepository.loadProjects.and.resolveTo([project]);
     tagRepository.loadTags.and.resolveTo([tag]);
     noteRepository.loadNotes.and.resolveTo([note]);
+    sectionRepository.loadSections.and.resolveTo([section]);
     appStateRepository.loadAppState.and.resolveTo(appState);
 
     TestBed.configureTestingModule({
@@ -151,6 +172,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidProjectRepository, useValue: projectRepository },
         { provide: SolidTagRepository, useValue: tagRepository },
         { provide: SolidNoteRepository, useValue: noteRepository },
+        { provide: SolidSectionRepository, useValue: sectionRepository },
         { provide: SolidAppStateRepository, useValue: appStateRepository },
       ],
     });
@@ -172,6 +194,9 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.note.ids).toEqual(['note-1']);
     expect(action.appDataComplete.note.entities['note-1']).toEqual(note);
     expect(action.appDataComplete.note.todayOrder).toEqual(['note-1']);
+    expect(action.appDataComplete.section.ids).toEqual(['section-1']);
+    expect(action.appDataComplete.section.entities['section-1']).toEqual(section);
+    expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
   });
 });

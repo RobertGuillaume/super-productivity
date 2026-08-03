@@ -6,11 +6,13 @@ export const SOLID_PRODUCTIVITY_PROJECT_TYPE = 'SuperProductivityProject';
 export const SOLID_PRODUCTIVITY_TAG_TYPE = 'SuperProductivityTag';
 export const SOLID_PRODUCTIVITY_NOTE_TYPE = 'SuperProductivityNote';
 export const SOLID_PRODUCTIVITY_APP_STATE_TYPE = 'SuperProductivityAppState';
+export const SOLID_PRODUCTIVITY_SECTION_TYPE = 'SuperProductivitySection';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
 export const SOLID_PRODUCTIVITY_NOTES_CONTAINER = 'super-productivity/notes';
 export const SOLID_PRODUCTIVITY_APP_CONTAINER = 'super-productivity/app';
+export const SOLID_PRODUCTIVITY_SECTIONS_CONTAINER = 'super-productivity/sections';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -22,6 +24,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     tags: SOLID_PRODUCTIVITY_TAGS_CONTAINER,
     notes: SOLID_PRODUCTIVITY_NOTES_CONTAINER,
     app: SOLID_PRODUCTIVITY_APP_CONTAINER,
+    sections: SOLID_PRODUCTIVITY_SECTIONS_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -48,6 +51,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
       classUri: `${SOLID_PRODUCTIVITY_NS}AppState`,
       container: 'app',
       defaultStatus: 'active',
+    },
+    [SOLID_PRODUCTIVITY_SECTION_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}Section`,
+      container: 'sections',
+      defaultStatus: 'open',
     },
   },
 } satisfies RuntimeLayoutInput;
@@ -137,4 +145,13 @@ export const SP_APP_STATE = {
   tagOrder: `${SOLID_PRODUCTIVITY_NS}tagOrder`,
   noteTodayOrder: `${SOLID_PRODUCTIVITY_NS}noteTodayOrder`,
   updated: `${SOLID_PRODUCTIVITY_NS}updated`,
+} as const;
+
+export const SP_SECTION = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  contextId: `${SOLID_PRODUCTIVITY_NS}contextId`,
+  contextType: `${SOLID_PRODUCTIVITY_NS}contextType`,
+  title: `${SOLID_PRODUCTIVITY_NS}title`,
+  isExpanded: `${SOLID_PRODUCTIVITY_NS}isExpanded`,
+  taskId: `${SOLID_PRODUCTIVITY_NS}taskId`,
 } as const;

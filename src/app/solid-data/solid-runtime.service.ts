@@ -10,6 +10,7 @@ import {
   SOLID_PRODUCTIVITY_APP_STATE_TYPE,
   SOLID_PRODUCTIVITY_NOTE_TYPE,
   SOLID_PRODUCTIVITY_PROJECT_TYPE,
+  SOLID_PRODUCTIVITY_SECTION_TYPE,
   SOLID_PRODUCTIVITY_TAG_TYPE,
   SOLID_PRODUCTIVITY_TASK_TYPE,
 } from './solid-productivity-vocab';
@@ -42,6 +43,10 @@ export class SolidRuntimeService {
 
   get appStateProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_APP_STATE_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_APP_STATE_TYPE];
+  }
+
+  get sectionProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_SECTION_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_SECTION_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
