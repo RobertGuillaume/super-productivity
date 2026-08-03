@@ -188,6 +188,18 @@ describe('SolidDataLayerStateService', () => {
       ),
     ).toBe(true);
     expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.moveToOtherProject({
+          task: {
+            ...task,
+            projectId: 'source-project',
+            subTasks: [],
+          },
+          targetProjectId: 'target-project',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
       service.ownsPersistentAction({
         ...action,
         type: ActionType.PROJECT_ADD,
