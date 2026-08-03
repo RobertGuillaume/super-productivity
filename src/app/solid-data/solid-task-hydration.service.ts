@@ -23,6 +23,9 @@ import {
   initialSectionState,
 } from '../features/section/store/section.reducer';
 import { Task } from '../features/tasks/task.model';
+import { TaskRepeatCfg } from '../features/task-repeat-cfg/task-repeat-cfg.model';
+import { initialTaskRepeatCfgState } from '../features/task-repeat-cfg/store/task-repeat-cfg.reducer';
+import { adapter as taskRepeatCfgAdapter } from '../features/task-repeat-cfg/store/task-repeat-cfg.selectors';
 import { initialTaskState } from '../features/tasks/store/task.reducer';
 import { taskAdapter } from '../features/tasks/store/task.adapter';
 import { TODAY_TAG } from '../features/tag/tag.const';
@@ -38,6 +41,7 @@ import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
+import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
 
 @Injectable({ providedIn: 'root' })
 export class SolidTaskHydrationService {
@@ -48,19 +52,29 @@ export class SolidTaskHydrationService {
   private readonly noteRepository = inject(SolidNoteRepository);
   private readonly issueProviderRepository = inject(SolidIssueProviderRepository);
   private readonly sectionRepository = inject(SolidSectionRepository);
+  private readonly taskRepeatCfgRepository = inject(SolidTaskRepeatCfgRepository);
   private readonly appStateRepository = inject(SolidAppStateRepository);
 
   async hydrateStore(): Promise<void> {
-    const [tasks, projects, tags, notes, sections, issueProviders, appState] =
-      await Promise.all([
-        this.taskRepository.loadTasks(),
-        this.projectRepository.loadProjects(),
-        this.tagRepository.loadTags(),
-        this.noteRepository.loadNotes(),
-        this.sectionRepository.loadSections(),
-        this.issueProviderRepository.loadIssueProviders(),
-        this.appStateRepository.loadAppState(),
-      ]);
+    const [
+      tasks,
+      projects,
+      tags,
+      notes,
+      sections,
+      issueProviders,
+      taskRepeatCfgs,
+      appState,
+    ] = await Promise.all([
+      this.taskRepository.loadTasks(),
+      this.projectRepository.loadProjects(),
+      this.tagRepository.loadTags(),
+      this.noteRepository.loadNotes(),
+      this.sectionRepository.loadSections(),
+      this.issueProviderRepository.loadIssueProviders(),
+      this.taskRepeatCfgRepository.loadTaskRepeatCfgs(),
+      this.appStateRepository.loadAppState(),
+    ]);
     const appDataComplete = createSolidAppData({
       tasks,
       projects,
@@ -68,6 +82,7 @@ export class SolidTaskHydrationService {
       notes,
       sections,
       issueProviders,
+      taskRepeatCfgs,
       appState,
     });
 
@@ -76,7 +91,8 @@ export class SolidTaskHydrationService {
       `Solid data layer hydrated task count: ${tasks.length}, ` +
         `project count: ${projects.length}, tag count: ${tags.length}, ` +
         `note count: ${notes.length}, section count: ${sections.length}, ` +
-        `issue provider count: ${issueProviders.length}`,
+        `issue provider count: ${issueProviders.length}, ` +
+        `repeat config count: ${taskRepeatCfgs.length}`,
     );
   }
 }
@@ -88,6 +104,7 @@ export const createSolidAppData = (input: {
   notes: readonly Note[];
   sections?: readonly Section[];
   issueProviders?: readonly IssueProvider[];
+  taskRepeatCfgs?: readonly TaskRepeatCfg[];
   appState?: SolidAppState | null;
 }): AppDataComplete => {
   const appDataComplete = Object.fromEntries(
@@ -117,6 +134,10 @@ export const createSolidAppData = (input: {
     issueProvider: issueProviderAdapter.setAll(
       [...(input.issueProviders ?? [])],
       issueProviderInitialState,
+    ),
+    taskRepeatCfg: taskRepeatCfgAdapter.setAll(
+      [...(input.taskRepeatCfgs ?? [])],
+      initialTaskRepeatCfgState,
     ),
   };
 };

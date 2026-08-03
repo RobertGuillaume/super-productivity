@@ -3,6 +3,10 @@ import { Store } from '@ngrx/store';
 import { Note } from '../features/note/note.model';
 import { IssueProvider } from '../features/issue/issue.model';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
+import {
+  DEFAULT_TASK_REPEAT_CFG,
+  TaskRepeatCfg,
+} from '../features/task-repeat-cfg/task-repeat-cfg.model';
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { Project } from '../features/project/project.model';
 import { Section } from '../features/section/section.model';
@@ -22,6 +26,7 @@ import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
+import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
 
 describe('SolidTaskHydrationService', () => {
   const task: Task = {
@@ -69,6 +74,13 @@ describe('SolidTaskHydrationService', () => {
       repo: 'owner/repo',
     },
   };
+  const taskRepeatCfg: TaskRepeatCfg = {
+    ...DEFAULT_TASK_REPEAT_CFG,
+    id: 'repeat-cfg-1',
+    projectId: 'project-1',
+    title: 'Repeat from Solid',
+    tagIds: ['tag-1'],
+  };
   const appState: SolidAppState = {
     id: SOLID_APP_STATE_ID,
     projectOrder: ['project-2', 'project-1'],
@@ -86,6 +98,7 @@ describe('SolidTaskHydrationService', () => {
       notes: [note],
       sections: [section],
       issueProviders: [issueProvider],
+      taskRepeatCfgs: [taskRepeatCfg],
     });
 
     expect(appData.task.ids).toEqual(['task-1']);
@@ -103,6 +116,8 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.section.entities['section-1']).toEqual(section);
     expect(appData.issueProvider.ids).toEqual(['issue-provider-1']);
     expect(appData.issueProvider.entities['issue-provider-1']).toEqual(issueProvider);
+    expect(appData.taskRepeatCfg.ids).toEqual(['repeat-cfg-1']);
+    expect(appData.taskRepeatCfg.entities['repeat-cfg-1']).toEqual(taskRepeatCfg);
     expect(appData.reminders).toEqual([]);
   });
 
@@ -181,6 +196,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidIssueProviderRepository',
       ['loadIssueProviders'],
     );
+    const taskRepeatCfgRepository = jasmine.createSpyObj<SolidTaskRepeatCfgRepository>(
+      'SolidTaskRepeatCfgRepository',
+      ['loadTaskRepeatCfgs'],
+    );
     const appStateRepository = jasmine.createSpyObj<SolidAppStateRepository>(
       'SolidAppStateRepository',
       ['loadAppState'],
@@ -191,6 +210,7 @@ describe('SolidTaskHydrationService', () => {
     noteRepository.loadNotes.and.resolveTo([note]);
     sectionRepository.loadSections.and.resolveTo([section]);
     issueProviderRepository.loadIssueProviders.and.resolveTo([issueProvider]);
+    taskRepeatCfgRepository.loadTaskRepeatCfgs.and.resolveTo([taskRepeatCfg]);
     appStateRepository.loadAppState.and.resolveTo(appState);
 
     TestBed.configureTestingModule({
@@ -202,6 +222,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidNoteRepository, useValue: noteRepository },
         { provide: SolidSectionRepository, useValue: sectionRepository },
         { provide: SolidIssueProviderRepository, useValue: issueProviderRepository },
+        { provide: SolidTaskRepeatCfgRepository, useValue: taskRepeatCfgRepository },
         { provide: SolidAppStateRepository, useValue: appStateRepository },
       ],
     });
@@ -229,8 +250,13 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.issueProvider.entities['issue-provider-1']).toEqual(
       issueProvider,
     );
+    expect(action.appDataComplete.taskRepeatCfg.ids).toEqual(['repeat-cfg-1']);
+    expect(action.appDataComplete.taskRepeatCfg.entities['repeat-cfg-1']).toEqual(
+      taskRepeatCfg,
+    );
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
+    expect(taskRepeatCfgRepository.loadTaskRepeatCfgs).toHaveBeenCalledTimes(1);
     expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
   });
 });

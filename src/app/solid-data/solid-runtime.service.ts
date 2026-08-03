@@ -14,6 +14,7 @@ import {
   SOLID_PRODUCTIVITY_SECTION_TYPE,
   SOLID_PRODUCTIVITY_TAG_TYPE,
   SOLID_PRODUCTIVITY_TASK_TYPE,
+  SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE,
 } from './solid-productivity-vocab';
 import { SOLID_RUNTIME } from './solid-runtime.token';
 
@@ -52,6 +53,10 @@ export class SolidRuntimeService {
 
   get issueProviderProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE];
+  }
+
+  get taskRepeatCfgProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
