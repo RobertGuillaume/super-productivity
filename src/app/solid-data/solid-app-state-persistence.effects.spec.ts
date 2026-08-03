@@ -69,6 +69,7 @@ describe('SolidAppStatePersistenceEffects', () => {
     solidAppStateRepository.saveAppStateOrder.and.resolveTo({
       id: 'super-productivity-app-state',
       projectOrder: ['project-2', 'project-1'],
+      sectionOrder: [],
       tagOrder: [],
       noteTodayOrder: [],
       updated: 1710000000000,
@@ -99,6 +100,7 @@ describe('SolidAppStatePersistenceEffects', () => {
     solidAppStateRepository.saveAppStateOrder.and.resolveTo({
       id: 'super-productivity-app-state',
       projectOrder: [],
+      sectionOrder: [],
       tagOrder: [TODAY_TAG.id, 'tag-2', 'tag-1'],
       noteTodayOrder: [],
       updated: 1710000000000,
@@ -133,6 +135,7 @@ describe('SolidAppStatePersistenceEffects', () => {
     solidAppStateRepository.saveAppStateOrder.and.resolveTo({
       id: 'super-productivity-app-state',
       projectOrder: [],
+      sectionOrder: [],
       tagOrder: [],
       noteTodayOrder: ['note-2', 'note-1'],
       updated: 1710000000000,

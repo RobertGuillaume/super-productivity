@@ -31,7 +31,9 @@ export class SolidAppStateRepository {
   }
 
   async saveAppStateOrder(
-    changes: Partial<Pick<SolidAppState, 'noteTodayOrder' | 'projectOrder' | 'tagOrder'>>,
+    changes: Partial<
+      Pick<SolidAppState, 'noteTodayOrder' | 'projectOrder' | 'sectionOrder' | 'tagOrder'>
+    >,
   ): Promise<SolidAppState> {
     const appContainerScope = this.appContainerScope();
 

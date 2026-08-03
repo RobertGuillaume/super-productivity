@@ -3,6 +3,14 @@ import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
 import { ActionType, OpType } from '../op-log/core/operation.types';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
+import {
+  addSection,
+  addTaskToSection,
+  deleteSection,
+  removeTaskFromSection,
+  updateSection,
+  updateSectionOrder,
+} from '../features/section/store/section.actions';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { moveTaskInTodayList } from '../features/work-context/store/work-context-meta.actions';
@@ -117,6 +125,66 @@ describe('SolidDataLayerStateService', () => {
         TaskSharedActions.removeTagsForAllTasks({
           tagIdsToRemove: ['tag-1'],
         }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        addSection({
+          section: {
+            id: 'section-1',
+            contextId: 'project-1',
+            contextType: WorkContextType.PROJECT,
+            title: 'Section',
+            isExpanded: true,
+            taskIds: ['task-1'],
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateSection({
+          section: {
+            id: 'section-1',
+            changes: {
+              title: 'Renamed',
+            },
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateSectionOrder({
+          contextId: 'project-1',
+          ids: ['section-2', 'section-1'],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        addTaskToSection({
+          sectionId: 'section-1',
+          taskId: 'task-1',
+          afterTaskId: null,
+          sourceSectionId: null,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        removeTaskFromSection({
+          sectionId: 'section-1',
+          taskId: 'task-1',
+          workContextId: 'project-1',
+          workContextType: WorkContextType.PROJECT,
+          workContextAfterTaskId: null,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        deleteSection({ id: 'section-1' }) as PersistentAction,
       ),
     ).toBe(true);
     expect(

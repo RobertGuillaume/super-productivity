@@ -15,6 +15,7 @@ describe('solidAppState.mapper', () => {
     projectOrder: ['project-2', 'project-1'],
     tagOrder: ['TODAY', 'tag-2', 'tag-1'],
     noteTodayOrder: ['note-2', 'note-1'],
+    sectionOrder: ['section-2', 'section-1'],
     updated: 1710000000000,
   };
 
@@ -37,6 +38,10 @@ describe('solidAppState.mapper', () => {
       'project-1',
     ]);
     expect(input.properties?.[SP_APP_STATE.noteTodayOrder]).toEqual(['note-2', 'note-1']);
+    expect(input.properties?.[SP_APP_STATE.sectionOrder]).toEqual([
+      'section-2',
+      'section-1',
+    ]);
   });
 
   it('maps app state updates to replacement RDF changes', () => {
@@ -53,6 +58,10 @@ describe('solidAppState.mapper', () => {
       'tag-2',
       'tag-1',
     ]);
+    expect(changes.replaceProperties?.[SP_APP_STATE.sectionOrder]).toEqual([
+      'section-2',
+      'section-1',
+    ]);
   });
 
   it('round-trips order fields through RDF properties', () => {
@@ -61,6 +70,7 @@ describe('solidAppState.mapper', () => {
       [SP_APP_STATE.projectOrder]: [literal('project-2'), literal('project-1')],
       [SP_APP_STATE.tagOrder]: [literal('TODAY'), literal('tag-2'), literal('tag-1')],
       [SP_APP_STATE.noteTodayOrder]: [literal('note-2'), literal('note-1')],
+      [SP_APP_STATE.sectionOrder]: [literal('section-2'), literal('section-1')],
       [SP_APP_STATE.updated]: [literal(1710000000000)],
     });
 

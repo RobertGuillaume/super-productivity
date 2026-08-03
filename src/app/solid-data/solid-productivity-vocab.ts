@@ -144,6 +144,7 @@ export const SP_APP_STATE = {
   projectOrder: `${SOLID_PRODUCTIVITY_NS}projectOrder`,
   tagOrder: `${SOLID_PRODUCTIVITY_NS}tagOrder`,
   noteTodayOrder: `${SOLID_PRODUCTIVITY_NS}noteTodayOrder`,
+  sectionOrder: `${SOLID_PRODUCTIVITY_NS}sectionOrder`,
   updated: `${SOLID_PRODUCTIVITY_NS}updated`,
 } as const;
 

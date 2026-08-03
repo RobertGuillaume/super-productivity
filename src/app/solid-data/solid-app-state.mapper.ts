@@ -23,6 +23,7 @@ export interface SolidAppState {
   projectOrder: string[];
   tagOrder: string[];
   noteTodayOrder: string[];
+  sectionOrder: string[];
   updated: number;
 }
 
@@ -38,6 +39,7 @@ export const createEmptySolidAppState = (): SolidAppState => ({
   projectOrder: [],
   tagOrder: [],
   noteTodayOrder: [],
+  sectionOrder: [],
   updated: Date.now(),
 });
 
@@ -73,6 +75,7 @@ export const solidThingToAppState = (thing: Thing): SolidAppState => ({
   projectOrder: stringArrayProp(thing, SP_APP_STATE.projectOrder),
   tagOrder: stringArrayProp(thing, SP_APP_STATE.tagOrder),
   noteTodayOrder: stringArrayProp(thing, SP_APP_STATE.noteTodayOrder),
+  sectionOrder: stringArrayProp(thing, SP_APP_STATE.sectionOrder),
   updated: numberProp(thing, SP_APP_STATE.updated) ?? 0,
 });
 
@@ -87,6 +90,9 @@ const buildAppStateSolidProperties = (appState: SolidAppState): ThingRdfProperty
     includeEmpty: true,
   });
   addArray(properties, SP_APP_STATE.noteTodayOrder, appState.noteTodayOrder, {
+    includeEmpty: true,
+  });
+  addArray(properties, SP_APP_STATE.sectionOrder, appState.sectionOrder, {
     includeEmpty: true,
   });
   addLiteral(properties, SP_APP_STATE.updated, appState.updated);

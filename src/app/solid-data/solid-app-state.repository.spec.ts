@@ -104,12 +104,14 @@ describe('SolidAppStateRepository', () => {
 
   it('creates deterministic app-state resources when no state exists', async () => {
     const createdThing = createThing({
+      sectionOrder: ['section-1'],
       tagOrder: ['TODAY', 'tag-1'],
     });
     things.query.and.resolveTo({ things: [] });
     things.create.and.resolveTo(createdThing);
 
     await TestBed.inject(SolidAppStateRepository).saveAppStateOrder({
+      sectionOrder: ['section-1'],
       tagOrder: ['TODAY', 'tag-1'],
     });
 
@@ -121,6 +123,7 @@ describe('SolidAppStateRepository', () => {
         },
         properties: jasmine.objectContaining({
           [SP_APP_STATE.id]: [SOLID_APP_STATE_ID],
+          [SP_APP_STATE.sectionOrder]: ['section-1'],
           [SP_APP_STATE.tagOrder]: ['TODAY', 'tag-1'],
         }),
       }),
@@ -130,10 +133,12 @@ describe('SolidAppStateRepository', () => {
   it('commits app-state updates through the runtime write plan API', async () => {
     const existingThing = createThing({
       projectOrder: ['project-1'],
+      sectionOrder: ['section-1'],
       tagOrder: ['TODAY', 'tag-1'],
     });
     const updatedThing = createThing({
-      projectOrder: ['project-2', 'project-1'],
+      projectOrder: ['project-1'],
+      sectionOrder: ['section-2', 'section-1'],
       tagOrder: ['TODAY', 'tag-1'],
     });
     const plan = {
@@ -158,20 +163,21 @@ describe('SolidAppStateRepository', () => {
     });
 
     const saved = await TestBed.inject(SolidAppStateRepository).saveAppStateOrder({
-      projectOrder: ['project-2', 'project-1'],
+      sectionOrder: ['section-2', 'section-1'],
     });
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,
       jasmine.objectContaining({
         replaceProperties: jasmine.objectContaining({
-          [SP_APP_STATE.projectOrder]: ['project-2', 'project-1'],
+          [SP_APP_STATE.projectOrder]: ['project-1'],
+          [SP_APP_STATE.sectionOrder]: ['section-2', 'section-1'],
           [SP_APP_STATE.tagOrder]: ['TODAY', 'tag-1'],
         }),
       }),
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);
-    expect(saved.projectOrder).toEqual(['project-2', 'project-1']);
+    expect(saved.sectionOrder).toEqual(['section-2', 'section-1']);
   });
 });
 
@@ -179,12 +185,14 @@ const createThing = (
   orders: Partial<{
     noteTodayOrder: string[];
     projectOrder: string[];
+    sectionOrder: string[];
     tagOrder: string[];
   }>,
 ): Thing => {
   const properties: Readonly<Record<string, readonly RdfValue[]>> = {
     [SP_APP_STATE.id]: [literal(SOLID_APP_STATE_ID)],
     [SP_APP_STATE.projectOrder]: (orders.projectOrder ?? []).map(literal),
+    [SP_APP_STATE.sectionOrder]: (orders.sectionOrder ?? []).map(literal),
     [SP_APP_STATE.tagOrder]: (orders.tagOrder ?? []).map(literal),
     [SP_APP_STATE.noteTodayOrder]: (orders.noteTodayOrder ?? []).map(literal),
     [SP_APP_STATE.updated]: [literal(1710000000000)],

@@ -97,6 +97,7 @@ import { OperationLogEffects } from '../op-log/capture/operation-log.effects';
 import { SolidAppStatePersistenceEffects } from '../solid-data/solid-app-state-persistence.effects';
 import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistence.effects';
 import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
+import { SolidSectionPersistenceEffects } from '../solid-data/solid-section-persistence.effects';
 import { SolidTagPersistenceEffects } from '../solid-data/solid-tag-persistence.effects';
 import { SolidTaskPersistenceEffects } from '../solid-data/solid-task-persistence.effects';
 import { SolidTodayPersistenceEffects } from '../solid-data/solid-today-persistence.effects';
@@ -120,6 +121,7 @@ import {
     EffectsModule.forFeature([OperationLogEffects]),
     EffectsModule.forFeature([SolidTaskPersistenceEffects]),
     EffectsModule.forFeature([SolidProjectPersistenceEffects]),
+    EffectsModule.forFeature([SolidSectionPersistenceEffects]),
     EffectsModule.forFeature([SolidTagPersistenceEffects]),
     EffectsModule.forFeature([SolidNotePersistenceEffects]),
     EffectsModule.forFeature([SolidAppStatePersistenceEffects]),

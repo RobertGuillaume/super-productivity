@@ -63,6 +63,7 @@ describe('SolidTaskHydrationService', () => {
     projectOrder: ['project-2', 'project-1'],
     tagOrder: ['tag-2', TODAY_TAG.id, 'tag-1'],
     noteTodayOrder: ['note-2', 'note-1'],
+    sectionOrder: ['section-2', 'section-1'],
     updated: 1710000000400,
   };
 
@@ -112,13 +113,21 @@ describe('SolidTaskHydrationService', () => {
       ...note,
       id: 'note-3',
     };
+    const section2: Section = {
+      ...section,
+      id: 'section-2',
+    };
+    const section3: Section = {
+      ...section,
+      id: 'section-3',
+    };
 
     const appData = createSolidAppData({
       tasks: [task],
       projects: [project, project3, project2],
       tags: [tag, tag2],
       notes: [note, note3, note2],
-      sections: [section],
+      sections: [section, section3, section2],
       appState,
     });
 
@@ -130,7 +139,7 @@ describe('SolidTaskHydrationService', () => {
     ]);
     expect(appData.tag.ids).toEqual(['tag-2', TODAY_TAG.id, 'tag-1']);
     expect(appData.note.todayOrder).toEqual(['note-2', 'note-1', 'note-3']);
-    expect(appData.section.ids).toEqual(['section-1']);
+    expect(appData.section.ids).toEqual(['section-2', 'section-1', 'section-3']);
   });
 
   it('dispatches loadAllData with Solid task, project, tag, note, and section data', async () => {

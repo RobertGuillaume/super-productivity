@@ -90,6 +90,7 @@ export const createSolidAppData = (input: {
     input.notes,
     input.appState?.noteTodayOrder ?? [],
   );
+  const sections = applyOrder(input.sections ?? [], input.appState?.sectionOrder ?? []);
 
   return {
     ...appDataComplete,
@@ -100,7 +101,7 @@ export const createSolidAppData = (input: {
       ...initialNoteState,
       todayOrder: noteTodayOrder,
     }),
-    section: sectionAdapter.setAll([...(input.sections ?? [])], initialSectionState),
+    section: sectionAdapter.setAll(sections, initialSectionState),
   };
 };
 
