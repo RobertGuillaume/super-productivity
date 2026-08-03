@@ -200,6 +200,15 @@ describe('SolidDataLayerStateService', () => {
       ),
     ).toBe(true);
     expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.deleteProject({
+          projectId: 'project-1',
+          noteIds: ['note-1'],
+          allTaskIds: ['task-1'],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
       service.ownsPersistentAction({
         ...action,
         type: ActionType.PROJECT_ADD,

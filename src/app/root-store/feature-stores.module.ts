@@ -96,6 +96,7 @@ import { PluginHooksEffects } from '../plugins/plugin-hooks.effects';
 import { OperationLogEffects } from '../op-log/capture/operation-log.effects';
 import { SolidAppStatePersistenceEffects } from '../solid-data/solid-app-state-persistence.effects';
 import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistence.effects';
+import { SolidProjectDeleteCascadeEffects } from '../solid-data/solid-project-delete-cascade.effects';
 import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
 import { SolidSectionPersistenceEffects } from '../solid-data/solid-section-persistence.effects';
 import { SolidTagPersistenceEffects } from '../solid-data/solid-tag-persistence.effects';
@@ -121,6 +122,7 @@ import {
   imports: [
     EffectsModule.forFeature([OperationLogEffects]),
     EffectsModule.forFeature([SolidTaskPersistenceEffects]),
+    EffectsModule.forFeature([SolidProjectDeleteCascadeEffects]),
     EffectsModule.forFeature([SolidProjectPersistenceEffects]),
     EffectsModule.forFeature([SolidSectionPersistenceEffects]),
     EffectsModule.forFeature([SolidTagPersistenceEffects]),
