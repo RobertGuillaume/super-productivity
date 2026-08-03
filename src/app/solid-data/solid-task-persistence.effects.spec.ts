@@ -161,6 +161,35 @@ describe('SolidTaskPersistenceEffects', () => {
     subscription.unsubscribe();
   });
 
+  it('persists task tag membership with the full post-reducer task', async () => {
+    const taggedTask: Task = {
+      ...task,
+      tagIds: ['tag-1'],
+    };
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidTaskRepository.saveTask.and.resolveTo(taggedTask);
+    store.select.and.returnValue(of([taggedTask]));
+    const effects = TestBed.inject(SolidTaskPersistenceEffects);
+    const subscription = effects.persistTaskUpdate$.subscribe();
+
+    actions$.next(
+      TaskSharedActions.addTagToTask({
+        taskId: 'task-1',
+        tagId: 'tag-1',
+      }),
+    );
+    await Promise.resolve();
+
+    expect(store.select.calls.mostRecent().args as unknown[]).toEqual([
+      selectTasksById,
+      {
+        ids: ['task-1'],
+      },
+    ]);
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(taggedTask);
+    subscription.unsubscribe();
+  });
+
   it('surfaces Solid persistence failures', async () => {
     solidDataLayerState.ownsPersistentAction.and.returnValue(true);
     solidTaskRepository.saveTask.and.rejectWith(new Error('write failed'));

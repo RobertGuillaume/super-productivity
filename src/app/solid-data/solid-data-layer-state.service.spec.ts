@@ -105,6 +105,14 @@ describe('SolidDataLayerStateService', () => {
       }),
     ).toBe(true);
     expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.addTagToTask({
+          taskId: 'task-1',
+          tagId: 'tag-1',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
       service.ownsPersistentAction({
         ...action,
         type: ActionType.PROJECT_ADD,

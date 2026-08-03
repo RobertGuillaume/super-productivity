@@ -4,6 +4,7 @@ import { ActionType } from '../op-log/core/operation.types';
 import { isSolidDataLayerEnabled } from './solid-data-layer-feature-flag';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SOLID_PROJECT_TASK_ORDER_ACTION_TYPES } from './solid-project-task-order-action-types';
+import { SOLID_TASK_TAG_MEMBERSHIP_ACTION_TYPES } from './solid-task-tag-action-types';
 import { SOLID_TODAY_ACTION_TYPES } from './solid-today-action-types';
 import { SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES } from './solid-work-context-action-types';
 
@@ -37,6 +38,7 @@ export class SolidDataLayerStateService {
     ActionType.TASK_SHARED_DELETE,
     ActionType.TASK_SHARED_DELETE_MULTIPLE,
     ...SOLID_PROJECT_TASK_ORDER_ACTION_TYPES,
+    ...SOLID_TASK_TAG_MEMBERSHIP_ACTION_TYPES,
     ...SOLID_TODAY_ACTION_TYPES,
     ...SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES,
   ]);

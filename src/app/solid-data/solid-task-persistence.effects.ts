@@ -12,7 +12,16 @@ import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import {
+  SolidTaskTagMembershipAction,
+  SOLID_TASK_TAG_MEMBERSHIP_ACTION_TYPES,
+} from './solid-task-tag-action-types';
 import { SolidTaskRepository } from './solid-task.repository';
+
+type SolidTaskUpdateAction =
+  | ReturnType<typeof TaskSharedActions.updateTask>
+  | ReturnType<typeof TaskSharedActions.updateTasks>
+  | SolidTaskTagMembershipAction;
 
 @Injectable()
 export class SolidTaskPersistenceEffects {
@@ -46,13 +55,8 @@ export class SolidTaskPersistenceEffects {
     () =>
       this.actions$.pipe(
         filter(
-          (
-            action,
-          ): action is
-            | (ReturnType<typeof TaskSharedActions.updateTask> & PersistentAction)
-            | (ReturnType<typeof TaskSharedActions.updateTasks> & PersistentAction) =>
-            (action.type === ActionType.TASK_SHARED_UPDATE ||
-              action.type === ActionType.TASK_SHARED_UPDATE_MULTIPLE) &&
+          (action): action is SolidTaskUpdateAction & PersistentAction =>
+            isSolidTaskUpdateAction(action) &&
             !(action as PersistentAction).meta?.isRemote,
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
@@ -113,13 +117,13 @@ export class SolidTaskPersistenceEffects {
     );
   }
 
-  private taskIdsForUpdateAction(
-    action:
-      | ReturnType<typeof TaskSharedActions.updateTask>
-      | ReturnType<typeof TaskSharedActions.updateTasks>,
-  ): string[] {
+  private taskIdsForUpdateAction(action: SolidTaskUpdateAction): string[] {
     if (action.type === ActionType.TASK_SHARED_UPDATE_MULTIPLE) {
       return action.tasks.map((task) => task.id as string);
+    }
+
+    if (action.type === ActionType.TASK_SHARED_ADD_TAG) {
+      return [action.taskId];
     }
 
     return Array.from(
@@ -145,3 +149,15 @@ export class SolidTaskPersistenceEffects {
     return EMPTY;
   }
 }
+
+const SOLID_TASK_UPDATE_ACTION_TYPES = new Set<string>([
+  ActionType.TASK_SHARED_UPDATE,
+  ActionType.TASK_SHARED_UPDATE_MULTIPLE,
+  ...SOLID_TASK_TAG_MEMBERSHIP_ACTION_TYPES,
+]);
+
+const isSolidTaskUpdateAction = (action: unknown): action is SolidTaskUpdateAction =>
+  typeof action === 'object' &&
+  action !== null &&
+  'type' in action &&
+  SOLID_TASK_UPDATE_ACTION_TYPES.has((action as { type: string }).type);
