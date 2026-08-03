@@ -3,6 +3,7 @@ import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
 import { ActionType, OpType } from '../op-log/core/operation.types';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
+import { PlannerActions } from '../features/planner/store/planner.actions';
 import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
 import {
   DEFAULT_TASK_REPEAT_CFG,
@@ -771,6 +772,50 @@ describe('SolidDataLayerStateService', () => {
       service.ownsPersistentAction(
         TaskSharedActions.convertToMainTask({
           task,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        PlannerActions.upsertPlannerDay({
+          day: '2026-08-04',
+          taskIds: ['task-1'],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        PlannerActions.transferTask({
+          task,
+          prevDay: '2026-08-04',
+          newDay: '2026-08-05',
+          targetIndex: 0,
+          today: '2026-08-04',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        PlannerActions.moveInList({
+          targetDay: '2026-08-04',
+          fromIndex: 0,
+          toIndex: 1,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        PlannerActions.moveBeforeTask({
+          fromTask: task,
+          toTaskId: 'task-2',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        PlannerActions.planTaskForDay({
+          task,
+          day: '2026-08-04',
         }) as PersistentAction,
       ),
     ).toBe(true);

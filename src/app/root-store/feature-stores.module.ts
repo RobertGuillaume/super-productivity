@@ -98,6 +98,7 @@ import { SolidAppStatePersistenceEffects } from '../solid-data/solid-app-state-p
 import { SolidEmbeddedTaskPersistenceEffects } from '../solid-data/solid-embedded-task-persistence.effects';
 import { SolidIssueProviderPersistenceEffects } from '../solid-data/solid-issue-provider-persistence.effects';
 import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistence.effects';
+import { SolidPlannerPersistenceEffects } from '../solid-data/solid-planner-persistence.effects';
 import { SolidProjectDeleteCascadeEffects } from '../solid-data/solid-project-delete-cascade.effects';
 import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
 import { SolidSectionPersistenceEffects } from '../solid-data/solid-section-persistence.effects';
@@ -130,6 +131,7 @@ import {
     EffectsModule.forFeature([OperationLogEffects]),
     EffectsModule.forFeature([SolidTaskPersistenceEffects]),
     EffectsModule.forFeature([SolidEmbeddedTaskPersistenceEffects]),
+    EffectsModule.forFeature([SolidPlannerPersistenceEffects]),
     EffectsModule.forFeature([SolidProjectDeleteCascadeEffects]),
     EffectsModule.forFeature([SolidProjectPersistenceEffects]),
     EffectsModule.forFeature([SolidSectionPersistenceEffects]),

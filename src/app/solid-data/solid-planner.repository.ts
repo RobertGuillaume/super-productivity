@@ -47,7 +47,18 @@ export class SolidPlannerRepository {
   }
 
   async savePlannerState(plannerState: PlannerState): Promise<PlannerState> {
+    await this.replacePlannerState(plannerState);
+    return plannerState;
+  }
+
+  async replacePlannerState(plannerState: PlannerState): Promise<PlannerState> {
+    const existingDays = await this.loadPlannerDays();
+    const nextDays = new Set(Object.keys(plannerState.days));
+
     await Promise.all([
+      ...existingDays
+        .filter((plannerDay) => !nextDays.has(plannerDay.day))
+        .map((plannerDay) => this.deletePlannerDay(plannerDay.day)),
       ...Object.entries(plannerState.days).map(([day, taskIds]) =>
         this.savePlannerDay({ day, taskIds, updated: Date.now() }),
       ),
@@ -55,6 +66,15 @@ export class SolidPlannerRepository {
     ]);
 
     return plannerState;
+  }
+
+  async loadPlannerDays(): Promise<SolidPlannerDay[]> {
+    const result = await this.solidRuntime.client.things.query(solidPlannerDayQuery, {
+      scope: this.plannerContainerScope(),
+      autoDiscover: true,
+    });
+
+    return result.things.map(solidThingToPlannerDay);
   }
 
   async savePlannerDay(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
