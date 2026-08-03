@@ -719,5 +719,60 @@ describe('SolidDataLayerStateService', () => {
         }) as PersistentAction,
       ),
     ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.moveToArchive({
+          tasks: [
+            {
+              ...task,
+              subTasks: [],
+            },
+          ],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.restoreTask({
+          task: {
+            ...task,
+            subTasks: [],
+          },
+          subTasks: [],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.restoreDeletedTask({
+          task: {
+            ...task,
+            subTasks: [],
+          },
+          tagTaskIdMap: {
+            ['tag-1']: ['task-1'],
+          },
+          deletedTaskEntities: {
+            ['task-1']: task,
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.convertToSubTask({
+          taskId: 'task-1',
+          targetParentId: 'parent-1',
+          afterTaskId: null,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.convertToMainTask({
+          task,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
   });
 });

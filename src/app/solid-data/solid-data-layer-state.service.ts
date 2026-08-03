@@ -8,6 +8,7 @@ import { SOLID_PROJECT_TASK_ORDER_ACTION_TYPES } from './solid-project-task-orde
 import { SOLID_ISSUE_PROVIDER_ACTION_TYPES } from './solid-issue-provider-action-types';
 import { SOLID_EMBEDDED_TASK_ACTION_TYPES } from './solid-embedded-task-action-types';
 import { SOLID_SECTION_ACTION_TYPES } from './solid-section-action-types';
+import { SOLID_TASK_ARCHIVE_LIFECYCLE_ACTION_TYPES } from './solid-task-archive-lifecycle-action-types';
 import { SOLID_TASK_BATCH_ACTION_TYPES } from './solid-task-batch-action-types';
 import { SOLID_TASK_TAG_ACTION_TYPES } from './solid-task-tag-action-types';
 import { SOLID_TASK_PROJECT_MOVE_ACTION_TYPES } from './solid-task-project-move-action-types';
@@ -51,6 +52,7 @@ export class SolidDataLayerStateService {
     ...SOLID_EMBEDDED_TASK_ACTION_TYPES,
     ...SOLID_PROJECT_TASK_ORDER_ACTION_TYPES,
     ...SOLID_SECTION_ACTION_TYPES,
+    ...SOLID_TASK_ARCHIVE_LIFECYCLE_ACTION_TYPES,
     ...SOLID_TASK_BATCH_ACTION_TYPES,
     ...SOLID_TASK_DEADLINE_ACTION_TYPES,
     ...SOLID_TASK_PROJECT_MOVE_ACTION_TYPES,
