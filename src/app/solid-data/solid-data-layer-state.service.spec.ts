@@ -113,6 +113,13 @@ describe('SolidDataLayerStateService', () => {
       ),
     ).toBe(true);
     expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.removeTagsForAllTasks({
+          tagIdsToRemove: ['tag-1'],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
       service.ownsPersistentAction({
         ...action,
         type: ActionType.PROJECT_ADD,

@@ -5,7 +5,7 @@ import { EMPTY, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
 import { Log } from '../core/log';
-import { selectTasksById } from '../features/tasks/store/task.selectors';
+import { selectAllTasks, selectTasksById } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
 import { T } from '../t.const';
@@ -13,6 +13,7 @@ import { ALL_ACTIONS } from '../util/local-actions.token';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import {
+  isSolidTaskTagBulkRemovalAction,
   SolidTaskTagMembershipAction,
   SOLID_TASK_TAG_MEMBERSHIP_ACTION_TYPES,
 } from './solid-task-tag-action-types';
@@ -74,6 +75,30 @@ export class SolidTaskPersistenceEffects {
               ),
               catchError((error) => this.handlePersistenceError(error)),
             ),
+        ),
+      ),
+    { dispatch: false },
+  );
+
+  persistBulkTagRemoval$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        filter(
+          (action): action is PersistentAction =>
+            isSolidTaskTagBulkRemovalAction(action) &&
+            !(action as PersistentAction).meta?.isRemote,
+        ),
+        filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
+        concatMap(() =>
+          this.store.select(selectAllTasks).pipe(
+            take(1),
+            concatMap((tasks) =>
+              from(
+                Promise.all(tasks.map((task) => this.solidTaskRepository.saveTask(task))),
+              ),
+            ),
+            catchError((error) => this.handlePersistenceError(error)),
+          ),
         ),
       ),
     { dispatch: false },

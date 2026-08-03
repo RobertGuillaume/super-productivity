@@ -4,7 +4,7 @@ import { of, Subject } from 'rxjs';
 import { SnackService } from '../core/snack/snack.service';
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
-import { selectTasksById } from '../features/tasks/store/task.selectors';
+import { selectAllTasks, selectTasksById } from '../features/tasks/store/task.selectors';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { ALL_ACTIONS } from '../util/local-actions.token';
@@ -187,6 +187,57 @@ describe('SolidTaskPersistenceEffects', () => {
       },
     ]);
     expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(taggedTask);
+    subscription.unsubscribe();
+  });
+
+  it('persists all post-reducer tasks after bulk tag removal', async () => {
+    const firstTask: Task = {
+      ...task,
+      tagIds: [],
+    };
+    const secondTask: Task = {
+      ...task,
+      id: 'task-2',
+      title: 'Second task',
+      tagIds: ['tag-2'],
+    };
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidTaskRepository.saveTask.and.resolveTo(firstTask);
+    store.select.and.returnValue(of([firstTask, secondTask]));
+    const effects = TestBed.inject(SolidTaskPersistenceEffects);
+    const subscription = effects.persistBulkTagRemoval$.subscribe();
+
+    actions$.next(
+      TaskSharedActions.removeTagsForAllTasks({
+        tagIdsToRemove: ['tag-1'],
+      }),
+    );
+    await Promise.resolve();
+
+    expect(store.select.calls.mostRecent().args as unknown[]).toEqual([selectAllTasks]);
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledWith(firstTask);
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledWith(secondTask);
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledTimes(2);
+    subscription.unsubscribe();
+  });
+
+  it('ignores remote bulk tag removal actions', async () => {
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    const effects = TestBed.inject(SolidTaskPersistenceEffects);
+    const subscription = effects.persistBulkTagRemoval$.subscribe();
+
+    actions$.next({
+      ...TaskSharedActions.removeTagsForAllTasks({
+        tagIdsToRemove: ['tag-1'],
+      }),
+      meta: {
+        isRemote: true,
+      },
+    } as Action);
+    await Promise.resolve();
+
+    expect(store.select).not.toHaveBeenCalled();
+    expect(solidTaskRepository.saveTask).not.toHaveBeenCalled();
     subscription.unsubscribe();
   });
 
