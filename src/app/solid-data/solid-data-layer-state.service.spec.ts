@@ -17,6 +17,24 @@ import {
   updateTaskRepeatCfgs,
 } from '../features/task-repeat-cfg/store/task-repeat-cfg.actions';
 import {
+  __updateMultipleTaskSimple,
+  addSubTask,
+  moveSubTask,
+  moveSubTaskDown,
+  moveSubTaskToBottom,
+  moveSubTaskToTop,
+  moveSubTaskUp,
+  removeTimeSpent,
+  roundTimeSpentForDay,
+  updateTaskUi,
+} from '../features/tasks/store/task.actions';
+import {
+  addTaskAttachment,
+  deleteTaskAttachment,
+  updateTaskAttachment,
+} from '../features/tasks/task-attachment/task-attachment.actions';
+import { syncTimeSpent } from '../features/time-tracking/store/time-tracking.actions';
+import {
   addSection,
   addTaskToSection,
   deleteSection,
@@ -568,6 +586,136 @@ describe('SolidDataLayerStateService', () => {
       service.ownsPersistentAction(
         TaskSharedActions.deleteTaskRepeatCfg({
           taskRepeatCfgId: 'repeat-cfg-1',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        __updateMultipleTaskSimple({
+          taskUpdates: [
+            {
+              id: 'task-1',
+              changes: {
+                title: 'Updated',
+              },
+            },
+          ],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateTaskUi({
+          task: {
+            id: 'task-1',
+            changes: {
+              _hideSubTasksMode: 1,
+            },
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        moveSubTask({
+          taskId: 'task-1',
+          srcTaskId: 'parent-1',
+          targetTaskId: 'target-parent-1',
+          afterTaskId: null,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        moveSubTaskUp({ id: 'task-1', parentId: 'parent-1' }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        moveSubTaskDown({ id: 'task-1', parentId: 'parent-1' }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        moveSubTaskToTop({ id: 'task-1', parentId: 'parent-1' }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        moveSubTaskToBottom({
+          id: 'task-1',
+          parentId: 'parent-1',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        removeTimeSpent({
+          id: 'task-1',
+          date: '2026-08-03',
+          duration: 1000,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        addSubTask({
+          task: {
+            ...task,
+            id: 'sub-task-1',
+          },
+          parentId: 'task-1',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        roundTimeSpentForDay({
+          day: '2026-08-03',
+          taskIds: ['task-1'],
+          roundTo: 'QUARTER',
+          isRoundUp: true,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        addTaskAttachment({
+          taskId: 'task-1',
+          taskAttachment: {
+            id: 'attachment-1',
+            type: 'LINK',
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateTaskAttachment({
+          taskId: 'task-1',
+          taskAttachment: {
+            id: 'attachment-1',
+            changes: {
+              title: 'Updated attachment',
+            },
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        deleteTaskAttachment({
+          taskId: 'task-1',
+          id: 'attachment-1',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        syncTimeSpent({
+          taskId: 'task-1',
+          date: '2026-08-03',
+          duration: 1000,
         }) as PersistentAction,
       ),
     ).toBe(true);
