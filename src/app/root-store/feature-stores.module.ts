@@ -95,6 +95,7 @@ import { appStateFeature } from './app-state/app-state.reducer';
 import { PluginHooksEffects } from '../plugins/plugin-hooks.effects';
 import { OperationLogEffects } from '../op-log/capture/operation-log.effects';
 import { SolidAppStatePersistenceEffects } from '../solid-data/solid-app-state-persistence.effects';
+import { SolidIssueProviderPersistenceEffects } from '../solid-data/solid-issue-provider-persistence.effects';
 import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistence.effects';
 import { SolidProjectDeleteCascadeEffects } from '../solid-data/solid-project-delete-cascade.effects';
 import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
@@ -134,6 +135,7 @@ import {
     EffectsModule.forFeature([SolidTaskProjectMovePersistenceEffects]),
     EffectsModule.forFeature([SolidTaskSchedulingPersistenceEffects]),
     EffectsModule.forFeature([SolidNotePersistenceEffects]),
+    EffectsModule.forFeature([SolidIssueProviderPersistenceEffects]),
     EffectsModule.forFeature([SolidAppStatePersistenceEffects]),
     EffectsModule.forFeature([SolidWorkContextPersistenceEffects]),
     EffectsModule.forFeature([SolidTodayPersistenceEffects]),

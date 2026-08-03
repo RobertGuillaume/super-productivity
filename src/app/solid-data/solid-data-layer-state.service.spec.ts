@@ -3,6 +3,7 @@ import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
 import { ActionType, OpType } from '../op-log/core/operation.types';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
+import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
 import {
   addSection,
   addTaskToSection,
@@ -445,6 +446,54 @@ describe('SolidDataLayerStateService', () => {
           taskIds: ['task-1'],
           today: '2026-07-24',
           startOfNextDayDiffMs: 0,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        IssueProviderActions.addIssueProvider({
+          issueProvider: {
+            id: 'issue-provider-1',
+            issueProviderKey: 'GITHUB',
+            isEnabled: true,
+            pluginId: 'github-issue-provider',
+            pluginConfig: {},
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        IssueProviderActions.updateIssueProvider({
+          issueProvider: {
+            id: 'issue-provider-1',
+            changes: {
+              isEnabled: false,
+            },
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        IssueProviderActions.sortIssueProvidersFirst({
+          ids: ['issue-provider-1'],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.deleteIssueProvider({
+          issueProviderId: 'issue-provider-1',
+          taskIdsToUnlink: ['task-1'],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.deleteIssueProviders({
+          ids: ['issue-provider-1'],
+          taskIdsToUnlink: ['task-1'],
         }) as PersistentAction,
       ),
     ).toBe(true);
