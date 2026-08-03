@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Store } from '@ngrx/store';
 import { Note } from '../features/note/note.model';
+import { IssueProvider } from '../features/issue/issue.model';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { Project } from '../features/project/project.model';
@@ -16,6 +17,7 @@ import {
   SolidTaskHydrationService,
 } from './solid-task-hydration.service';
 import { SolidNoteRepository } from './solid-note.repository';
+import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -58,6 +60,15 @@ describe('SolidTaskHydrationService', () => {
     isExpanded: true,
     taskIds: ['task-1'],
   };
+  const issueProvider: IssueProvider = {
+    id: 'issue-provider-1',
+    issueProviderKey: 'GITHUB',
+    isEnabled: true,
+    pluginId: 'github-issue-provider',
+    pluginConfig: {
+      repo: 'owner/repo',
+    },
+  };
   const appState: SolidAppState = {
     id: SOLID_APP_STATE_ID,
     projectOrder: ['project-2', 'project-1'],
@@ -74,6 +85,7 @@ describe('SolidTaskHydrationService', () => {
       tags: [tag],
       notes: [note],
       sections: [section],
+      issueProviders: [issueProvider],
     });
 
     expect(appData.task.ids).toEqual(['task-1']);
@@ -89,6 +101,8 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.note.todayOrder).toEqual(['note-1']);
     expect(appData.section.ids).toEqual(['section-1']);
     expect(appData.section.entities['section-1']).toEqual(section);
+    expect(appData.issueProvider.ids).toEqual(['issue-provider-1']);
+    expect(appData.issueProvider.entities['issue-provider-1']).toEqual(issueProvider);
     expect(appData.reminders).toEqual([]);
   });
 
@@ -142,7 +156,7 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.section.ids).toEqual(['section-2', 'section-1', 'section-3']);
   });
 
-  it('dispatches loadAllData with Solid task, project, tag, note, and section data', async () => {
+  it('dispatches loadAllData with Solid task, project, tag, note, section, and issue provider data', async () => {
     const store = jasmine.createSpyObj<Store>('Store', ['dispatch']);
     const taskRepository = jasmine.createSpyObj<SolidTaskRepository>(
       'SolidTaskRepository',
@@ -163,6 +177,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidSectionRepository',
       ['loadSections'],
     );
+    const issueProviderRepository = jasmine.createSpyObj<SolidIssueProviderRepository>(
+      'SolidIssueProviderRepository',
+      ['loadIssueProviders'],
+    );
     const appStateRepository = jasmine.createSpyObj<SolidAppStateRepository>(
       'SolidAppStateRepository',
       ['loadAppState'],
@@ -172,6 +190,7 @@ describe('SolidTaskHydrationService', () => {
     tagRepository.loadTags.and.resolveTo([tag]);
     noteRepository.loadNotes.and.resolveTo([note]);
     sectionRepository.loadSections.and.resolveTo([section]);
+    issueProviderRepository.loadIssueProviders.and.resolveTo([issueProvider]);
     appStateRepository.loadAppState.and.resolveTo(appState);
 
     TestBed.configureTestingModule({
@@ -182,6 +201,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidTagRepository, useValue: tagRepository },
         { provide: SolidNoteRepository, useValue: noteRepository },
         { provide: SolidSectionRepository, useValue: sectionRepository },
+        { provide: SolidIssueProviderRepository, useValue: issueProviderRepository },
         { provide: SolidAppStateRepository, useValue: appStateRepository },
       ],
     });
@@ -205,7 +225,12 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.note.todayOrder).toEqual(['note-1']);
     expect(action.appDataComplete.section.ids).toEqual(['section-1']);
     expect(action.appDataComplete.section.entities['section-1']).toEqual(section);
+    expect(action.appDataComplete.issueProvider.ids).toEqual(['issue-provider-1']);
+    expect(action.appDataComplete.issueProvider.entities['issue-provider-1']).toEqual(
+      issueProvider,
+    );
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
+    expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
     expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
   });
 });

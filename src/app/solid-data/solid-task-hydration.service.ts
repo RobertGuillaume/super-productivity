@@ -2,6 +2,11 @@ import { inject, Injectable } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { Log } from '../core/log';
 import { Note } from '../features/note/note.model';
+import { IssueProvider } from '../features/issue/issue.model';
+import {
+  adapter as issueProviderAdapter,
+  issueProviderInitialState,
+} from '../features/issue/store/issue-provider.reducer';
 import {
   adapter as noteAdapter,
   initialNoteState,
@@ -28,6 +33,7 @@ import { loadAllData } from '../root-store/meta/load-all-data.action';
 import { SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidNoteRepository } from './solid-note.repository';
+import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -40,24 +46,28 @@ export class SolidTaskHydrationService {
   private readonly projectRepository = inject(SolidProjectRepository);
   private readonly tagRepository = inject(SolidTagRepository);
   private readonly noteRepository = inject(SolidNoteRepository);
+  private readonly issueProviderRepository = inject(SolidIssueProviderRepository);
   private readonly sectionRepository = inject(SolidSectionRepository);
   private readonly appStateRepository = inject(SolidAppStateRepository);
 
   async hydrateStore(): Promise<void> {
-    const [tasks, projects, tags, notes, sections, appState] = await Promise.all([
-      this.taskRepository.loadTasks(),
-      this.projectRepository.loadProjects(),
-      this.tagRepository.loadTags(),
-      this.noteRepository.loadNotes(),
-      this.sectionRepository.loadSections(),
-      this.appStateRepository.loadAppState(),
-    ]);
+    const [tasks, projects, tags, notes, sections, issueProviders, appState] =
+      await Promise.all([
+        this.taskRepository.loadTasks(),
+        this.projectRepository.loadProjects(),
+        this.tagRepository.loadTags(),
+        this.noteRepository.loadNotes(),
+        this.sectionRepository.loadSections(),
+        this.issueProviderRepository.loadIssueProviders(),
+        this.appStateRepository.loadAppState(),
+      ]);
     const appDataComplete = createSolidAppData({
       tasks,
       projects,
       tags,
       notes,
       sections,
+      issueProviders,
       appState,
     });
 
@@ -65,7 +75,8 @@ export class SolidTaskHydrationService {
     Log.normal(
       `Solid data layer hydrated task count: ${tasks.length}, ` +
         `project count: ${projects.length}, tag count: ${tags.length}, ` +
-        `note count: ${notes.length}, section count: ${sections.length}`,
+        `note count: ${notes.length}, section count: ${sections.length}, ` +
+        `issue provider count: ${issueProviders.length}`,
     );
   }
 }
@@ -76,6 +87,7 @@ export const createSolidAppData = (input: {
   tags: readonly Tag[];
   notes: readonly Note[];
   sections?: readonly Section[];
+  issueProviders?: readonly IssueProvider[];
   appState?: SolidAppState | null;
 }): AppDataComplete => {
   const appDataComplete = Object.fromEntries(
@@ -102,6 +114,10 @@ export const createSolidAppData = (input: {
       todayOrder: noteTodayOrder,
     }),
     section: sectionAdapter.setAll(sections, initialSectionState),
+    issueProvider: issueProviderAdapter.setAll(
+      [...(input.issueProviders ?? [])],
+      issueProviderInitialState,
+    ),
   };
 };
 

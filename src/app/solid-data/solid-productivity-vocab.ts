@@ -7,12 +7,15 @@ export const SOLID_PRODUCTIVITY_TAG_TYPE = 'SuperProductivityTag';
 export const SOLID_PRODUCTIVITY_NOTE_TYPE = 'SuperProductivityNote';
 export const SOLID_PRODUCTIVITY_APP_STATE_TYPE = 'SuperProductivityAppState';
 export const SOLID_PRODUCTIVITY_SECTION_TYPE = 'SuperProductivitySection';
+export const SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE = 'SuperProductivityIssueProvider';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
 export const SOLID_PRODUCTIVITY_NOTES_CONTAINER = 'super-productivity/notes';
 export const SOLID_PRODUCTIVITY_APP_CONTAINER = 'super-productivity/app';
 export const SOLID_PRODUCTIVITY_SECTIONS_CONTAINER = 'super-productivity/sections';
+export const SOLID_PRODUCTIVITY_ISSUE_PROVIDERS_CONTAINER =
+  'super-productivity/issue-providers';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -25,6 +28,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     notes: SOLID_PRODUCTIVITY_NOTES_CONTAINER,
     app: SOLID_PRODUCTIVITY_APP_CONTAINER,
     sections: SOLID_PRODUCTIVITY_SECTIONS_CONTAINER,
+    issueProviders: SOLID_PRODUCTIVITY_ISSUE_PROVIDERS_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -56,6 +60,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
       classUri: `${SOLID_PRODUCTIVITY_NS}Section`,
       container: 'sections',
       defaultStatus: 'open',
+    },
+    [SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}IssueProvider`,
+      container: 'issueProviders',
+      defaultStatus: 'active',
     },
   },
 } satisfies RuntimeLayoutInput;
@@ -155,4 +164,14 @@ export const SP_SECTION = {
   title: `${SOLID_PRODUCTIVITY_NS}title`,
   isExpanded: `${SOLID_PRODUCTIVITY_NS}isExpanded`,
   taskId: `${SOLID_PRODUCTIVITY_NS}taskId`,
+} as const;
+
+export const SP_ISSUE_PROVIDER = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  issueProviderKey: `${SOLID_PRODUCTIVITY_NS}issueProviderKey`,
+  isEnabled: `${SOLID_PRODUCTIVITY_NS}isEnabled`,
+  order: `${SOLID_PRODUCTIVITY_NS}order`,
+  defaultProjectId: `${SOLID_PRODUCTIVITY_NS}defaultProjectId`,
+  pinnedSearch: `${SOLID_PRODUCTIVITY_NS}pinnedSearch`,
+  providerData: `${SOLID_PRODUCTIVITY_NS}providerData`,
 } as const;

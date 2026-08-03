@@ -8,6 +8,7 @@ import type {
 import {
   SOLID_PRODUCTIVITY_LAYOUT,
   SOLID_PRODUCTIVITY_APP_STATE_TYPE,
+  SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE,
   SOLID_PRODUCTIVITY_NOTE_TYPE,
   SOLID_PRODUCTIVITY_PROJECT_TYPE,
   SOLID_PRODUCTIVITY_SECTION_TYPE,
@@ -47,6 +48,10 @@ export class SolidRuntimeService {
 
   get sectionProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_SECTION_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_SECTION_TYPE];
+  }
+
+  get issueProviderProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
