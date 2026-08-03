@@ -239,6 +239,35 @@ describe('SolidDataLayerStateService', () => {
       ),
     ).toBe(true);
     expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.setDeadline({
+          taskId: 'task-1',
+          deadlineDay: '2026-08-03',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.planDeadlineTasksForToday({
+          taskIds: ['task-1'],
+          today: '2026-08-03',
+          startOfNextDayDiffMs: 0,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.removeDeadline({ taskId: 'task-1' }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.clearDeadlineReminder({
+          taskId: 'task-1',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
       service.ownsPersistentAction({
         ...action,
         type: ActionType.PROJECT_ADD,
