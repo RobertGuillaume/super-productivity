@@ -9,6 +9,7 @@ import {
 } from '../features/task-repeat-cfg/task-repeat-cfg.model';
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { Project } from '../features/project/project.model';
+import { PlannerState } from '../features/planner/store/planner.reducer';
 import { Section } from '../features/section/section.model';
 import { DEFAULT_TAG, TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
@@ -25,6 +26,7 @@ import {
 } from './solid-task-hydration.service';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
+import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -106,6 +108,12 @@ describe('SolidTaskHydrationService', () => {
       bucket: 'young',
     },
   ];
+  const plannerState: PlannerState = {
+    days: {
+      ['2026-08-04']: ['task-1'],
+    },
+    addPlannedTasksDialogLastShown: '2026-08-04',
+  };
   const appState: SolidAppState = {
     id: SOLID_APP_STATE_ID,
     projectOrder: ['project-2', 'project-1'],
@@ -125,6 +133,7 @@ describe('SolidTaskHydrationService', () => {
       issueProviders: [issueProvider],
       taskRepeatCfgs: [taskRepeatCfg],
       archivedTasks,
+      plannerState,
     });
 
     expect(appData.task.ids).toEqual(['task-1']);
@@ -152,6 +161,7 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.archiveOld.task.entities['archived-old-task-1']).toEqual(
       archivedOldTask,
     );
+    expect(appData.planner).toEqual(plannerState);
     expect(appData.reminders).toEqual([]);
   });
 
@@ -219,6 +229,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidProjectRepository',
       ['loadProjects'],
     );
+    const plannerRepository = jasmine.createSpyObj<SolidPlannerRepository>(
+      'SolidPlannerRepository',
+      ['loadPlannerState'],
+    );
     const tagRepository = jasmine.createSpyObj<SolidTagRepository>('SolidTagRepository', [
       'loadTags',
     ]);
@@ -250,6 +264,7 @@ describe('SolidTaskHydrationService', () => {
     sectionRepository.loadSections.and.resolveTo([section]);
     issueProviderRepository.loadIssueProviders.and.resolveTo([issueProvider]);
     taskRepeatCfgRepository.loadTaskRepeatCfgs.and.resolveTo([taskRepeatCfg]);
+    plannerRepository.loadPlannerState.and.resolveTo(plannerState);
     appStateRepository.loadAppState.and.resolveTo(appState);
 
     TestBed.configureTestingModule({
@@ -258,6 +273,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidTaskRepository, useValue: taskRepository },
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
         { provide: SolidProjectRepository, useValue: projectRepository },
+        { provide: SolidPlannerRepository, useValue: plannerRepository },
         { provide: SolidTagRepository, useValue: tagRepository },
         { provide: SolidNoteRepository, useValue: noteRepository },
         { provide: SolidSectionRepository, useValue: sectionRepository },
@@ -297,7 +313,9 @@ describe('SolidTaskHydrationService', () => {
     const appDataComplete = action.appDataComplete as AppDataComplete;
     expect(appDataComplete.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appDataComplete.archiveOld.task.ids).toEqual(['archived-old-task-1']);
+    expect(appDataComplete.planner).toEqual(plannerState);
     expect(archivedTaskRepository.loadArchivedTasks).toHaveBeenCalledTimes(1);
+    expect(plannerRepository.loadPlannerState).toHaveBeenCalledTimes(1);
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
     expect(taskRepeatCfgRepository.loadTaskRepeatCfgs).toHaveBeenCalledTimes(1);

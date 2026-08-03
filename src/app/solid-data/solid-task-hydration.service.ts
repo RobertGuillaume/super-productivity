@@ -17,6 +17,7 @@ import {
   initialProjectState,
   projectAdapter,
 } from '../features/project/store/project.reducer';
+import { PlannerState } from '../features/planner/store/planner.reducer';
 import { Section } from '../features/section/section.model';
 import {
   adapter as sectionAdapter,
@@ -40,6 +41,7 @@ import { SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
+import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -52,6 +54,7 @@ export class SolidTaskHydrationService {
   private readonly taskRepository = inject(SolidTaskRepository);
   private readonly archivedTaskRepository = inject(SolidArchivedTaskRepository);
   private readonly projectRepository = inject(SolidProjectRepository);
+  private readonly plannerRepository = inject(SolidPlannerRepository);
   private readonly tagRepository = inject(SolidTagRepository);
   private readonly noteRepository = inject(SolidNoteRepository);
   private readonly issueProviderRepository = inject(SolidIssueProviderRepository);
@@ -69,6 +72,7 @@ export class SolidTaskHydrationService {
       sections,
       issueProviders,
       taskRepeatCfgs,
+      plannerState,
       appState,
     ] = await Promise.all([
       this.taskRepository.loadTasks(),
@@ -79,6 +83,7 @@ export class SolidTaskHydrationService {
       this.sectionRepository.loadSections(),
       this.issueProviderRepository.loadIssueProviders(),
       this.taskRepeatCfgRepository.loadTaskRepeatCfgs(),
+      this.plannerRepository.loadPlannerState(),
       this.appStateRepository.loadAppState(),
     ]);
     const appDataComplete = createSolidAppData({
@@ -90,6 +95,7 @@ export class SolidTaskHydrationService {
       issueProviders,
       taskRepeatCfgs,
       archivedTasks,
+      plannerState,
       appState,
     });
 
@@ -100,7 +106,8 @@ export class SolidTaskHydrationService {
         `note count: ${notes.length}, section count: ${sections.length}, ` +
         `issue provider count: ${issueProviders.length}, ` +
         `repeat config count: ${taskRepeatCfgs.length}, ` +
-        `archived task count: ${archivedTasks.length}`,
+        `archived task count: ${archivedTasks.length}, ` +
+        `planner day count: ${Object.keys(plannerState.days).length}`,
     );
   }
 }
@@ -114,6 +121,7 @@ export const createSolidAppData = (input: {
   issueProviders?: readonly IssueProvider[];
   taskRepeatCfgs?: readonly TaskRepeatCfg[];
   archivedTasks?: readonly SolidArchivedTask[];
+  plannerState?: PlannerState;
   appState?: SolidAppState | null;
 }): AppDataComplete => {
   const appDataComplete = Object.fromEntries(
@@ -160,6 +168,7 @@ export const createSolidAppData = (input: {
       task: taskAdapter.setAll(archiveOldTasks, initialTaskState),
       timeTracking: initialTimeTrackingState,
     },
+    planner: input.plannerState ?? appDataComplete.planner,
   };
 };
 

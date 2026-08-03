@@ -11,6 +11,8 @@ import {
   SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE,
   SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE,
   SOLID_PRODUCTIVITY_NOTE_TYPE,
+  SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE,
+  SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE,
   SOLID_PRODUCTIVITY_PROJECT_TYPE,
   SOLID_PRODUCTIVITY_SECTION_TYPE,
   SOLID_PRODUCTIVITY_TAG_TYPE,
@@ -62,6 +64,14 @@ export class SolidRuntimeService {
 
   get archivedTaskProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE];
+  }
+
+  get plannerDayProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE];
+  }
+
+  get plannerStateProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
