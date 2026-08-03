@@ -8,6 +8,7 @@ import type {
 import {
   SOLID_PRODUCTIVITY_LAYOUT,
   SOLID_PRODUCTIVITY_APP_STATE_TYPE,
+  SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE,
   SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE,
   SOLID_PRODUCTIVITY_NOTE_TYPE,
   SOLID_PRODUCTIVITY_PROJECT_TYPE,
@@ -57,6 +58,10 @@ export class SolidRuntimeService {
 
   get taskRepeatCfgProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE];
+  }
+
+  get archivedTaskProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {

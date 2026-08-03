@@ -13,7 +13,10 @@ import { Section } from '../features/section/section.model';
 import { DEFAULT_TAG, TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { WorkContextType } from '../features/work-context/work-context.model';
+import { AppDataComplete } from '../op-log/model/model-config';
 import { loadAllData } from '../root-store/meta/load-all-data.action';
+import { SolidArchivedTask } from './solid-archived-task.mapper';
+import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SOLID_APP_STATE_ID, SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import {
@@ -81,6 +84,28 @@ describe('SolidTaskHydrationService', () => {
     title: 'Repeat from Solid',
     tagIds: ['tag-1'],
   };
+  const archivedYoungTask: Task = {
+    ...task,
+    id: 'archived-young-task-1',
+    isDone: true,
+    doneOn: 1710000000500,
+  };
+  const archivedOldTask: Task = {
+    ...task,
+    id: 'archived-old-task-1',
+    isDone: true,
+    doneOn: 1710000000600,
+  };
+  const archivedTasks: SolidArchivedTask[] = [
+    {
+      task: archivedOldTask,
+      bucket: 'old',
+    },
+    {
+      task: archivedYoungTask,
+      bucket: 'young',
+    },
+  ];
   const appState: SolidAppState = {
     id: SOLID_APP_STATE_ID,
     projectOrder: ['project-2', 'project-1'],
@@ -99,6 +124,7 @@ describe('SolidTaskHydrationService', () => {
       sections: [section],
       issueProviders: [issueProvider],
       taskRepeatCfgs: [taskRepeatCfg],
+      archivedTasks,
     });
 
     expect(appData.task.ids).toEqual(['task-1']);
@@ -118,6 +144,14 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.issueProvider.entities['issue-provider-1']).toEqual(issueProvider);
     expect(appData.taskRepeatCfg.ids).toEqual(['repeat-cfg-1']);
     expect(appData.taskRepeatCfg.entities['repeat-cfg-1']).toEqual(taskRepeatCfg);
+    expect(appData.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
+    expect(appData.archiveYoung.task.entities['archived-young-task-1']).toEqual(
+      archivedYoungTask,
+    );
+    expect(appData.archiveOld.task.ids).toEqual(['archived-old-task-1']);
+    expect(appData.archiveOld.task.entities['archived-old-task-1']).toEqual(
+      archivedOldTask,
+    );
     expect(appData.reminders).toEqual([]);
   });
 
@@ -177,6 +211,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidTaskRepository',
       ['loadTasks'],
     );
+    const archivedTaskRepository = jasmine.createSpyObj<SolidArchivedTaskRepository>(
+      'SolidArchivedTaskRepository',
+      ['loadArchivedTasks'],
+    );
     const projectRepository = jasmine.createSpyObj<SolidProjectRepository>(
       'SolidProjectRepository',
       ['loadProjects'],
@@ -205,6 +243,7 @@ describe('SolidTaskHydrationService', () => {
       ['loadAppState'],
     );
     taskRepository.loadTasks.and.resolveTo([task]);
+    archivedTaskRepository.loadArchivedTasks.and.resolveTo(archivedTasks);
     projectRepository.loadProjects.and.resolveTo([project]);
     tagRepository.loadTags.and.resolveTo([tag]);
     noteRepository.loadNotes.and.resolveTo([note]);
@@ -217,6 +256,7 @@ describe('SolidTaskHydrationService', () => {
       providers: [
         { provide: Store, useValue: store },
         { provide: SolidTaskRepository, useValue: taskRepository },
+        { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
         { provide: SolidProjectRepository, useValue: projectRepository },
         { provide: SolidTagRepository, useValue: tagRepository },
         { provide: SolidNoteRepository, useValue: noteRepository },
@@ -254,6 +294,10 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.taskRepeatCfg.entities['repeat-cfg-1']).toEqual(
       taskRepeatCfg,
     );
+    const appDataComplete = action.appDataComplete as AppDataComplete;
+    expect(appDataComplete.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
+    expect(appDataComplete.archiveOld.task.ids).toEqual(['archived-old-task-1']);
+    expect(archivedTaskRepository.loadArchivedTasks).toHaveBeenCalledTimes(1);
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
     expect(taskRepeatCfgRepository.loadTaskRepeatCfgs).toHaveBeenCalledTimes(1);

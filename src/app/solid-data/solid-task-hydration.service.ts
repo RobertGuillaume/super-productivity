@@ -28,11 +28,14 @@ import { initialTaskRepeatCfgState } from '../features/task-repeat-cfg/store/tas
 import { adapter as taskRepeatCfgAdapter } from '../features/task-repeat-cfg/store/task-repeat-cfg.selectors';
 import { initialTaskState } from '../features/tasks/store/task.reducer';
 import { taskAdapter } from '../features/tasks/store/task.adapter';
+import { initialTimeTrackingState } from '../features/time-tracking/store/time-tracking.reducer';
 import { TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { initialTagState, tagAdapter } from '../features/tag/store/tag.reducer';
 import { AppDataComplete, MODEL_CONFIGS } from '../op-log/model/model-config';
 import { loadAllData } from '../root-store/meta/load-all-data.action';
+import { SolidArchivedTask, SolidArchiveBucket } from './solid-archived-task.mapper';
+import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidNoteRepository } from './solid-note.repository';
@@ -47,6 +50,7 @@ import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository
 export class SolidTaskHydrationService {
   private readonly store = inject(Store);
   private readonly taskRepository = inject(SolidTaskRepository);
+  private readonly archivedTaskRepository = inject(SolidArchivedTaskRepository);
   private readonly projectRepository = inject(SolidProjectRepository);
   private readonly tagRepository = inject(SolidTagRepository);
   private readonly noteRepository = inject(SolidNoteRepository);
@@ -58,6 +62,7 @@ export class SolidTaskHydrationService {
   async hydrateStore(): Promise<void> {
     const [
       tasks,
+      archivedTasks,
       projects,
       tags,
       notes,
@@ -67,6 +72,7 @@ export class SolidTaskHydrationService {
       appState,
     ] = await Promise.all([
       this.taskRepository.loadTasks(),
+      this.archivedTaskRepository.loadArchivedTasks(),
       this.projectRepository.loadProjects(),
       this.tagRepository.loadTags(),
       this.noteRepository.loadNotes(),
@@ -83,6 +89,7 @@ export class SolidTaskHydrationService {
       sections,
       issueProviders,
       taskRepeatCfgs,
+      archivedTasks,
       appState,
     });
 
@@ -92,7 +99,8 @@ export class SolidTaskHydrationService {
         `project count: ${projects.length}, tag count: ${tags.length}, ` +
         `note count: ${notes.length}, section count: ${sections.length}, ` +
         `issue provider count: ${issueProviders.length}, ` +
-        `repeat config count: ${taskRepeatCfgs.length}`,
+        `repeat config count: ${taskRepeatCfgs.length}, ` +
+        `archived task count: ${archivedTasks.length}`,
     );
   }
 }
@@ -105,6 +113,7 @@ export const createSolidAppData = (input: {
   sections?: readonly Section[];
   issueProviders?: readonly IssueProvider[];
   taskRepeatCfgs?: readonly TaskRepeatCfg[];
+  archivedTasks?: readonly SolidArchivedTask[];
   appState?: SolidAppState | null;
 }): AppDataComplete => {
   const appDataComplete = Object.fromEntries(
@@ -120,6 +129,8 @@ export const createSolidAppData = (input: {
     input.appState?.noteTodayOrder ?? [],
   );
   const sections = applyOrder(input.sections ?? [], input.appState?.sectionOrder ?? []);
+  const archiveYoungTasks = archivedTasksForBucket(input.archivedTasks ?? [], 'young');
+  const archiveOldTasks = archivedTasksForBucket(input.archivedTasks ?? [], 'old');
 
   return {
     ...appDataComplete,
@@ -139,6 +150,16 @@ export const createSolidAppData = (input: {
       [...(input.taskRepeatCfgs ?? [])],
       initialTaskRepeatCfgState,
     ),
+    archiveYoung: {
+      ...appDataComplete.archiveYoung,
+      task: taskAdapter.setAll(archiveYoungTasks, initialTaskState),
+      timeTracking: initialTimeTrackingState,
+    },
+    archiveOld: {
+      ...appDataComplete.archiveOld,
+      task: taskAdapter.setAll(archiveOldTasks, initialTaskState),
+      timeTracking: initialTimeTrackingState,
+    },
   };
 };
 
@@ -189,3 +210,12 @@ const applyOrder = <T extends { id: string }>(
 
   return [...orderedItems, ...unorderedItems];
 };
+
+const archivedTasksForBucket = (
+  archivedTasks: readonly SolidArchivedTask[],
+  bucket: SolidArchiveBucket,
+): Task[] =>
+  archivedTasks
+    .filter((archivedTask) => archivedTask.bucket === bucket)
+    .map((archivedTask) => archivedTask.task)
+    .sort((a, b) => a.id.localeCompare(b.id));

@@ -9,6 +9,7 @@ export const SOLID_PRODUCTIVITY_APP_STATE_TYPE = 'SuperProductivityAppState';
 export const SOLID_PRODUCTIVITY_SECTION_TYPE = 'SuperProductivitySection';
 export const SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE = 'SuperProductivityIssueProvider';
 export const SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE = 'SuperProductivityTaskRepeatCfg';
+export const SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE = 'SuperProductivityArchivedTask';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
@@ -19,6 +20,8 @@ export const SOLID_PRODUCTIVITY_ISSUE_PROVIDERS_CONTAINER =
   'super-productivity/issue-providers';
 export const SOLID_PRODUCTIVITY_TASK_REPEAT_CFGS_CONTAINER =
   'super-productivity/repeat-configs';
+export const SOLID_PRODUCTIVITY_ARCHIVED_TASKS_CONTAINER =
+  'super-productivity/archive/tasks';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -33,6 +36,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     sections: SOLID_PRODUCTIVITY_SECTIONS_CONTAINER,
     issueProviders: SOLID_PRODUCTIVITY_ISSUE_PROVIDERS_CONTAINER,
     taskRepeatCfgs: SOLID_PRODUCTIVITY_TASK_REPEAT_CFGS_CONTAINER,
+    archivedTasks: SOLID_PRODUCTIVITY_ARCHIVED_TASKS_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -74,6 +78,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
       classUri: `${SOLID_PRODUCTIVITY_NS}TaskRepeatCfg`,
       container: 'taskRepeatCfgs',
       defaultStatus: 'active',
+    },
+    [SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}ArchivedTask`,
+      container: 'archivedTasks',
+      defaultStatus: 'archived',
     },
   },
 } satisfies RuntimeLayoutInput;
@@ -195,4 +204,15 @@ export const SP_TASK_REPEAT_CFG = {
   quickSetting: `${SOLID_PRODUCTIVITY_NS}quickSetting`,
   order: `${SOLID_PRODUCTIVITY_NS}order`,
   repeatCfgData: `${SOLID_PRODUCTIVITY_NS}repeatCfgData`,
+} as const;
+
+export const SP_ARCHIVED_TASK = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  bucket: `${SOLID_PRODUCTIVITY_NS}archiveBucket`,
+  projectId: `${SOLID_PRODUCTIVITY_NS}projectId`,
+  parentId: `${SOLID_PRODUCTIVITY_NS}parentId`,
+  subTaskId: `${SOLID_PRODUCTIVITY_NS}subTaskId`,
+  tagId: `${SOLID_PRODUCTIVITY_NS}tagId`,
+  doneOn: `${SOLID_PRODUCTIVITY_NS}doneOn`,
+  taskData: `${SOLID_PRODUCTIVITY_NS}taskData`,
 } as const;
