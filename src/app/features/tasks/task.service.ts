@@ -477,7 +477,9 @@ export class TaskService {
 
   remove(task: TaskWithSubTasks): void {
     this._taskTimeSync.clearOne(task.id);
-    task.subTasks.forEach((subTask) => this._taskTimeSync.clearOne(subTask.id));
+    // Clear via subTaskIds (always present) not subTasks: the keyboard-delete path
+    // passes a raw Task entity whose subTasks array is undefined (see #9280).
+    task.subTaskIds.forEach((id) => this._taskTimeSync.clearOne(id));
     this._store.dispatch(TaskSharedActions.deleteTask({ task }));
   }
 
@@ -1016,7 +1018,7 @@ export class TaskService {
 
     if (parentTasksToArchive.length) {
       // Only move parent tasks to archive, never subtasks
-      // Note: Full task payload required for sync - see docs/archive-operation-redesign.md
+      // Note: Full task payload required for sync - see docs/sync-and-op-log/operation-log-architecture.md
       // Persist first: dispatch removes the tasks from NgRx and makes the captured
       // operation eligible for a full-state snapshot. If archive persistence were
       // still in flight, that snapshot could acknowledge the operation while

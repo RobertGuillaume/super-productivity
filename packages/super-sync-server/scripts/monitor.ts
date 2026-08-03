@@ -1,4 +1,4 @@
-import { prisma, disconnectDb } from '../src/db';
+import { prisma, disconnectDb, reportMonitoringError } from './monitoring-db';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -186,8 +186,9 @@ const showStats = async (): Promise<void> => {
       tableSizes.forEach((t) => console.log(`  ${t.table}: ${t.size}`));
     }
   } catch (error) {
+    reportMonitoringError('Error:', error);
     console.log('Status: Disconnected ❌');
-    console.error('Error:', error);
+    process.exitCode = 1;
   }
 
   // Disk space
@@ -302,7 +303,8 @@ const showUsage = async (saveHistory = true, showFullEmails = false): Promise<vo
       console.log(`\nSnapshot saved to ${USAGE_HISTORY_PATH}`);
     }
   } catch (error) {
-    console.error('Error fetching usage data:', error);
+    reportMonitoringError('Error fetching usage data:', error);
+    process.exitCode = 1;
   }
 };
 
@@ -610,7 +612,8 @@ const showOps = async (args: string[]): Promise<void> => {
       }
     }
   } catch (error) {
-    console.error('Error fetching operations:', error);
+    reportMonitoringError('Error fetching operations:', error);
+    process.exitCode = 1;
   }
 };
 
@@ -761,7 +764,8 @@ const showActiveUsers = async (args: string[]): Promise<void> => {
       `\nUsers who never registered a device: ${Number(neverSynced[0]?.count ?? 0)}`,
     );
   } catch (error) {
-    console.error('Error fetching active users:', error);
+    reportMonitoringError('Error fetching active users:', error);
+    process.exitCode = 1;
   }
 };
 
@@ -822,7 +826,8 @@ const showActiveUsersQuick = async (args: string[]): Promise<void> => {
       })),
     );
   } catch (error) {
-    console.error('Error fetching active users (quick):', error);
+    reportMonitoringError('Error fetching active users (quick):', error);
+    process.exitCode = 1;
   }
 };
 
@@ -882,7 +887,8 @@ const main = async (): Promise<void> => {
         break;
     }
   } catch (err) {
-    console.error('Unexpected error:', err);
+    reportMonitoringError('Unexpected error:', err);
+    process.exitCode = 1;
   } finally {
     await disconnectDb();
   }
