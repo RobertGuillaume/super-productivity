@@ -101,6 +101,7 @@ import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-pers
 import { SolidSectionPersistenceEffects } from '../solid-data/solid-section-persistence.effects';
 import { SolidTagPersistenceEffects } from '../solid-data/solid-tag-persistence.effects';
 import { SolidTaskProjectMovePersistenceEffects } from '../solid-data/solid-task-project-move-persistence.effects';
+import { SolidTaskSchedulingPersistenceEffects } from '../solid-data/solid-task-scheduling-persistence.effects';
 import { SolidTaskPersistenceEffects } from '../solid-data/solid-task-persistence.effects';
 import { SolidTodayPersistenceEffects } from '../solid-data/solid-today-persistence.effects';
 import { SolidWorkContextPersistenceEffects } from '../solid-data/solid-work-context-persistence.effects';
@@ -127,6 +128,7 @@ import {
     EffectsModule.forFeature([SolidSectionPersistenceEffects]),
     EffectsModule.forFeature([SolidTagPersistenceEffects]),
     EffectsModule.forFeature([SolidTaskProjectMovePersistenceEffects]),
+    EffectsModule.forFeature([SolidTaskSchedulingPersistenceEffects]),
     EffectsModule.forFeature([SolidNotePersistenceEffects]),
     EffectsModule.forFeature([SolidAppStatePersistenceEffects]),
     EffectsModule.forFeature([SolidWorkContextPersistenceEffects]),

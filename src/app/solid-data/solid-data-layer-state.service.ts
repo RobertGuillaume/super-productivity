@@ -8,6 +8,7 @@ import { SOLID_PROJECT_TASK_ORDER_ACTION_TYPES } from './solid-project-task-orde
 import { SOLID_SECTION_ACTION_TYPES } from './solid-section-action-types';
 import { SOLID_TASK_TAG_ACTION_TYPES } from './solid-task-tag-action-types';
 import { SOLID_TASK_PROJECT_MOVE_ACTION_TYPES } from './solid-task-project-move-action-types';
+import { SOLID_TASK_SCHEDULING_ACTION_TYPES } from './solid-task-scheduling-action-types';
 import { SOLID_TODAY_ACTION_TYPES } from './solid-today-action-types';
 import { SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES } from './solid-work-context-action-types';
 
@@ -44,6 +45,7 @@ export class SolidDataLayerStateService {
     ...SOLID_PROJECT_TASK_ORDER_ACTION_TYPES,
     ...SOLID_SECTION_ACTION_TYPES,
     ...SOLID_TASK_PROJECT_MOVE_ACTION_TYPES,
+    ...SOLID_TASK_SCHEDULING_ACTION_TYPES,
     ...SOLID_TASK_TAG_ACTION_TYPES,
     ...SOLID_TODAY_ACTION_TYPES,
     ...SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES,

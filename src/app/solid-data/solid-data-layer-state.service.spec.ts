@@ -209,6 +209,36 @@ describe('SolidDataLayerStateService', () => {
       ),
     ).toBe(true);
     expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.scheduleTaskWithTime({
+          task,
+          dueWithTime: 1710000000500,
+          remindAt: 1710000000500,
+          isMoveToBacklog: false,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.reScheduleTaskWithTime({
+          task,
+          dueWithTime: 1710000000600,
+          remindAt: 1710000000600,
+          isMoveToBacklog: false,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.unscheduleTask({ id: 'task-1' }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.dismissReminderOnly({ id: 'task-1' }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
       service.ownsPersistentAction({
         ...action,
         type: ActionType.PROJECT_ADD,
