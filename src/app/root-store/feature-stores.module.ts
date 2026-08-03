@@ -104,6 +104,7 @@ import { SolidTagPersistenceEffects } from '../solid-data/solid-tag-persistence.
 import { SolidTaskBatchPersistenceEffects } from '../solid-data/solid-task-batch-persistence.effects';
 import { SolidTaskDeadlinePersistenceEffects } from '../solid-data/solid-task-deadline-persistence.effects';
 import { SolidTaskProjectMovePersistenceEffects } from '../solid-data/solid-task-project-move-persistence.effects';
+import { SolidTaskRepeatCfgPersistenceEffects } from '../solid-data/solid-task-repeat-cfg-persistence.effects';
 import { SolidTaskSchedulingPersistenceEffects } from '../solid-data/solid-task-scheduling-persistence.effects';
 import { SolidTaskPersistenceEffects } from '../solid-data/solid-task-persistence.effects';
 import { SolidTodayPersistenceEffects } from '../solid-data/solid-today-persistence.effects';
@@ -133,6 +134,7 @@ import {
     EffectsModule.forFeature([SolidTaskBatchPersistenceEffects]),
     EffectsModule.forFeature([SolidTaskDeadlinePersistenceEffects]),
     EffectsModule.forFeature([SolidTaskProjectMovePersistenceEffects]),
+    EffectsModule.forFeature([SolidTaskRepeatCfgPersistenceEffects]),
     EffectsModule.forFeature([SolidTaskSchedulingPersistenceEffects]),
     EffectsModule.forFeature([SolidNotePersistenceEffects]),
     EffectsModule.forFeature([SolidIssueProviderPersistenceEffects]),

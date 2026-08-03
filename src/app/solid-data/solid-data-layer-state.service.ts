@@ -10,6 +10,7 @@ import { SOLID_SECTION_ACTION_TYPES } from './solid-section-action-types';
 import { SOLID_TASK_BATCH_ACTION_TYPES } from './solid-task-batch-action-types';
 import { SOLID_TASK_TAG_ACTION_TYPES } from './solid-task-tag-action-types';
 import { SOLID_TASK_PROJECT_MOVE_ACTION_TYPES } from './solid-task-project-move-action-types';
+import { SOLID_TASK_REPEAT_CFG_ACTION_TYPES } from './solid-task-repeat-cfg-action-types';
 import { SOLID_TASK_SCHEDULING_ACTION_TYPES } from './solid-task-scheduling-action-types';
 import { SOLID_TASK_DEADLINE_ACTION_TYPES } from './solid-task-deadline-action-types';
 import { SOLID_TODAY_ACTION_TYPES } from './solid-today-action-types';
@@ -51,6 +52,7 @@ export class SolidDataLayerStateService {
     ...SOLID_TASK_BATCH_ACTION_TYPES,
     ...SOLID_TASK_DEADLINE_ACTION_TYPES,
     ...SOLID_TASK_PROJECT_MOVE_ACTION_TYPES,
+    ...SOLID_TASK_REPEAT_CFG_ACTION_TYPES,
     ...SOLID_TASK_SCHEDULING_ACTION_TYPES,
     ...SOLID_TASK_TAG_ACTION_TYPES,
     ...SOLID_TODAY_ACTION_TYPES,

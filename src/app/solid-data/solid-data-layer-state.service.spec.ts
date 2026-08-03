@@ -5,6 +5,18 @@ import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
 import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
 import {
+  DEFAULT_TASK_REPEAT_CFG,
+  TaskRepeatCfg,
+} from '../features/task-repeat-cfg/task-repeat-cfg.model';
+import {
+  addTaskRepeatCfgToTask,
+  deleteTaskRepeatCfg,
+  deleteTaskRepeatCfgInstance,
+  deleteTaskRepeatCfgs,
+  updateTaskRepeatCfg,
+  updateTaskRepeatCfgs,
+} from '../features/task-repeat-cfg/store/task-repeat-cfg.actions';
+import {
   addSection,
   addTaskToSection,
   deleteSection,
@@ -66,6 +78,13 @@ describe('SolidDataLayerStateService', () => {
       id: 'task-1',
       projectId: 'project-1',
       created: 1710000000000,
+    };
+    const taskRepeatCfg: TaskRepeatCfg = {
+      ...DEFAULT_TASK_REPEAT_CFG,
+      id: 'repeat-cfg-1',
+      projectId: 'project-1',
+      title: 'Repeat',
+      tagIds: ['tag-1'],
     };
     const action = TaskSharedActions.addTask({
       task,
@@ -494,6 +513,61 @@ describe('SolidDataLayerStateService', () => {
         TaskSharedActions.deleteIssueProviders({
           ids: ['issue-provider-1'],
           taskIdsToUnlink: ['task-1'],
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        addTaskRepeatCfgToTask({
+          taskId: 'task-1',
+          taskRepeatCfg,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateTaskRepeatCfg({
+          taskRepeatCfg: {
+            id: 'repeat-cfg-1',
+            changes: {
+              isPaused: true,
+            },
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateTaskRepeatCfgs({
+          ids: ['repeat-cfg-1'],
+          changes: {
+            isPaused: true,
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        deleteTaskRepeatCfgInstance({
+          repeatCfgId: 'repeat-cfg-1',
+          dateStr: '2026-08-03',
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        deleteTaskRepeatCfg({ id: 'repeat-cfg-1' }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        deleteTaskRepeatCfgs({ ids: ['repeat-cfg-1'] }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        TaskSharedActions.deleteTaskRepeatCfg({
+          taskRepeatCfgId: 'repeat-cfg-1',
         }) as PersistentAction,
       ),
     ).toBe(true);
