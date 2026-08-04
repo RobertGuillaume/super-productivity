@@ -100,6 +100,7 @@ import { SolidEmbeddedTaskPersistenceEffects } from '../solid-data/solid-embedde
 import { SolidGlobalConfigPersistenceEffects } from '../solid-data/solid-global-config-persistence.effects';
 import { SolidIssueProviderPersistenceEffects } from '../solid-data/solid-issue-provider-persistence.effects';
 import { SolidMetricPersistenceEffects } from '../solid-data/solid-metric-persistence.effects';
+import { SolidMenuTreePersistenceEffects } from '../solid-data/solid-menu-tree-persistence.effects';
 import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistence.effects';
 import { SolidPlannerPersistenceEffects } from '../solid-data/solid-planner-persistence.effects';
 import { SolidProjectDeleteCascadeEffects } from '../solid-data/solid-project-delete-cascade.effects';
@@ -152,6 +153,7 @@ import {
     EffectsModule.forFeature([SolidGlobalConfigPersistenceEffects]),
     EffectsModule.forFeature([SolidIssueProviderPersistenceEffects]),
     EffectsModule.forFeature([SolidMetricPersistenceEffects]),
+    EffectsModule.forFeature([SolidMenuTreePersistenceEffects]),
     EffectsModule.forFeature([SolidAppStatePersistenceEffects]),
     EffectsModule.forFeature([SolidWorkContextPersistenceEffects]),
     EffectsModule.forFeature([SolidTodayPersistenceEffects]),

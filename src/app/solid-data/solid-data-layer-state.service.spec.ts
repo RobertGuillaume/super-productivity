@@ -9,6 +9,8 @@ import {
 } from '../features/boards/boards.model';
 import { addBoard, updatePanelCfg } from '../features/boards/store/boards.actions';
 import { updateGlobalConfigSection } from '../features/config/store/global-config.actions';
+import { updateProjectTree } from '../features/menu-tree/store/menu-tree.actions';
+import { MenuTreeKind } from '../features/menu-tree/store/menu-tree.model';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
 import { PlannerActions } from '../features/planner/store/planner.actions';
 import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
@@ -658,6 +660,18 @@ describe('SolidDataLayerStateService', () => {
           sectionCfg: {
             isDisableAnimations: true,
           },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateProjectTree({
+          tree: [
+            {
+              id: 'project-1',
+              k: MenuTreeKind.PROJECT,
+            },
+          ],
         }) as PersistentAction,
       ),
     ).toBe(true);
