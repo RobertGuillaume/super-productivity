@@ -6,6 +6,11 @@ import { moveProjectTaskToBacklogList } from '../features/project/store/project.
 import { PlannerActions } from '../features/planner/store/planner.actions';
 import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
 import {
+  SimpleCounter,
+  SimpleCounterType,
+} from '../features/simple-counter/simple-counter.model';
+import { addSimpleCounter } from '../features/simple-counter/store/simple-counter.actions';
+import {
   DEFAULT_TASK_REPEAT_CFG,
   TaskRepeatCfg,
 } from '../features/task-repeat-cfg/task-repeat-cfg.model';
@@ -104,6 +109,15 @@ describe('SolidDataLayerStateService', () => {
       projectId: 'project-1',
       title: 'Repeat',
       tagIds: ['tag-1'],
+    };
+    const simpleCounter: SimpleCounter = {
+      id: 'counter-1',
+      title: 'Counter',
+      isEnabled: true,
+      icon: 'timer',
+      type: SimpleCounterType.StopWatch,
+      countOnDay: {},
+      isOn: false,
     };
     const action = TaskSharedActions.addTask({
       task,
@@ -588,6 +602,11 @@ describe('SolidDataLayerStateService', () => {
         TaskSharedActions.deleteTaskRepeatCfg({
           taskRepeatCfgId: 'repeat-cfg-1',
         }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        addSimpleCounter({ simpleCounter }) as PersistentAction,
       ),
     ).toBe(true);
     expect(

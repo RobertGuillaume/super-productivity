@@ -183,6 +183,73 @@ describe('SolidSimpleCounterRepository', () => {
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);
     expect(saved.title).toBe('Updated counter');
   });
+
+  it('deletes existing simple counter resources through the runtime delete API', async () => {
+    const existingThing = createThing(simpleCounter, 0);
+    things.query.and.resolveTo({ things: [existingThing] });
+    things.delete.and.resolveTo();
+
+    await TestBed.inject(SolidSimpleCounterRepository).deleteSimpleCounter('counter-1');
+
+    expect(things.delete).toHaveBeenCalledOnceWith(existingThing.uri);
+  });
+
+  it('replaces all simple counters and deletes stale resources', async () => {
+    const staleThing = createThing({ ...simpleCounter, id: 'stale-counter' }, 0);
+    const existingThing = createThing(simpleCounter, 1);
+    const newCounter = {
+      ...simpleCounter,
+      id: 'counter-2',
+      title: 'Fresh counter',
+    };
+    const plan = {
+      id: 'write-plan-1',
+      kind: 'thing.update',
+      request: {
+        kind: 'thing.update',
+        uri: existingThing.uri,
+        changes: {},
+      },
+      operations: [],
+      affectedResources: [],
+      diagnostics: [],
+    } as RuntimeWritePlan;
+
+    things.query.and.returnValues(
+      Promise.resolve({ things: [staleThing, existingThing] }),
+      Promise.resolve({ things: [staleThing] }),
+      Promise.resolve({ things: [existingThing] }),
+      Promise.resolve({ things: [] }),
+    );
+    things.delete.and.resolveTo();
+    things.create.and.resolveTo(createThing(newCounter, 1));
+    writes.planUpdate.and.returnValue(plan);
+    writes.commit.and.resolveTo({
+      planId: plan.id,
+      kind: 'thing.update',
+      result: existingThing,
+    });
+
+    await TestBed.inject(SolidSimpleCounterRepository).replaceSimpleCounters([
+      simpleCounter,
+      newCounter,
+    ]);
+
+    expect(things.delete).toHaveBeenCalledOnceWith(staleThing.uri);
+    expect(writes.planUpdate).toHaveBeenCalledOnceWith(
+      existingThing.uri,
+      jasmine.objectContaining({
+        replaceProperties: jasmine.any(Object),
+      }),
+    );
+    expect(things.create).toHaveBeenCalledOnceWith(
+      jasmine.objectContaining({
+        target: jasmine.objectContaining({
+          resourceName: 'counter-2',
+        }),
+      }),
+    );
+  });
 });
 
 const createThing = (simpleCounter: SimpleCounter, order: number): Thing => {

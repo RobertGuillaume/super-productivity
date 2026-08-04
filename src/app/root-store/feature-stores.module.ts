@@ -102,6 +102,7 @@ import { SolidPlannerPersistenceEffects } from '../solid-data/solid-planner-pers
 import { SolidProjectDeleteCascadeEffects } from '../solid-data/solid-project-delete-cascade.effects';
 import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
 import { SolidSectionPersistenceEffects } from '../solid-data/solid-section-persistence.effects';
+import { SolidSimpleCounterPersistenceEffects } from '../solid-data/solid-simple-counter-persistence.effects';
 import { SolidTagPersistenceEffects } from '../solid-data/solid-tag-persistence.effects';
 import { SolidTaskArchiveLifecyclePersistenceEffects } from '../solid-data/solid-task-archive-lifecycle-persistence.effects';
 import { SolidTaskBatchPersistenceEffects } from '../solid-data/solid-task-batch-persistence.effects';
@@ -135,6 +136,7 @@ import {
     EffectsModule.forFeature([SolidProjectDeleteCascadeEffects]),
     EffectsModule.forFeature([SolidProjectPersistenceEffects]),
     EffectsModule.forFeature([SolidSectionPersistenceEffects]),
+    EffectsModule.forFeature([SolidSimpleCounterPersistenceEffects]),
     EffectsModule.forFeature([SolidTagPersistenceEffects]),
     EffectsModule.forFeature([SolidTaskArchiveLifecyclePersistenceEffects]),
     EffectsModule.forFeature([SolidTaskBatchPersistenceEffects]),

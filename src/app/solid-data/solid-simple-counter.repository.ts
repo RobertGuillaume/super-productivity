@@ -68,6 +68,26 @@ export class SolidSimpleCounterRepository {
     return solidThingToSimpleCounter(commit.result);
   }
 
+  async replaceSimpleCounters(
+    simpleCounters: readonly SimpleCounter[],
+  ): Promise<SimpleCounter[]> {
+    const existingThings = await this.querySimpleCounterThings();
+    const nextIds = new Set(simpleCounters.map((simpleCounter) => simpleCounter.id));
+
+    await Promise.all(
+      existingThings
+        .map(solidThingToSimpleCounter)
+        .filter((simpleCounter) => !nextIds.has(simpleCounter.id))
+        .map((simpleCounter) => this.deleteSimpleCounter(simpleCounter.id)),
+    );
+
+    return Promise.all(
+      simpleCounters.map((simpleCounter, order) =>
+        this.saveSimpleCounter(simpleCounter, order),
+      ),
+    );
+  }
+
   async deleteSimpleCounter(simpleCounterId: string): Promise<void> {
     const existingThing = await this.findSimpleCounterThing(simpleCounterId);
     if (existingThing !== null) {
@@ -113,6 +133,15 @@ export class SolidSimpleCounterRepository {
     );
 
     return result.things[0] ?? null;
+  }
+
+  private async querySimpleCounterThings(): Promise<Thing[]> {
+    const result = await this.solidRuntime.client.things.query(solidSimpleCounterQuery, {
+      scope: this.simpleCounterContainerScope(),
+      autoDiscover: true,
+    });
+
+    return [...result.things];
   }
 
   private simpleCounterContainerScope(): SolidSimpleCounterContainerScope {
