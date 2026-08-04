@@ -1,6 +1,11 @@
 import { inject, Injectable } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { Log } from '../core/log';
+import { Metric } from '../features/metric/metric.model';
+import {
+  initialMetricState,
+  metricAdapter,
+} from '../features/metric/store/metric.reducer';
 import { Note } from '../features/note/note.model';
 import { IssueProvider } from '../features/issue/issue.model';
 import {
@@ -46,6 +51,7 @@ import { SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
+import { SolidMetricRepository } from './solid-metric.repository';
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
@@ -64,6 +70,7 @@ export class SolidTaskHydrationService {
   private readonly tagRepository = inject(SolidTagRepository);
   private readonly noteRepository = inject(SolidNoteRepository);
   private readonly issueProviderRepository = inject(SolidIssueProviderRepository);
+  private readonly metricRepository = inject(SolidMetricRepository);
   private readonly sectionRepository = inject(SolidSectionRepository);
   private readonly taskRepeatCfgRepository = inject(SolidTaskRepeatCfgRepository);
   private readonly simpleCounterRepository = inject(SolidSimpleCounterRepository);
@@ -80,6 +87,7 @@ export class SolidTaskHydrationService {
       issueProviders,
       taskRepeatCfgs,
       simpleCounters,
+      metrics,
       plannerState,
       appState,
     ] = await Promise.all([
@@ -92,6 +100,7 @@ export class SolidTaskHydrationService {
       this.issueProviderRepository.loadIssueProviders(),
       this.taskRepeatCfgRepository.loadTaskRepeatCfgs(),
       this.simpleCounterRepository.loadSimpleCounters(),
+      this.metricRepository.loadMetrics(),
       this.plannerRepository.loadPlannerState(),
       this.appStateRepository.loadAppState(),
     ]);
@@ -104,6 +113,7 @@ export class SolidTaskHydrationService {
       issueProviders,
       taskRepeatCfgs,
       simpleCounters,
+      metrics,
       archivedTasks,
       plannerState,
       appState,
@@ -117,6 +127,7 @@ export class SolidTaskHydrationService {
         `issue provider count: ${issueProviders.length}, ` +
         `repeat config count: ${taskRepeatCfgs.length}, ` +
         `simple counter count: ${simpleCounters.length}, ` +
+        `metric count: ${metrics.length}, ` +
         `archived task count: ${archivedTasks.length}, ` +
         `planner day count: ${Object.keys(plannerState.days).length}`,
     );
@@ -132,6 +143,7 @@ export const createSolidAppData = (input: {
   issueProviders?: readonly IssueProvider[];
   taskRepeatCfgs?: readonly TaskRepeatCfg[];
   simpleCounters?: readonly SimpleCounter[];
+  metrics?: readonly Metric[];
   archivedTasks?: readonly SolidArchivedTask[];
   plannerState?: PlannerState;
   appState?: SolidAppState | null;
@@ -174,6 +186,7 @@ export const createSolidAppData = (input: {
       [...(input.simpleCounters ?? [])],
       initialSimpleCounterState,
     ),
+    metric: metricAdapter.setAll([...(input.metrics ?? [])], initialMetricState),
     archiveYoung: {
       ...appDataComplete.archiveYoung,
       task: taskAdapter.setAll(archiveYoungTasks, initialTaskState),

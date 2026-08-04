@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Store } from '@ngrx/store';
+import { Metric } from '../features/metric/metric.model';
 import { Note } from '../features/note/note.model';
 import { IssueProvider } from '../features/issue/issue.model';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
@@ -30,6 +31,7 @@ import {
 } from './solid-task-hydration.service';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
+import { SolidMetricRepository } from './solid-metric.repository';
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
@@ -103,6 +105,18 @@ describe('SolidTaskHydrationService', () => {
     },
     isOn: false,
   };
+  const metric: Metric = {
+    id: TODAY,
+    focusSessions: [25],
+    notes: 'Solid metric',
+    remindTomorrow: true,
+    reflections: [
+      {
+        text: 'Good rhythm',
+        created: 1710000000700,
+      },
+    ],
+  };
   const archivedYoungTask: Task = {
     ...task,
     id: 'archived-young-task-1',
@@ -150,6 +164,7 @@ describe('SolidTaskHydrationService', () => {
       issueProviders: [issueProvider],
       taskRepeatCfgs: [taskRepeatCfg],
       simpleCounters: [simpleCounter],
+      metrics: [metric],
       archivedTasks,
       plannerState,
     });
@@ -173,6 +188,8 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.taskRepeatCfg.entities['repeat-cfg-1']).toEqual(taskRepeatCfg);
     expect(appData.simpleCounter.ids).toEqual(['counter-1']);
     expect(appData.simpleCounter.entities['counter-1']).toEqual(simpleCounter);
+    expect(appData.metric.ids).toEqual([TODAY]);
+    expect(appData.metric.entities[TODAY]).toEqual(metric);
     expect(appData.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appData.archiveYoung.task.entities['archived-young-task-1']).toEqual(
       archivedYoungTask,
@@ -276,6 +293,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidSimpleCounterRepository',
       ['loadSimpleCounters'],
     );
+    const metricRepository = jasmine.createSpyObj<SolidMetricRepository>(
+      'SolidMetricRepository',
+      ['loadMetrics'],
+    );
     const appStateRepository = jasmine.createSpyObj<SolidAppStateRepository>(
       'SolidAppStateRepository',
       ['loadAppState'],
@@ -289,6 +310,7 @@ describe('SolidTaskHydrationService', () => {
     issueProviderRepository.loadIssueProviders.and.resolveTo([issueProvider]);
     taskRepeatCfgRepository.loadTaskRepeatCfgs.and.resolveTo([taskRepeatCfg]);
     simpleCounterRepository.loadSimpleCounters.and.resolveTo([simpleCounter]);
+    metricRepository.loadMetrics.and.resolveTo([metric]);
     plannerRepository.loadPlannerState.and.resolveTo(plannerState);
     appStateRepository.loadAppState.and.resolveTo(appState);
 
@@ -305,6 +327,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidIssueProviderRepository, useValue: issueProviderRepository },
         { provide: SolidTaskRepeatCfgRepository, useValue: taskRepeatCfgRepository },
         { provide: SolidSimpleCounterRepository, useValue: simpleCounterRepository },
+        { provide: SolidMetricRepository, useValue: metricRepository },
         { provide: SolidAppStateRepository, useValue: appStateRepository },
       ],
     });
@@ -340,6 +363,8 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.simpleCounter.entities['counter-1']).toEqual(
       simpleCounter,
     );
+    expect(action.appDataComplete.metric.ids).toEqual([TODAY]);
+    expect(action.appDataComplete.metric.entities[TODAY]).toEqual(metric);
     const appDataComplete = action.appDataComplete as AppDataComplete;
     expect(appDataComplete.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appDataComplete.archiveOld.task.ids).toEqual(['archived-old-task-1']);
@@ -350,6 +375,7 @@ describe('SolidTaskHydrationService', () => {
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
     expect(taskRepeatCfgRepository.loadTaskRepeatCfgs).toHaveBeenCalledTimes(1);
     expect(simpleCounterRepository.loadSimpleCounters).toHaveBeenCalledTimes(1);
+    expect(metricRepository.loadMetrics).toHaveBeenCalledTimes(1);
     expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
   });
 });

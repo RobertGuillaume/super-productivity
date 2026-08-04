@@ -10,6 +10,7 @@ import {
   SOLID_PRODUCTIVITY_APP_STATE_TYPE,
   SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE,
   SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE,
+  SOLID_PRODUCTIVITY_METRIC_TYPE,
   SOLID_PRODUCTIVITY_NOTE_TYPE,
   SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE,
   SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE,
@@ -77,6 +78,10 @@ export class SolidRuntimeService {
 
   get simpleCounterProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE];
+  }
+
+  get metricProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_METRIC_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_METRIC_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {

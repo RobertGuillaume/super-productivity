@@ -13,6 +13,7 @@ export const SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE = 'SuperProductivityArchivedT
 export const SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE = 'SuperProductivityPlannerDay';
 export const SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE = 'SuperProductivityPlannerState';
 export const SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE = 'SuperProductivitySimpleCounter';
+export const SOLID_PRODUCTIVITY_METRIC_TYPE = 'SuperProductivityMetric';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
@@ -28,6 +29,7 @@ export const SOLID_PRODUCTIVITY_ARCHIVED_TASKS_CONTAINER =
 export const SOLID_PRODUCTIVITY_PLANNER_CONTAINER = 'super-productivity/planner';
 export const SOLID_PRODUCTIVITY_SIMPLE_COUNTERS_CONTAINER =
   'super-productivity/simple-counters';
+export const SOLID_PRODUCTIVITY_METRICS_CONTAINER = 'super-productivity/metrics';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -45,6 +47,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     archivedTasks: SOLID_PRODUCTIVITY_ARCHIVED_TASKS_CONTAINER,
     planner: SOLID_PRODUCTIVITY_PLANNER_CONTAINER,
     simpleCounters: SOLID_PRODUCTIVITY_SIMPLE_COUNTERS_CONTAINER,
+    metrics: SOLID_PRODUCTIVITY_METRICS_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -105,6 +108,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     [SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}SimpleCounter`,
       container: 'simpleCounters',
+      defaultStatus: 'active',
+    },
+    [SOLID_PRODUCTIVITY_METRIC_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}Metric`,
+      container: 'metrics',
       defaultStatus: 'active',
     },
   },
@@ -267,4 +275,18 @@ export const SP_SIMPLE_COUNTER = {
   order: `${SOLID_PRODUCTIVITY_NS}order`,
   countOnDay: `${SOLID_PRODUCTIVITY_NS}countOnDay`,
   counterData: `${SOLID_PRODUCTIVITY_NS}counterData`,
+} as const;
+
+export const SP_METRIC = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  notes: `${SOLID_PRODUCTIVITY_NS}notes`,
+  remindTomorrow: `${SOLID_PRODUCTIVITY_NS}remindTomorrow`,
+  impactOfWork: `${SOLID_PRODUCTIVITY_NS}impactOfWork`,
+  energyCheckin: `${SOLID_PRODUCTIVITY_NS}energyCheckin`,
+  totalWorkMinutes: `${SOLID_PRODUCTIVITY_NS}totalWorkMinutes`,
+  completedTasks: `${SOLID_PRODUCTIVITY_NS}completedTasks`,
+  plannedTasks: `${SOLID_PRODUCTIVITY_NS}plannedTasks`,
+  focusSessions: `${SOLID_PRODUCTIVITY_NS}focusSessions`,
+  reflections: `${SOLID_PRODUCTIVITY_NS}reflections`,
+  metricData: `${SOLID_PRODUCTIVITY_NS}metricData`,
 } as const;
