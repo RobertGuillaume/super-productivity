@@ -8,6 +8,7 @@ import type {
 import {
   SOLID_PRODUCTIVITY_LAYOUT,
   SOLID_PRODUCTIVITY_APP_STATE_TYPE,
+  SOLID_PRODUCTIVITY_ARCHIVE_STATE_TYPE,
   SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE,
   SOLID_PRODUCTIVITY_BOARD_TYPE,
   SOLID_PRODUCTIVITY_GLOBAL_CONFIG_TYPE,
@@ -70,6 +71,10 @@ export class SolidRuntimeService {
 
   get archivedTaskProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE];
+  }
+
+  get archiveStateProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_ARCHIVE_STATE_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_ARCHIVE_STATE_TYPE];
   }
 
   get plannerDayProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE] {

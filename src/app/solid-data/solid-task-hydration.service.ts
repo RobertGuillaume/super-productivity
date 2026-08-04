@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { Store } from '@ngrx/store';
+import { ArchiveDbAdapter } from '../core/persistence/archive-db-adapter.service';
 import { Log } from '../core/log';
 import { BoardCfg } from '../features/boards/boards.model';
 import { GlobalConfigState } from '../features/config/global-config.model';
@@ -42,13 +43,14 @@ import { initialTaskRepeatCfgState } from '../features/task-repeat-cfg/store/tas
 import { adapter as taskRepeatCfgAdapter } from '../features/task-repeat-cfg/store/task-repeat-cfg.selectors';
 import { initialTaskState } from '../features/tasks/store/task.reducer';
 import { taskAdapter } from '../features/tasks/store/task.adapter';
-import { initialTimeTrackingState } from '../features/time-tracking/store/time-tracking.reducer';
 import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
 import { TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { initialTagState, tagAdapter } from '../features/tag/store/tag.reducer';
 import { AppDataComplete, MODEL_CONFIGS } from '../op-log/model/model-config';
 import { loadAllData } from '../root-store/meta/load-all-data.action';
+import { SolidArchiveState } from './solid-archive-state.mapper';
+import { SolidArchiveStateRepository } from './solid-archive-state.repository';
 import { SolidArchivedTask, SolidArchiveBucket } from './solid-archived-task.mapper';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidAppState } from './solid-app-state.mapper';
@@ -71,6 +73,8 @@ import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 @Injectable({ providedIn: 'root' })
 export class SolidTaskHydrationService {
   private readonly store = inject(Store);
+  private readonly archiveDbAdapter = inject(ArchiveDbAdapter);
+  private readonly archiveStateRepository = inject(SolidArchiveStateRepository);
   private readonly taskRepository = inject(SolidTaskRepository);
   private readonly archivedTaskRepository = inject(SolidArchivedTaskRepository);
   private readonly boardRepository = inject(SolidBoardRepository);
@@ -91,6 +95,7 @@ export class SolidTaskHydrationService {
   async hydrateStore(): Promise<void> {
     const [
       tasks,
+      archiveStates,
       archivedTasks,
       boards,
       globalConfig,
@@ -108,6 +113,7 @@ export class SolidTaskHydrationService {
       timeTrackingState,
     ] = await Promise.all([
       this.taskRepository.loadTasks(),
+      this.archiveStateRepository.loadArchiveStates(),
       this.archivedTaskRepository.loadArchivedTasks(),
       this.boardRepository.loadBoards(),
       this.globalConfigRepository.loadGlobalConfig(),
@@ -126,6 +132,7 @@ export class SolidTaskHydrationService {
     ]);
     const appDataComplete = createSolidAppData({
       tasks,
+      archiveStates,
       boards,
       globalConfig,
       menuTree,
@@ -143,9 +150,15 @@ export class SolidTaskHydrationService {
       timeTrackingState,
     });
 
+    await this.archiveDbAdapter.saveArchivesAtomic(
+      appDataComplete.archiveYoung,
+      appDataComplete.archiveOld,
+    );
+
     this.store.dispatch(loadAllData({ appDataComplete }));
     Log.normal(
       `Solid data layer hydrated task count: ${tasks.length}, ` +
+        `archive state loaded: young=${archiveStates.young.updated > 0}, old=${archiveStates.old.updated > 0}, ` +
         `board count: ${boards.length}, ` +
         `global config loaded: ${globalConfig !== null}, ` +
         `menu tree loaded: ${menuTree !== null}, ` +
@@ -164,6 +177,10 @@ export class SolidTaskHydrationService {
 
 export const createSolidAppData = (input: {
   tasks: readonly Task[];
+  archiveStates?: {
+    young: SolidArchiveState;
+    old: SolidArchiveState;
+  };
   boards?: readonly BoardCfg[];
   globalConfig?: GlobalConfigState | null;
   menuTree?: MenuTreeState | null;
@@ -228,12 +245,21 @@ export const createSolidAppData = (input: {
     archiveYoung: {
       ...appDataComplete.archiveYoung,
       task: taskAdapter.setAll(archiveYoungTasks, initialTaskState),
-      timeTracking: initialTimeTrackingState,
+      timeTracking:
+        input.archiveStates?.young.timeTracking ??
+        appDataComplete.archiveYoung.timeTracking,
+      lastTimeTrackingFlush:
+        input.archiveStates?.young.lastTimeTrackingFlush ??
+        appDataComplete.archiveYoung.lastTimeTrackingFlush,
     },
     archiveOld: {
       ...appDataComplete.archiveOld,
       task: taskAdapter.setAll(archiveOldTasks, initialTaskState),
-      timeTracking: initialTimeTrackingState,
+      timeTracking:
+        input.archiveStates?.old.timeTracking ?? appDataComplete.archiveOld.timeTracking,
+      lastTimeTrackingFlush:
+        input.archiveStates?.old.lastTimeTrackingFlush ??
+        appDataComplete.archiveOld.lastTimeTrackingFlush,
     },
     planner: input.plannerState ?? appDataComplete.planner,
   };

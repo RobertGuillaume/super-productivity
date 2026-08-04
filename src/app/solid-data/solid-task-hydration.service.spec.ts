@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Store } from '@ngrx/store';
+import { ArchiveDbAdapter } from '../core/persistence/archive-db-adapter.service';
 import {
   BoardCfg,
   BoardPanelCfgScheduledState,
@@ -30,6 +31,8 @@ import { Tag } from '../features/tag/tag.model';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { AppDataComplete } from '../op-log/model/model-config';
 import { loadAllData } from '../root-store/meta/load-all-data.action';
+import { SolidArchiveState } from './solid-archive-state.mapper';
+import { SolidArchiveStateRepository } from './solid-archive-state.repository';
 import { SolidArchivedTask } from './solid-archived-task.mapper';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SOLID_APP_STATE_ID, SolidAppState } from './solid-app-state.mapper';
@@ -191,6 +194,45 @@ describe('SolidTaskHydrationService', () => {
       bucket: 'young',
     },
   ];
+  const archiveStates: {
+    young: SolidArchiveState;
+    old: SolidArchiveState;
+  } = {
+    young: {
+      id: 'archive-young',
+      bucket: 'young',
+      timeTracking: {
+        project: {
+          ['project-1']: {
+            ['2026-08-03']: {
+              s: 1710000000000,
+              e: 1710003600000,
+            },
+          },
+        },
+        tag: {},
+      },
+      lastTimeTrackingFlush: 1710000000000,
+      updated: 1710000000100,
+    },
+    old: {
+      id: 'archive-old',
+      bucket: 'old',
+      timeTracking: {
+        project: {},
+        tag: {
+          ['tag-1']: {
+            ['2026-07-01']: {
+              s: 1700000000000,
+              e: 1700003600000,
+            },
+          },
+        },
+      },
+      lastTimeTrackingFlush: 1710000000200,
+      updated: 1710000000300,
+    },
+  };
   const plannerState: PlannerState = {
     days: {
       ['2026-08-04']: ['task-1'],
@@ -220,6 +262,7 @@ describe('SolidTaskHydrationService', () => {
   it('creates app data from Solid tasks, projects, and existing model defaults', () => {
     const appData = createSolidAppData({
       tasks: [task],
+      archiveStates,
       boards: [board],
       globalConfig,
       menuTree,
@@ -265,9 +308,17 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.archiveYoung.task.entities['archived-young-task-1']).toEqual(
       archivedYoungTask,
     );
+    expect(appData.archiveYoung.timeTracking).toEqual(archiveStates.young.timeTracking);
+    expect(appData.archiveYoung.lastTimeTrackingFlush).toBe(
+      archiveStates.young.lastTimeTrackingFlush,
+    );
     expect(appData.archiveOld.task.ids).toEqual(['archived-old-task-1']);
     expect(appData.archiveOld.task.entities['archived-old-task-1']).toEqual(
       archivedOldTask,
+    );
+    expect(appData.archiveOld.timeTracking).toEqual(archiveStates.old.timeTracking);
+    expect(appData.archiveOld.lastTimeTrackingFlush).toBe(
+      archiveStates.old.lastTimeTrackingFlush,
     );
     expect(appData.planner).toEqual(plannerState);
     expect(appData.reminders).toEqual([]);
@@ -325,6 +376,13 @@ describe('SolidTaskHydrationService', () => {
 
   it('dispatches loadAllData with Solid task, project, tag, note, section, and issue provider data', async () => {
     const store = jasmine.createSpyObj<Store>('Store', ['dispatch']);
+    const archiveDbAdapter = jasmine.createSpyObj<ArchiveDbAdapter>('ArchiveDbAdapter', [
+      'saveArchivesAtomic',
+    ]);
+    const archiveStateRepository = jasmine.createSpyObj<SolidArchiveStateRepository>(
+      'SolidArchiveStateRepository',
+      ['loadArchiveStates'],
+    );
     const taskRepository = jasmine.createSpyObj<SolidTaskRepository>(
       'SolidTaskRepository',
       ['loadTasks'],
@@ -388,6 +446,8 @@ describe('SolidTaskHydrationService', () => {
       'SolidTimeTrackingRepository',
       ['loadTimeTrackingState'],
     );
+    archiveDbAdapter.saveArchivesAtomic.and.resolveTo();
+    archiveStateRepository.loadArchiveStates.and.resolveTo(archiveStates);
     taskRepository.loadTasks.and.resolveTo([task]);
     archivedTaskRepository.loadArchivedTasks.and.resolveTo(archivedTasks);
     boardRepository.loadBoards.and.resolveTo([board]);
@@ -408,6 +468,8 @@ describe('SolidTaskHydrationService', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: Store, useValue: store },
+        { provide: ArchiveDbAdapter, useValue: archiveDbAdapter },
+        { provide: SolidArchiveStateRepository, useValue: archiveStateRepository },
         { provide: SolidTaskRepository, useValue: taskRepository },
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
         { provide: SolidBoardRepository, useValue: boardRepository },
@@ -467,7 +529,18 @@ describe('SolidTaskHydrationService', () => {
     expect(appDataComplete.timeTracking).toEqual(timeTrackingState);
     expect(appDataComplete.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appDataComplete.archiveOld.task.ids).toEqual(['archived-old-task-1']);
+    expect(appDataComplete.archiveYoung.timeTracking).toEqual(
+      archiveStates.young.timeTracking,
+    );
+    expect(appDataComplete.archiveOld.timeTracking).toEqual(
+      archiveStates.old.timeTracking,
+    );
+    expect(archiveDbAdapter.saveArchivesAtomic).toHaveBeenCalledOnceWith(
+      appDataComplete.archiveYoung,
+      appDataComplete.archiveOld,
+    );
     expect(appDataComplete.planner).toEqual(plannerState);
+    expect(archiveStateRepository.loadArchiveStates).toHaveBeenCalledTimes(1);
     expect(archivedTaskRepository.loadArchivedTasks).toHaveBeenCalledTimes(1);
     expect(boardRepository.loadBoards).toHaveBeenCalledTimes(1);
     expect(globalConfigRepository.loadGlobalConfig).toHaveBeenCalledTimes(1);

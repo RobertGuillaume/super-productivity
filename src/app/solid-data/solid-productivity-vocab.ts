@@ -10,6 +10,7 @@ export const SOLID_PRODUCTIVITY_SECTION_TYPE = 'SuperProductivitySection';
 export const SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE = 'SuperProductivityIssueProvider';
 export const SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE = 'SuperProductivityTaskRepeatCfg';
 export const SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE = 'SuperProductivityArchivedTask';
+export const SOLID_PRODUCTIVITY_ARCHIVE_STATE_TYPE = 'SuperProductivityArchiveState';
 export const SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE = 'SuperProductivityPlannerDay';
 export const SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE = 'SuperProductivityPlannerState';
 export const SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE = 'SuperProductivitySimpleCounter';
@@ -30,6 +31,8 @@ export const SOLID_PRODUCTIVITY_TASK_REPEAT_CFGS_CONTAINER =
   'super-productivity/repeat-configs';
 export const SOLID_PRODUCTIVITY_ARCHIVED_TASKS_CONTAINER =
   'super-productivity/archive/tasks';
+export const SOLID_PRODUCTIVITY_ARCHIVE_STATE_CONTAINER =
+  'super-productivity/archive/state';
 export const SOLID_PRODUCTIVITY_PLANNER_CONTAINER = 'super-productivity/planner';
 export const SOLID_PRODUCTIVITY_SIMPLE_COUNTERS_CONTAINER =
   'super-productivity/simple-counters';
@@ -54,6 +57,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     issueProviders: SOLID_PRODUCTIVITY_ISSUE_PROVIDERS_CONTAINER,
     taskRepeatCfgs: SOLID_PRODUCTIVITY_TASK_REPEAT_CFGS_CONTAINER,
     archivedTasks: SOLID_PRODUCTIVITY_ARCHIVED_TASKS_CONTAINER,
+    archiveState: SOLID_PRODUCTIVITY_ARCHIVE_STATE_CONTAINER,
     planner: SOLID_PRODUCTIVITY_PLANNER_CONTAINER,
     simpleCounters: SOLID_PRODUCTIVITY_SIMPLE_COUNTERS_CONTAINER,
     metrics: SOLID_PRODUCTIVITY_METRICS_CONTAINER,
@@ -107,6 +111,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
       classUri: `${SOLID_PRODUCTIVITY_NS}ArchivedTask`,
       container: 'archivedTasks',
       defaultStatus: 'archived',
+    },
+    [SOLID_PRODUCTIVITY_ARCHIVE_STATE_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}ArchiveState`,
+      container: 'archiveState',
+      defaultStatus: 'active',
     },
     [SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}PlannerDay`,
@@ -279,6 +288,14 @@ export const SP_ARCHIVED_TASK = {
   tagId: `${SOLID_PRODUCTIVITY_NS}tagId`,
   doneOn: `${SOLID_PRODUCTIVITY_NS}doneOn`,
   taskData: `${SOLID_PRODUCTIVITY_NS}taskData`,
+} as const;
+
+export const SP_ARCHIVE_STATE = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  bucket: `${SOLID_PRODUCTIVITY_NS}archiveBucket`,
+  lastTimeTrackingFlush: `${SOLID_PRODUCTIVITY_NS}lastTimeTrackingFlush`,
+  timeTracking: `${SOLID_PRODUCTIVITY_NS}timeTracking`,
+  updated: `${SOLID_PRODUCTIVITY_NS}updated`,
 } as const;
 
 export const SP_PLANNER_DAY = {
