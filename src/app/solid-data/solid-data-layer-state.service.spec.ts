@@ -5,6 +5,7 @@ import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
 import { PlannerActions } from '../features/planner/store/planner.actions';
 import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
+import { logFocusSession } from '../features/metric/store/metric.actions';
 import {
   SimpleCounter,
   SimpleCounterType,
@@ -607,6 +608,14 @@ describe('SolidDataLayerStateService', () => {
     expect(
       service.ownsPersistentAction(
         addSimpleCounter({ simpleCounter }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        logFocusSession({
+          day: '2026-08-04',
+          duration: 25,
+        }) as PersistentAction,
       ),
     ).toBe(true);
     expect(
