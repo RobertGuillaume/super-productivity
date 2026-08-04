@@ -14,6 +14,7 @@ export const SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE = 'SuperProductivityPlannerDay'
 export const SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE = 'SuperProductivityPlannerState';
 export const SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE = 'SuperProductivitySimpleCounter';
 export const SOLID_PRODUCTIVITY_METRIC_TYPE = 'SuperProductivityMetric';
+export const SOLID_PRODUCTIVITY_BOARD_TYPE = 'SuperProductivityBoard';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
@@ -30,6 +31,7 @@ export const SOLID_PRODUCTIVITY_PLANNER_CONTAINER = 'super-productivity/planner'
 export const SOLID_PRODUCTIVITY_SIMPLE_COUNTERS_CONTAINER =
   'super-productivity/simple-counters';
 export const SOLID_PRODUCTIVITY_METRICS_CONTAINER = 'super-productivity/metrics';
+export const SOLID_PRODUCTIVITY_BOARDS_CONTAINER = 'super-productivity/boards';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -48,6 +50,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     planner: SOLID_PRODUCTIVITY_PLANNER_CONTAINER,
     simpleCounters: SOLID_PRODUCTIVITY_SIMPLE_COUNTERS_CONTAINER,
     metrics: SOLID_PRODUCTIVITY_METRICS_CONTAINER,
+    boards: SOLID_PRODUCTIVITY_BOARDS_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -113,6 +116,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     [SOLID_PRODUCTIVITY_METRIC_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}Metric`,
       container: 'metrics',
+      defaultStatus: 'active',
+    },
+    [SOLID_PRODUCTIVITY_BOARD_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}Board`,
+      container: 'boards',
       defaultStatus: 'active',
     },
   },
@@ -289,4 +297,13 @@ export const SP_METRIC = {
   focusSessions: `${SOLID_PRODUCTIVITY_NS}focusSessions`,
   reflections: `${SOLID_PRODUCTIVITY_NS}reflections`,
   metricData: `${SOLID_PRODUCTIVITY_NS}metricData`,
+} as const;
+
+export const SP_BOARD = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  title: `${SOLID_PRODUCTIVITY_NS}title`,
+  cols: `${SOLID_PRODUCTIVITY_NS}cols`,
+  order: `${SOLID_PRODUCTIVITY_NS}order`,
+  panels: `${SOLID_PRODUCTIVITY_NS}panels`,
+  boardData: `${SOLID_PRODUCTIVITY_NS}boardData`,
 } as const;

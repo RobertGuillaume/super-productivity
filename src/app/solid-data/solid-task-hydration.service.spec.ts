@@ -1,5 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { Store } from '@ngrx/store';
+import {
+  BoardCfg,
+  BoardPanelCfgScheduledState,
+  BoardPanelCfgTaskDoneState,
+} from '../features/boards/boards.model';
 import { Metric } from '../features/metric/metric.model';
 import { Note } from '../features/note/note.model';
 import { IssueProvider } from '../features/issue/issue.model';
@@ -25,6 +30,7 @@ import { SolidArchivedTask } from './solid-archived-task.mapper';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SOLID_APP_STATE_ID, SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
+import { SolidBoardRepository } from './solid-board.repository';
 import {
   createSolidAppData,
   SolidTaskHydrationService,
@@ -117,6 +123,24 @@ describe('SolidTaskHydrationService', () => {
       },
     ],
   };
+  const board: BoardCfg = {
+    id: 'board-1',
+    title: 'Solid board',
+    cols: 1,
+    panels: [
+      {
+        id: 'panel-1',
+        title: 'Panel',
+        taskIds: ['task-1'],
+        includedTagIds: [],
+        excludedTagIds: [],
+        taskDoneState: BoardPanelCfgTaskDoneState.All,
+        scheduledState: BoardPanelCfgScheduledState.All,
+        isParentTasksOnly: false,
+        projectIds: ['project-1'],
+      },
+    ],
+  };
   const archivedYoungTask: Task = {
     ...task,
     id: 'archived-young-task-1',
@@ -157,6 +181,7 @@ describe('SolidTaskHydrationService', () => {
   it('creates app data from Solid tasks, projects, and existing model defaults', () => {
     const appData = createSolidAppData({
       tasks: [task],
+      boards: [board],
       projects: [project],
       tags: [tag],
       notes: [note],
@@ -170,6 +195,7 @@ describe('SolidTaskHydrationService', () => {
     });
 
     expect(appData.task.ids).toEqual(['task-1']);
+    expect(appData.boards.boardCfgs).toEqual([board]);
     expect(appData.task.entities['task-1']).toEqual(task);
     expect(appData.project.ids).toEqual([INBOX_PROJECT.id, 'project-1']);
     expect(appData.project.entities[INBOX_PROJECT.id]).toEqual(INBOX_PROJECT);
@@ -262,6 +288,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidArchivedTaskRepository',
       ['loadArchivedTasks'],
     );
+    const boardRepository = jasmine.createSpyObj<SolidBoardRepository>(
+      'SolidBoardRepository',
+      ['loadBoards'],
+    );
     const projectRepository = jasmine.createSpyObj<SolidProjectRepository>(
       'SolidProjectRepository',
       ['loadProjects'],
@@ -303,6 +333,7 @@ describe('SolidTaskHydrationService', () => {
     );
     taskRepository.loadTasks.and.resolveTo([task]);
     archivedTaskRepository.loadArchivedTasks.and.resolveTo(archivedTasks);
+    boardRepository.loadBoards.and.resolveTo([board]);
     projectRepository.loadProjects.and.resolveTo([project]);
     tagRepository.loadTags.and.resolveTo([tag]);
     noteRepository.loadNotes.and.resolveTo([note]);
@@ -319,6 +350,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: Store, useValue: store },
         { provide: SolidTaskRepository, useValue: taskRepository },
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
+        { provide: SolidBoardRepository, useValue: boardRepository },
         { provide: SolidProjectRepository, useValue: projectRepository },
         { provide: SolidPlannerRepository, useValue: plannerRepository },
         { provide: SolidTagRepository, useValue: tagRepository },
@@ -341,6 +373,7 @@ describe('SolidTaskHydrationService', () => {
     >;
     expect(action.type).toBe(loadAllData.type);
     expect(action.appDataComplete.task.ids).toEqual(['task-1']);
+    expect(action.appDataComplete.boards.boardCfgs).toEqual([board]);
     expect(action.appDataComplete.task.entities['task-1']).toEqual(task);
     expect(action.appDataComplete.project.ids).toEqual([INBOX_PROJECT.id, 'project-1']);
     expect(action.appDataComplete.project.entities['project-1']).toEqual(project);
@@ -370,6 +403,7 @@ describe('SolidTaskHydrationService', () => {
     expect(appDataComplete.archiveOld.task.ids).toEqual(['archived-old-task-1']);
     expect(appDataComplete.planner).toEqual(plannerState);
     expect(archivedTaskRepository.loadArchivedTasks).toHaveBeenCalledTimes(1);
+    expect(boardRepository.loadBoards).toHaveBeenCalledTimes(1);
     expect(plannerRepository.loadPlannerState).toHaveBeenCalledTimes(1);
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
