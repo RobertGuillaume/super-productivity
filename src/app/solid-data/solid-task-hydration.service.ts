@@ -27,6 +27,7 @@ import {
   projectAdapter,
 } from '../features/project/store/project.reducer';
 import { PlannerState } from '../features/planner/store/planner.reducer';
+import { PluginMetadata, PluginUserData } from '../plugins/plugin-persistence.model';
 import { Section } from '../features/section/section.model';
 import {
   adapter as sectionAdapter,
@@ -62,6 +63,7 @@ import { SolidIssueProviderRepository } from './solid-issue-provider.repository'
 import { SolidMetricRepository } from './solid-metric.repository';
 import { SolidMenuTreeRepository } from './solid-menu-tree.repository';
 import { SolidPlannerRepository } from './solid-planner.repository';
+import { SolidPluginDataRepository } from './solid-plugin-data.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
@@ -82,6 +84,7 @@ export class SolidTaskHydrationService {
   private readonly menuTreeRepository = inject(SolidMenuTreeRepository);
   private readonly projectRepository = inject(SolidProjectRepository);
   private readonly plannerRepository = inject(SolidPlannerRepository);
+  private readonly pluginDataRepository = inject(SolidPluginDataRepository);
   private readonly tagRepository = inject(SolidTagRepository);
   private readonly noteRepository = inject(SolidNoteRepository);
   private readonly issueProviderRepository = inject(SolidIssueProviderRepository);
@@ -109,6 +112,8 @@ export class SolidTaskHydrationService {
       simpleCounters,
       metrics,
       plannerState,
+      pluginUserData,
+      pluginMetadata,
       appState,
       timeTrackingState,
     ] = await Promise.all([
@@ -127,6 +132,8 @@ export class SolidTaskHydrationService {
       this.simpleCounterRepository.loadSimpleCounters(),
       this.metricRepository.loadMetrics(),
       this.plannerRepository.loadPlannerState(),
+      this.pluginDataRepository.loadPluginUserData(),
+      this.pluginDataRepository.loadPluginMetadata(),
       this.appStateRepository.loadAppState(),
       this.timeTrackingRepository.loadTimeTrackingState(),
     ]);
@@ -146,6 +153,8 @@ export class SolidTaskHydrationService {
       metrics,
       archivedTasks,
       plannerState,
+      pluginUserData,
+      pluginMetadata,
       appState,
       timeTrackingState,
     });
@@ -170,6 +179,8 @@ export class SolidTaskHydrationService {
         `metric count: ${metrics.length}, ` +
         `archived task count: ${archivedTasks.length}, ` +
         `planner day count: ${Object.keys(plannerState.days).length}, ` +
+        `plugin user data count: ${pluginUserData.length}, ` +
+        `plugin metadata count: ${pluginMetadata.length}, ` +
         `time tracking project count: ${Object.keys(timeTrackingState.project).length}`,
     );
   }
@@ -194,6 +205,8 @@ export const createSolidAppData = (input: {
   metrics?: readonly Metric[];
   archivedTasks?: readonly SolidArchivedTask[];
   plannerState?: PlannerState;
+  pluginUserData?: readonly PluginUserData[];
+  pluginMetadata?: readonly PluginMetadata[];
   appState?: SolidAppState | null;
   timeTrackingState?: TimeTrackingState;
 }): AppDataComplete => {
@@ -241,6 +254,8 @@ export const createSolidAppData = (input: {
       initialSimpleCounterState,
     ),
     metric: metricAdapter.setAll([...(input.metrics ?? [])], initialMetricState),
+    pluginUserData: [...(input.pluginUserData ?? [])],
+    pluginMetadata: [...(input.pluginMetadata ?? [])],
     timeTracking: input.timeTrackingState ?? appDataComplete.timeTracking,
     archiveYoung: {
       ...appDataComplete.archiveYoung,

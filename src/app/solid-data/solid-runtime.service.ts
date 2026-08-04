@@ -16,6 +16,8 @@ import {
   SOLID_PRODUCTIVITY_MENU_TREE_TYPE,
   SOLID_PRODUCTIVITY_METRIC_TYPE,
   SOLID_PRODUCTIVITY_NOTE_TYPE,
+  SOLID_PRODUCTIVITY_PLUGIN_METADATA_TYPE,
+  SOLID_PRODUCTIVITY_PLUGIN_USER_DATA_TYPE,
   SOLID_PRODUCTIVITY_PLANNER_DAY_TYPE,
   SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE,
   SOLID_PRODUCTIVITY_PROJECT_TYPE,
@@ -107,6 +109,14 @@ export class SolidRuntimeService {
 
   get timeTrackingProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_TIME_TRACKING_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_TIME_TRACKING_TYPE];
+  }
+
+  get pluginUserDataProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_PLUGIN_USER_DATA_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_PLUGIN_USER_DATA_TYPE];
+  }
+
+  get pluginMetadataProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_PLUGIN_METADATA_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_PLUGIN_METADATA_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {

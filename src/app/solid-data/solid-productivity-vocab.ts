@@ -19,6 +19,8 @@ export const SOLID_PRODUCTIVITY_BOARD_TYPE = 'SuperProductivityBoard';
 export const SOLID_PRODUCTIVITY_GLOBAL_CONFIG_TYPE = 'SuperProductivityGlobalConfig';
 export const SOLID_PRODUCTIVITY_MENU_TREE_TYPE = 'SuperProductivityMenuTree';
 export const SOLID_PRODUCTIVITY_TIME_TRACKING_TYPE = 'SuperProductivityTimeTracking';
+export const SOLID_PRODUCTIVITY_PLUGIN_USER_DATA_TYPE = 'SuperProductivityPluginUserData';
+export const SOLID_PRODUCTIVITY_PLUGIN_METADATA_TYPE = 'SuperProductivityPluginMetadata';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
@@ -42,6 +44,10 @@ export const SOLID_PRODUCTIVITY_CONFIG_CONTAINER = 'super-productivity/config';
 export const SOLID_PRODUCTIVITY_MENU_TREE_CONTAINER = 'super-productivity/menu-tree';
 export const SOLID_PRODUCTIVITY_TIME_TRACKING_CONTAINER =
   'super-productivity/time-tracking';
+export const SOLID_PRODUCTIVITY_PLUGIN_USER_DATA_CONTAINER =
+  'super-productivity/plugins/user-data';
+export const SOLID_PRODUCTIVITY_PLUGIN_METADATA_CONTAINER =
+  'super-productivity/plugins/metadata';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -65,6 +71,8 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     config: SOLID_PRODUCTIVITY_CONFIG_CONTAINER,
     menuTree: SOLID_PRODUCTIVITY_MENU_TREE_CONTAINER,
     timeTracking: SOLID_PRODUCTIVITY_TIME_TRACKING_CONTAINER,
+    pluginUserData: SOLID_PRODUCTIVITY_PLUGIN_USER_DATA_CONTAINER,
+    pluginMetadata: SOLID_PRODUCTIVITY_PLUGIN_METADATA_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -155,6 +163,16 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     [SOLID_PRODUCTIVITY_TIME_TRACKING_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}TimeTracking`,
       container: 'timeTracking',
+      defaultStatus: 'active',
+    },
+    [SOLID_PRODUCTIVITY_PLUGIN_USER_DATA_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}PluginUserData`,
+      container: 'pluginUserData',
+      defaultStatus: 'active',
+    },
+    [SOLID_PRODUCTIVITY_PLUGIN_METADATA_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}PluginMetadata`,
+      container: 'pluginMetadata',
       defaultStatus: 'active',
     },
   },
@@ -369,5 +387,19 @@ export const SP_TIME_TRACKING = {
   contextId: `${SOLID_PRODUCTIVITY_NS}contextId`,
   date: `${SOLID_PRODUCTIVITY_NS}date`,
   data: `${SOLID_PRODUCTIVITY_NS}timeTrackingData`,
+  updated: `${SOLID_PRODUCTIVITY_NS}updated`,
+} as const;
+
+export const SP_PLUGIN_USER_DATA = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  data: `${SOLID_PRODUCTIVITY_NS}pluginUserDataPayload`,
+  userData: `${SOLID_PRODUCTIVITY_NS}pluginUserData`,
+  updated: `${SOLID_PRODUCTIVITY_NS}updated`,
+} as const;
+
+export const SP_PLUGIN_METADATA = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  isEnabled: `${SOLID_PRODUCTIVITY_NS}isEnabled`,
+  metadataData: `${SOLID_PRODUCTIVITY_NS}pluginMetadata`,
   updated: `${SOLID_PRODUCTIVITY_NS}updated`,
 } as const;

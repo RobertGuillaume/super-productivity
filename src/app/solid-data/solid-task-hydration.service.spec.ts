@@ -21,6 +21,7 @@ import {
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { Project } from '../features/project/project.model';
 import { PlannerState } from '../features/planner/store/planner.reducer';
+import { PluginMetadata, PluginUserData } from '../plugins/plugin-persistence.model';
 import { Section } from '../features/section/section.model';
 import {
   SimpleCounter,
@@ -48,6 +49,7 @@ import { SolidIssueProviderRepository } from './solid-issue-provider.repository'
 import { SolidMetricRepository } from './solid-metric.repository';
 import { SolidMenuTreeRepository } from './solid-menu-tree.repository';
 import { SolidPlannerRepository } from './solid-planner.repository';
+import { SolidPluginDataRepository } from './solid-plugin-data.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
@@ -250,6 +252,16 @@ describe('SolidTaskHydrationService', () => {
     },
     tag: {},
   };
+  const pluginUserData: PluginUserData = {
+    id: 'plugin-a:doc-1',
+    data: JSON.stringify({
+      title: 'Plugin doc',
+    }),
+  };
+  const pluginMetadata: PluginMetadata = {
+    id: 'plugin-a',
+    isEnabled: true,
+  };
   const appState: SolidAppState = {
     id: SOLID_APP_STATE_ID,
     projectOrder: ['project-2', 'project-1'],
@@ -276,6 +288,8 @@ describe('SolidTaskHydrationService', () => {
       metrics: [metric],
       archivedTasks,
       plannerState,
+      pluginUserData: [pluginUserData],
+      pluginMetadata: [pluginMetadata],
       timeTrackingState,
     });
 
@@ -303,6 +317,8 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.simpleCounter.entities['counter-1']).toEqual(simpleCounter);
     expect(appData.metric.ids).toEqual([TODAY]);
     expect(appData.metric.entities[TODAY]).toEqual(metric);
+    expect(appData.pluginUserData).toEqual([pluginUserData]);
+    expect(appData.pluginMetadata).toEqual([pluginMetadata]);
     expect(appData.timeTracking).toEqual(timeTrackingState);
     expect(appData.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appData.archiveYoung.task.entities['archived-young-task-1']).toEqual(
@@ -411,6 +427,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidPlannerRepository',
       ['loadPlannerState'],
     );
+    const pluginDataRepository = jasmine.createSpyObj<SolidPluginDataRepository>(
+      'SolidPluginDataRepository',
+      ['loadPluginUserData', 'loadPluginMetadata'],
+    );
     const tagRepository = jasmine.createSpyObj<SolidTagRepository>('SolidTagRepository', [
       'loadTags',
     ]);
@@ -462,6 +482,8 @@ describe('SolidTaskHydrationService', () => {
     simpleCounterRepository.loadSimpleCounters.and.resolveTo([simpleCounter]);
     metricRepository.loadMetrics.and.resolveTo([metric]);
     plannerRepository.loadPlannerState.and.resolveTo(plannerState);
+    pluginDataRepository.loadPluginUserData.and.resolveTo([pluginUserData]);
+    pluginDataRepository.loadPluginMetadata.and.resolveTo([pluginMetadata]);
     appStateRepository.loadAppState.and.resolveTo(appState);
     timeTrackingRepository.loadTimeTrackingState.and.resolveTo(timeTrackingState);
 
@@ -477,6 +499,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidMenuTreeRepository, useValue: menuTreeRepository },
         { provide: SolidProjectRepository, useValue: projectRepository },
         { provide: SolidPlannerRepository, useValue: plannerRepository },
+        { provide: SolidPluginDataRepository, useValue: pluginDataRepository },
         { provide: SolidTagRepository, useValue: tagRepository },
         { provide: SolidNoteRepository, useValue: noteRepository },
         { provide: SolidSectionRepository, useValue: sectionRepository },
@@ -526,6 +549,8 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.metric.ids).toEqual([TODAY]);
     expect(action.appDataComplete.metric.entities[TODAY]).toEqual(metric);
     const appDataComplete = action.appDataComplete as AppDataComplete;
+    expect(appDataComplete.pluginUserData).toEqual([pluginUserData]);
+    expect(appDataComplete.pluginMetadata).toEqual([pluginMetadata]);
     expect(appDataComplete.timeTracking).toEqual(timeTrackingState);
     expect(appDataComplete.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appDataComplete.archiveOld.task.ids).toEqual(['archived-old-task-1']);
@@ -546,6 +571,8 @@ describe('SolidTaskHydrationService', () => {
     expect(globalConfigRepository.loadGlobalConfig).toHaveBeenCalledTimes(1);
     expect(menuTreeRepository.loadMenuTree).toHaveBeenCalledTimes(1);
     expect(plannerRepository.loadPlannerState).toHaveBeenCalledTimes(1);
+    expect(pluginDataRepository.loadPluginUserData).toHaveBeenCalledTimes(1);
+    expect(pluginDataRepository.loadPluginMetadata).toHaveBeenCalledTimes(1);
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
     expect(taskRepeatCfgRepository.loadTaskRepeatCfgs).toHaveBeenCalledTimes(1);
