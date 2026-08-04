@@ -11,6 +11,10 @@ import { INBOX_PROJECT } from '../features/project/project.const';
 import { Project } from '../features/project/project.model';
 import { PlannerState } from '../features/planner/store/planner.reducer';
 import { Section } from '../features/section/section.model';
+import {
+  SimpleCounter,
+  SimpleCounterType,
+} from '../features/simple-counter/simple-counter.model';
 import { DEFAULT_TAG, TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { WorkContextType } from '../features/work-context/work-context.model';
@@ -29,11 +33,13 @@ import { SolidIssueProviderRepository } from './solid-issue-provider.repository'
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
+import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
 
 describe('SolidTaskHydrationService', () => {
+  const TODAY = '2026-08-04';
   const task: Task = {
     ...DEFAULT_TASK,
     id: 'task-1',
@@ -86,6 +92,17 @@ describe('SolidTaskHydrationService', () => {
     title: 'Repeat from Solid',
     tagIds: ['tag-1'],
   };
+  const simpleCounter: SimpleCounter = {
+    id: 'counter-1',
+    title: 'Solid counter',
+    isEnabled: true,
+    icon: 'timer',
+    type: SimpleCounterType.StopWatch,
+    countOnDay: {
+      [TODAY]: 120000,
+    },
+    isOn: false,
+  };
   const archivedYoungTask: Task = {
     ...task,
     id: 'archived-young-task-1',
@@ -132,6 +149,7 @@ describe('SolidTaskHydrationService', () => {
       sections: [section],
       issueProviders: [issueProvider],
       taskRepeatCfgs: [taskRepeatCfg],
+      simpleCounters: [simpleCounter],
       archivedTasks,
       plannerState,
     });
@@ -153,6 +171,8 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.issueProvider.entities['issue-provider-1']).toEqual(issueProvider);
     expect(appData.taskRepeatCfg.ids).toEqual(['repeat-cfg-1']);
     expect(appData.taskRepeatCfg.entities['repeat-cfg-1']).toEqual(taskRepeatCfg);
+    expect(appData.simpleCounter.ids).toEqual(['counter-1']);
+    expect(appData.simpleCounter.entities['counter-1']).toEqual(simpleCounter);
     expect(appData.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appData.archiveYoung.task.entities['archived-young-task-1']).toEqual(
       archivedYoungTask,
@@ -252,6 +272,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidTaskRepeatCfgRepository',
       ['loadTaskRepeatCfgs'],
     );
+    const simpleCounterRepository = jasmine.createSpyObj<SolidSimpleCounterRepository>(
+      'SolidSimpleCounterRepository',
+      ['loadSimpleCounters'],
+    );
     const appStateRepository = jasmine.createSpyObj<SolidAppStateRepository>(
       'SolidAppStateRepository',
       ['loadAppState'],
@@ -264,6 +288,7 @@ describe('SolidTaskHydrationService', () => {
     sectionRepository.loadSections.and.resolveTo([section]);
     issueProviderRepository.loadIssueProviders.and.resolveTo([issueProvider]);
     taskRepeatCfgRepository.loadTaskRepeatCfgs.and.resolveTo([taskRepeatCfg]);
+    simpleCounterRepository.loadSimpleCounters.and.resolveTo([simpleCounter]);
     plannerRepository.loadPlannerState.and.resolveTo(plannerState);
     appStateRepository.loadAppState.and.resolveTo(appState);
 
@@ -279,6 +304,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidSectionRepository, useValue: sectionRepository },
         { provide: SolidIssueProviderRepository, useValue: issueProviderRepository },
         { provide: SolidTaskRepeatCfgRepository, useValue: taskRepeatCfgRepository },
+        { provide: SolidSimpleCounterRepository, useValue: simpleCounterRepository },
         { provide: SolidAppStateRepository, useValue: appStateRepository },
       ],
     });
@@ -310,6 +336,10 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.taskRepeatCfg.entities['repeat-cfg-1']).toEqual(
       taskRepeatCfg,
     );
+    expect(action.appDataComplete.simpleCounter.ids).toEqual(['counter-1']);
+    expect(action.appDataComplete.simpleCounter.entities['counter-1']).toEqual(
+      simpleCounter,
+    );
     const appDataComplete = action.appDataComplete as AppDataComplete;
     expect(appDataComplete.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appDataComplete.archiveOld.task.ids).toEqual(['archived-old-task-1']);
@@ -319,6 +349,7 @@ describe('SolidTaskHydrationService', () => {
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
     expect(taskRepeatCfgRepository.loadTaskRepeatCfgs).toHaveBeenCalledTimes(1);
+    expect(simpleCounterRepository.loadSimpleCounters).toHaveBeenCalledTimes(1);
     expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
   });
 });

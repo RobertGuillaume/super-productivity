@@ -15,6 +15,7 @@ import {
   SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE,
   SOLID_PRODUCTIVITY_PROJECT_TYPE,
   SOLID_PRODUCTIVITY_SECTION_TYPE,
+  SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE,
   SOLID_PRODUCTIVITY_TAG_TYPE,
   SOLID_PRODUCTIVITY_TASK_TYPE,
   SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE,
@@ -72,6 +73,10 @@ export class SolidRuntimeService {
 
   get plannerStateProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE];
+  }
+
+  get simpleCounterProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {

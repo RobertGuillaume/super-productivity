@@ -23,6 +23,11 @@ import {
   adapter as sectionAdapter,
   initialSectionState,
 } from '../features/section/store/section.reducer';
+import { SimpleCounter } from '../features/simple-counter/simple-counter.model';
+import {
+  adapter as simpleCounterAdapter,
+  initialSimpleCounterState,
+} from '../features/simple-counter/store/simple-counter.reducer';
 import { Task } from '../features/tasks/task.model';
 import { TaskRepeatCfg } from '../features/task-repeat-cfg/task-repeat-cfg.model';
 import { initialTaskRepeatCfgState } from '../features/task-repeat-cfg/store/task-repeat-cfg.reducer';
@@ -44,6 +49,7 @@ import { SolidIssueProviderRepository } from './solid-issue-provider.repository'
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
+import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
@@ -60,6 +66,7 @@ export class SolidTaskHydrationService {
   private readonly issueProviderRepository = inject(SolidIssueProviderRepository);
   private readonly sectionRepository = inject(SolidSectionRepository);
   private readonly taskRepeatCfgRepository = inject(SolidTaskRepeatCfgRepository);
+  private readonly simpleCounterRepository = inject(SolidSimpleCounterRepository);
   private readonly appStateRepository = inject(SolidAppStateRepository);
 
   async hydrateStore(): Promise<void> {
@@ -72,6 +79,7 @@ export class SolidTaskHydrationService {
       sections,
       issueProviders,
       taskRepeatCfgs,
+      simpleCounters,
       plannerState,
       appState,
     ] = await Promise.all([
@@ -83,6 +91,7 @@ export class SolidTaskHydrationService {
       this.sectionRepository.loadSections(),
       this.issueProviderRepository.loadIssueProviders(),
       this.taskRepeatCfgRepository.loadTaskRepeatCfgs(),
+      this.simpleCounterRepository.loadSimpleCounters(),
       this.plannerRepository.loadPlannerState(),
       this.appStateRepository.loadAppState(),
     ]);
@@ -94,6 +103,7 @@ export class SolidTaskHydrationService {
       sections,
       issueProviders,
       taskRepeatCfgs,
+      simpleCounters,
       archivedTasks,
       plannerState,
       appState,
@@ -106,6 +116,7 @@ export class SolidTaskHydrationService {
         `note count: ${notes.length}, section count: ${sections.length}, ` +
         `issue provider count: ${issueProviders.length}, ` +
         `repeat config count: ${taskRepeatCfgs.length}, ` +
+        `simple counter count: ${simpleCounters.length}, ` +
         `archived task count: ${archivedTasks.length}, ` +
         `planner day count: ${Object.keys(plannerState.days).length}`,
     );
@@ -120,6 +131,7 @@ export const createSolidAppData = (input: {
   sections?: readonly Section[];
   issueProviders?: readonly IssueProvider[];
   taskRepeatCfgs?: readonly TaskRepeatCfg[];
+  simpleCounters?: readonly SimpleCounter[];
   archivedTasks?: readonly SolidArchivedTask[];
   plannerState?: PlannerState;
   appState?: SolidAppState | null;
@@ -157,6 +169,10 @@ export const createSolidAppData = (input: {
     taskRepeatCfg: taskRepeatCfgAdapter.setAll(
       [...(input.taskRepeatCfgs ?? [])],
       initialTaskRepeatCfgState,
+    ),
+    simpleCounter: simpleCounterAdapter.setAll(
+      [...(input.simpleCounters ?? [])],
+      initialSimpleCounterState,
     ),
     archiveYoung: {
       ...appDataComplete.archiveYoung,
