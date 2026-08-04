@@ -15,8 +15,10 @@ import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidArchiveStateRepository } from './solid-archive-state.repository';
 import {
-  isSolidArchiveStateAction,
+  isSolidArchiveStatePersistenceTrigger,
   SolidArchiveStateAction,
+  SolidArchiveStatePersistenceTrigger,
+  solidArchiveStateSourceAction,
 } from './solid-archive-state-action-types';
 import { SolidArchivedTask, SolidArchiveBucket } from './solid-archived-task.mapper';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
@@ -38,12 +40,18 @@ export class SolidArchiveStatePersistenceEffects {
   persistArchiveState$ = createEffect(
     () =>
       this.actions$.pipe(
-        filter(
-          (action): action is SolidArchiveStateAction & PersistentAction =>
-            isSolidArchiveStateAction(action) &&
-            !(action as PersistentAction).meta?.isRemote,
+        filter((action): action is SolidArchiveStatePersistenceTrigger =>
+          isSolidArchiveStatePersistenceTrigger(action),
         ),
-        filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
+        filter((action) => {
+          const sourceAction = solidArchiveStateSourceAction(action);
+          return (
+            !(sourceAction as PersistentAction).meta?.isRemote &&
+            this.solidDataLayerState.ownsPersistentAction(
+              sourceAction as SolidArchiveStateAction & PersistentAction,
+            )
+          );
+        }),
         concatMap(() =>
           this.store.select(selectTimeTrackingState).pipe(
             take(1),

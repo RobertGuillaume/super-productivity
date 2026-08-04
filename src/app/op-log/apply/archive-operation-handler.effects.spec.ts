@@ -8,7 +8,10 @@ import {
 } from './archive-operation-handler.service';
 import { LOCAL_ACTIONS } from '../../util/local-actions.token';
 import { TaskSharedActions } from '../../root-store/meta/task-shared.actions';
-import { flushYoungToOld } from '../../features/archive/store/archive.actions';
+import {
+  archiveOperationHandled,
+  flushYoungToOld,
+} from '../../features/archive/store/archive.actions';
 import { deleteTag } from '../../features/tag/store/tag.actions';
 import { Action } from '@ngrx/store';
 import { Task, TaskWithSubTasks } from '../../features/tasks/task.model';
@@ -66,8 +69,9 @@ describe('ArchiveOperationHandlerEffects', () => {
       const tasks = [createMockTaskWithSubTasks('task-1')];
       const action = TaskSharedActions.moveToArchive({ tasks });
 
-      effects.handleArchiveOperations$.subscribe(() => {
+      effects.handleArchiveOperations$.subscribe((emittedAction) => {
         expect(mockArchiveOperationHandler.handleOperation).toHaveBeenCalledWith(action);
+        expect(emittedAction).toEqual(archiveOperationHandled({ sourceAction: action }));
         done();
       });
 
@@ -193,9 +197,10 @@ describe('ArchiveOperationHandlerEffects', () => {
       effects.handleArchiveOperations$.subscribe({
         next: () => {
           emitCount++;
-          if (emitCount === 2) {
+          if (emitCount === 1) {
             // Effect should continue processing even after error
             expect(mockArchiveOperationHandler.handleOperation).toHaveBeenCalledTimes(2);
+            expect(mockSnackService.open).toHaveBeenCalledTimes(1);
             // Restore window functions
             window.alert = originalAlert;
             window.confirm = originalConfirm;

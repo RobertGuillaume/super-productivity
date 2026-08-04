@@ -4,7 +4,11 @@ import { of, Subject } from 'rxjs';
 import { ArchiveDbAdapter } from '../core/persistence/archive-db-adapter.service';
 import { SnackService } from '../core/snack/snack.service';
 import { ArchiveModel } from '../features/archive/archive.model';
-import { flushYoungToOld } from '../features/archive/store/archive.actions';
+import {
+  archiveOperationHandled,
+  compressArchive,
+  flushYoungToOld,
+} from '../features/archive/store/archive.actions';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { selectTimeTrackingState } from '../features/time-tracking/store/time-tracking.selectors';
 import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
@@ -230,6 +234,74 @@ describe('SolidArchiveStatePersistenceEffects', () => {
     expect(timeTrackingRepository.replaceTimeTrackingState).toHaveBeenCalledOnceWith(
       activeTimeTrackingState,
     );
+    subscription.unsubscribe();
+  });
+
+  it('waits for archive maintenance actions to be handled before mirroring Solid archive state', async () => {
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    const sourceAction = compressArchive({
+      timestamp: 1710000000000,
+      oneYearAgoTimestamp: 1678464000000,
+    });
+    const effects = TestBed.inject(SolidArchiveStatePersistenceEffects);
+    const subscription = effects.persistArchiveState$.subscribe();
+
+    actions$.next(sourceAction);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(archiveDbAdapter.loadArchiveYoung).not.toHaveBeenCalled();
+    expect(archivedTaskRepository.replaceArchivedTasks).not.toHaveBeenCalled();
+
+    actions$.next(archiveOperationHandled({ sourceAction }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(archiveDbAdapter.loadArchiveYoung).toHaveBeenCalledTimes(1);
+    expect(
+      archiveStateRepository.archiveModelToSolidArchiveState.calls.allArgs(),
+    ).toEqual([
+      ['young', archiveYoung],
+      ['old', archiveOld],
+    ]);
+    expect(archivedTaskRepository.replaceArchivedTasks).toHaveBeenCalledOnceWith([
+      {
+        task: youngTask,
+        bucket: 'young',
+      },
+      {
+        task: oldTask,
+        bucket: 'old',
+      },
+    ]);
+    subscription.unsubscribe();
+  });
+
+  it('ignores remote archive maintenance completion signals', async () => {
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    const effects = TestBed.inject(SolidArchiveStatePersistenceEffects);
+    const subscription = effects.persistArchiveState$.subscribe();
+    const sourceAction = compressArchive({
+      timestamp: 1710000000000,
+      oneYearAgoTimestamp: 1678464000000,
+    });
+
+    actions$.next(
+      archiveOperationHandled({
+        sourceAction: {
+          ...sourceAction,
+          meta: {
+            ...sourceAction.meta,
+            isRemote: true,
+          },
+        },
+      }),
+    );
+    await Promise.resolve();
+
+    expect(store.select).not.toHaveBeenCalled();
+    expect(archiveDbAdapter.loadArchiveYoung).not.toHaveBeenCalled();
+    expect(archiveStateRepository.saveArchiveState).not.toHaveBeenCalled();
     subscription.unsubscribe();
   });
 

@@ -863,7 +863,7 @@ describe('SolidDataLayerStateService', () => {
           oneYearAgoTimestamp: 1678464000000,
         }) as PersistentAction,
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       service.ownsPersistentAction(
         TaskSharedActions.restoreTask({

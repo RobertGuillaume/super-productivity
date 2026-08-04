@@ -1,7 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { createEffect } from '@ngrx/effects';
 import { LOCAL_ACTIONS } from '../../util/local-actions.token';
-import { concatMap, filter } from 'rxjs/operators';
+import { EMPTY, from } from 'rxjs';
+import { catchError, concatMap, filter, map } from 'rxjs/operators';
 import {
   ArchiveOperationHandler,
   isArchiveAffectingAction,
@@ -9,6 +10,7 @@ import {
 import { devError } from '../../util/dev-error';
 import { SnackService } from '../../core/snack/snack.service';
 import { T } from '../../t.const';
+import { archiveOperationHandled } from '../../features/archive/store/archive.actions';
 
 /**
  * Unified effect for all archive-affecting operations.
@@ -76,14 +78,13 @@ export class ArchiveOperationHandlerEffects {
    * important for archive consistency (e.g., deleteProject shouldn't overlap
    * with other archive writes).
    */
-  handleArchiveOperations$ = createEffect(
-    () =>
-      this._localActions$.pipe(
-        filter(isArchiveAffectingAction),
-        concatMap(async (action) => {
-          try {
-            await this._archiveOperationHandler.handleOperation(action);
-          } catch (e) {
+  handleArchiveOperations$ = createEffect(() =>
+    this._localActions$.pipe(
+      filter(isArchiveAffectingAction),
+      concatMap((action) =>
+        from(this._archiveOperationHandler.handleOperation(action)).pipe(
+          map(() => archiveOperationHandled({ sourceAction: action })),
+          catchError((e) => {
             // Archive operations failing is serious but not critical to app function.
             // Log the error and notify user but don't crash the effect stream.
             devError(e);
@@ -91,10 +92,11 @@ export class ArchiveOperationHandlerEffects {
               type: 'ERROR',
               msg: T.F.SYNC.S.ARCHIVE_OPERATION_FAILED,
             });
-          }
-        }),
+            return EMPTY;
+          }),
+        ),
       ),
-    { dispatch: false },
+    ),
   );
 
   /**

@@ -1,5 +1,8 @@
-import { createAction } from '@ngrx/store';
-import { PersistentActionMeta } from '../../../op-log/core/persistent-action.interface';
+import { createAction, props } from '@ngrx/store';
+import {
+  PersistentAction,
+  PersistentActionMeta,
+} from '../../../op-log/core/persistent-action.interface';
 import { OpType } from '../../../op-log/core/operation.types';
 
 /**
@@ -11,6 +14,11 @@ import { OpType } from '../../../op-log/core/operation.types';
  */
 export const remoteArchiveDataApplied = createAction(
   '[Archive] Remote Archive Data Applied',
+);
+
+export const archiveOperationHandled = createAction(
+  '[Archive] Archive Operation Handled',
+  props<{ sourceAction: PersistentAction }>(),
 );
 
 /**
