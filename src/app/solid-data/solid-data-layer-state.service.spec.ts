@@ -49,7 +49,11 @@ import {
   deleteTaskAttachment,
   updateTaskAttachment,
 } from '../features/tasks/task-attachment/task-attachment.actions';
-import { syncTimeSpent } from '../features/time-tracking/store/time-tracking.actions';
+import {
+  syncTimeSpent,
+  syncTimeTracking,
+  updateWorkContextData,
+} from '../features/time-tracking/store/time-tracking.actions';
 import {
   addSection,
   addTaskToSection,
@@ -802,6 +806,32 @@ describe('SolidDataLayerStateService', () => {
           taskId: 'task-1',
           date: '2026-08-03',
           duration: 1000,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateWorkContextData({
+          ctx: {
+            id: 'project-1',
+            type: WorkContextType.PROJECT,
+          },
+          date: '2026-08-03',
+          updates: {
+            e: 1710000000000,
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        syncTimeTracking({
+          contextType: 'TAG',
+          contextId: 'tag-1',
+          date: '2026-08-03',
+          data: {
+            e: 1710000000000,
+          },
         }) as PersistentAction,
       ),
     ).toBe(true);

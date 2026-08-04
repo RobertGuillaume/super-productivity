@@ -115,6 +115,7 @@ import { SolidTaskProjectMovePersistenceEffects } from '../solid-data/solid-task
 import { SolidTaskRepeatCfgPersistenceEffects } from '../solid-data/solid-task-repeat-cfg-persistence.effects';
 import { SolidTaskSchedulingPersistenceEffects } from '../solid-data/solid-task-scheduling-persistence.effects';
 import { SolidTaskPersistenceEffects } from '../solid-data/solid-task-persistence.effects';
+import { SolidTimeTrackingPersistenceEffects } from '../solid-data/solid-time-tracking-persistence.effects';
 import { SolidTodayPersistenceEffects } from '../solid-data/solid-today-persistence.effects';
 import { SolidWorkContextPersistenceEffects } from '../solid-data/solid-work-context-persistence.effects';
 import { IssueTwoWaySyncEffects } from '../features/issue/two-way-sync/issue-two-way-sync.effects';
@@ -156,6 +157,7 @@ import {
     EffectsModule.forFeature([SolidMenuTreePersistenceEffects]),
     EffectsModule.forFeature([SolidAppStatePersistenceEffects]),
     EffectsModule.forFeature([SolidWorkContextPersistenceEffects]),
+    EffectsModule.forFeature([SolidTimeTrackingPersistenceEffects]),
     EffectsModule.forFeature([SolidTodayPersistenceEffects]),
 
     StoreModule.forFeature(appStateFeature),

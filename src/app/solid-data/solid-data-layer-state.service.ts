@@ -21,6 +21,7 @@ import { SOLID_TASK_PROJECT_MOVE_ACTION_TYPES } from './solid-task-project-move-
 import { SOLID_TASK_REPEAT_CFG_ACTION_TYPES } from './solid-task-repeat-cfg-action-types';
 import { SOLID_TASK_SCHEDULING_ACTION_TYPES } from './solid-task-scheduling-action-types';
 import { SOLID_TASK_DEADLINE_ACTION_TYPES } from './solid-task-deadline-action-types';
+import { SOLID_TIME_TRACKING_ACTION_TYPES } from './solid-time-tracking-action-types';
 import { SOLID_TODAY_ACTION_TYPES } from './solid-today-action-types';
 import { SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES } from './solid-work-context-action-types';
 
@@ -71,6 +72,7 @@ export class SolidDataLayerStateService {
     ...SOLID_TASK_REPEAT_CFG_ACTION_TYPES,
     ...SOLID_TASK_SCHEDULING_ACTION_TYPES,
     ...SOLID_TASK_TAG_ACTION_TYPES,
+    ...SOLID_TIME_TRACKING_ACTION_TYPES,
     ...SOLID_TODAY_ACTION_TYPES,
     ...SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES,
   ]);
