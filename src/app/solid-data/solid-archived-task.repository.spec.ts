@@ -174,37 +174,85 @@ describe('SolidArchivedTaskRepository', () => {
 
     expect(things.delete.calls.allArgs()).toEqual([[youngThing.uri], [oldThing.uri]]);
   });
+
+  it('replaces archived task resources by bucket and deletes stale archive entries', async () => {
+    const oldTask: Task = {
+      ...task,
+      title: 'Moved to old archive',
+    };
+    const existingYoungThing = createThing(task.title, 'young');
+    const staleThing = createThing('Stale task', 'young', {
+      ...task,
+      id: 'task-2',
+      title: 'Stale task',
+    });
+    const createdOldThing = createThing(oldTask.title, 'old', oldTask);
+
+    things.query.and.callFake((query: { where?: readonly unknown[] }) =>
+      Promise.resolve({
+        things: query.where === undefined ? [existingYoungThing, staleThing] : [],
+      }),
+    );
+    things.create.and.resolveTo(createdOldThing);
+    things.delete.and.resolveTo(undefined);
+
+    await TestBed.inject(SolidArchivedTaskRepository).replaceArchivedTasks([
+      {
+        task: oldTask,
+        bucket: 'old',
+      },
+    ]);
+
+    expect(things.create).toHaveBeenCalledOnceWith(
+      jasmine.objectContaining({
+        target: jasmine.objectContaining({
+          resourceName: 'old-task-1',
+        }),
+      }),
+    );
+    expect(things.delete.calls.allArgs()).toEqual([
+      [existingYoungThing.uri],
+      [staleThing.uri],
+    ]);
+  });
 });
 
-const createThing = (title: string, bucket: 'young' | 'old'): Thing => {
+const createThing = (
+  title: string,
+  bucket: 'young' | 'old',
+  taskInput: Task = {
+    ...DEFAULT_TASK,
+    id: 'task-1',
+    title,
+    projectId: 'project-1',
+    isDone: true,
+    created: 1710000000000,
+    doneOn: 1710000000100,
+  },
+): Thing => {
   const properties: Readonly<Record<string, readonly RdfValue[]>> = {
-    [SP_ARCHIVED_TASK.id]: [literal('task-1')],
+    [SP_ARCHIVED_TASK.id]: [literal(taskInput.id)],
     [SP_ARCHIVED_TASK.bucket]: [literal(bucket)],
-    [SP_ARCHIVED_TASK.projectId]: [literal('project-1')],
-    [SP_ARCHIVED_TASK.doneOn]: [literal(1710000000100)],
+    [SP_ARCHIVED_TASK.projectId]: [literal(taskInput.projectId)],
+    [SP_ARCHIVED_TASK.doneOn]: [literal(taskInput.doneOn ?? 0)],
     [SP_ARCHIVED_TASK.taskData]: [
       literal(
         JSON.stringify({
-          ...DEFAULT_TASK,
-          id: 'task-1',
+          ...taskInput,
           title,
-          projectId: 'project-1',
-          isDone: true,
-          created: 1710000000000,
-          doneOn: 1710000000100,
         }),
       ),
     ],
   };
   const thing: Thing = {
-    uri: `https://pod.example/super-productivity/archive/tasks/${bucket}-task-1.ttl#it`,
+    uri: `https://pod.example/super-productivity/archive/tasks/${bucket}-${taskInput.id}.ttl#it`,
     content: {
-      uri: `https://pod.example/super-productivity/archive/tasks/${bucket}-task-1.ttl`,
+      uri: `https://pod.example/super-productivity/archive/tasks/${bucket}-${taskInput.id}.ttl`,
       kind: 'rdf',
       source: 'runtime-managed',
     },
     source: {
-      uri: `https://pod.example/super-productivity/archive/tasks/${bucket}-task-1.ttl`,
+      uri: `https://pod.example/super-productivity/archive/tasks/${bucket}-${taskInput.id}.ttl`,
       kind: 'runtime-managed',
     },
     types: ['SuperProductivityArchivedTask'],

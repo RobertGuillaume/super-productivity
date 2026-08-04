@@ -77,6 +77,27 @@ export class SolidArchivedTaskRepository {
     await Promise.all(taskIds.map((taskId) => this.deleteArchivedTask(taskId)));
   }
 
+  async replaceArchivedTasks(archivedTasks: readonly SolidArchivedTask[]): Promise<void> {
+    const existingThings = await this.findAllArchivedTaskThings();
+    const desiredKeys = new Set(
+      archivedTasks.map((archivedTask) => archivedTaskKey(archivedTask)),
+    );
+
+    await Promise.all(
+      archivedTasks.map((archivedTask) =>
+        this.saveArchivedTask(archivedTask.task, archivedTask.bucket),
+      ),
+    );
+
+    await Promise.all(
+      existingThings
+        .filter(
+          (thing) => !desiredKeys.has(archivedTaskKey(solidThingToArchivedTask(thing))),
+        )
+        .map((thing) => this.solidRuntime.client.things.delete(thing.uri)),
+    );
+  }
+
   subscribeArchivedTasks(listener: (tasks: SolidArchivedTask[]) => void): Unsubscribe {
     return this.solidRuntime.client.things.subscribe(
       solidArchivedTaskQuery,
@@ -138,6 +159,15 @@ export class SolidArchivedTaskRepository {
     return result.things;
   }
 
+  private async findAllArchivedTaskThings(): Promise<Thing[]> {
+    const result = await this.solidRuntime.client.things.query(solidArchivedTaskQuery, {
+      scope: this.archivedTaskContainerScope(),
+      autoDiscover: true,
+    });
+
+    return result.things;
+  }
+
   private archivedTaskContainerScope(): SolidArchivedTaskContainerScope {
     const layout = this.solidRuntime.ensureLayout();
     return {
@@ -146,3 +176,6 @@ export class SolidArchivedTaskRepository {
     };
   }
 }
+
+const archivedTaskKey = (archivedTask: SolidArchivedTask): string =>
+  `${archivedTask.bucket}:${archivedTask.task.id}`;

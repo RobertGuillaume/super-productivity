@@ -11,6 +11,7 @@ import {
   timeTrackingEntryId,
   timeTrackingEntryToSolidChanges,
   timeTrackingEntryToSolidCreateInput,
+  timeTrackingStateToEntries,
 } from './solid-time-tracking.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 
@@ -78,6 +79,24 @@ export class SolidTimeTrackingRepository {
     return updatedEntry;
   }
 
+  async replaceTimeTrackingState(state: TimeTrackingState): Promise<void> {
+    const existingThings = await this.findAllTimeTrackingThings();
+    const entries = timeTrackingStateToEntries(state);
+    const desiredIds = new Set(entries.map((entry) => entry.id));
+
+    await Promise.all(entries.map((entry) => this.saveTimeTrackingEntry(entry)));
+
+    await Promise.all(
+      existingThings
+        .map((thing) => ({
+          thing,
+          entry: solidThingToTimeTrackingEntry(thing),
+        }))
+        .filter(({ entry }) => entry !== null && !desiredIds.has(entry.id))
+        .map(({ thing }) => this.solidRuntime.client.things.delete(thing.uri)),
+    );
+  }
+
   private async findTimeTrackingThing(
     contextType: SolidTimeTrackingContextType,
     contextId: string,
@@ -102,6 +121,15 @@ export class SolidTimeTrackingRepository {
     );
 
     return result.things[0] ?? null;
+  }
+
+  private async findAllTimeTrackingThings(): Promise<Thing[]> {
+    const result = await this.solidRuntime.client.things.query(solidTimeTrackingQuery, {
+      scope: this.timeTrackingContainerScope(),
+      autoDiscover: true,
+    });
+
+    return result.things;
   }
 
   private timeTrackingContainerScope(): SolidTimeTrackingContainerScope {

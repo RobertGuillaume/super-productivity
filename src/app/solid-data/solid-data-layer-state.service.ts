@@ -3,6 +3,7 @@ import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
 import { isSolidDataLayerEnabled } from './solid-data-layer-feature-flag';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SOLID_ARCHIVE_STATE_ACTION_TYPES } from './solid-archive-state-action-types';
 import { SOLID_BOARD_ACTION_TYPES } from './solid-board-action-types';
 import { SOLID_PROJECT_DELETE_ACTION_TYPES } from './solid-project-delete-action-types';
 import { SOLID_PROJECT_TASK_ORDER_ACTION_TYPES } from './solid-project-task-order-action-types';
@@ -30,6 +31,7 @@ export class SolidDataLayerStateService {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly solidOwnedActionTypes = new Set<string>([
     ...SOLID_BOARD_ACTION_TYPES,
+    ...SOLID_ARCHIVE_STATE_ACTION_TYPES,
     ActionType.PROJECT_ADD,
     ActionType.PROJECT_UPDATE,
     ActionType.PROJECT_UPDATE_ADVANCED_CFG,

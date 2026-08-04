@@ -7,6 +7,10 @@ import {
   BoardPanelCfgScheduledState,
   BoardPanelCfgTaskDoneState,
 } from '../features/boards/boards.model';
+import {
+  compressArchive,
+  flushYoungToOld,
+} from '../features/archive/store/archive.actions';
 import { addBoard, updatePanelCfg } from '../features/boards/store/boards.actions';
 import { updateGlobalConfigSection } from '../features/config/store/global-config.actions';
 import { updateProjectTree } from '../features/menu-tree/store/menu-tree.actions';
@@ -847,6 +851,19 @@ describe('SolidDataLayerStateService', () => {
         }) as PersistentAction,
       ),
     ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        flushYoungToOld({ timestamp: 1710000000000 }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        compressArchive({
+          timestamp: 1710000000000,
+          oneYearAgoTimestamp: 1678464000000,
+        }) as PersistentAction,
+      ),
+    ).toBe(false);
     expect(
       service.ownsPersistentAction(
         TaskSharedActions.restoreTask({

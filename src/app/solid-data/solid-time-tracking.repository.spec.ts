@@ -36,6 +36,7 @@ describe('SolidTimeTrackingRepository', () => {
   let things: {
     query: jasmine.Spy;
     create: jasmine.Spy;
+    delete: jasmine.Spy;
   };
   let writes: {
     planUpdate: jasmine.Spy;
@@ -44,7 +45,7 @@ describe('SolidTimeTrackingRepository', () => {
 
   beforeEach(() => {
     discovery = jasmine.createSpyObj('discovery', ['start']);
-    things = jasmine.createSpyObj('things', ['query', 'create']);
+    things = jasmine.createSpyObj('things', ['query', 'create', 'delete']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
 
     const solidRuntime = {
@@ -170,6 +171,67 @@ describe('SolidTimeTrackingRepository', () => {
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);
     expect(saved.data.e).toBe(1710007200000);
+  });
+
+  it('replaces active time tracking resources with the selected state', async () => {
+    const staleEntry: SolidTimeTrackingEntry = {
+      ...entry,
+      id: timeTrackingEntryId('TAG', 'tag-1', '2026-08-04'),
+      contextType: 'TAG',
+      contextId: 'tag-1',
+      data: {
+        s: 1700000000000,
+      },
+    };
+    const existingThing = createThing(entry);
+    const staleThing = createThing(staleEntry);
+    const plan = {
+      id: 'write-plan-1',
+      kind: 'thing.update',
+      request: {
+        kind: 'thing.update',
+        uri: existingThing.uri,
+        changes: {},
+      },
+      operations: [],
+      affectedResources: [],
+      diagnostics: [],
+    } as RuntimeWritePlan;
+
+    things.query.and.callFake((query: { where?: readonly unknown[] }) =>
+      Promise.resolve({
+        things:
+          query.where === undefined
+            ? [existingThing, staleThing]
+            : query.where.length > 0
+              ? [existingThing]
+              : [],
+      }),
+    );
+    writes.planUpdate.and.returnValue(plan);
+    writes.commit.and.resolveTo({
+      planId: plan.id,
+      kind: 'thing.update',
+      result: existingThing,
+    });
+    things.delete.and.resolveTo(undefined);
+
+    await TestBed.inject(SolidTimeTrackingRepository).replaceTimeTrackingState({
+      project: {
+        ['project-1']: {
+          ['2026-08-04']: entry.data,
+        },
+      },
+      tag: {},
+    });
+
+    expect(writes.planUpdate).toHaveBeenCalledOnceWith(
+      existingThing.uri,
+      jasmine.objectContaining({
+        replaceProperties: jasmine.any(Object),
+      }),
+    );
+    expect(things.delete).toHaveBeenCalledOnceWith(staleThing.uri);
   });
 });
 
