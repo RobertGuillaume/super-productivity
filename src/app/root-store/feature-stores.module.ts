@@ -95,6 +95,7 @@ import { appStateFeature } from './app-state/app-state.reducer';
 import { PluginHooksEffects } from '../plugins/plugin-hooks.effects';
 import { OperationLogEffects } from '../op-log/capture/operation-log.effects';
 import { SolidAppStatePersistenceEffects } from '../solid-data/solid-app-state-persistence.effects';
+import { SolidBoardPersistenceEffects } from '../solid-data/solid-board-persistence.effects';
 import { SolidEmbeddedTaskPersistenceEffects } from '../solid-data/solid-embedded-task-persistence.effects';
 import { SolidIssueProviderPersistenceEffects } from '../solid-data/solid-issue-provider-persistence.effects';
 import { SolidMetricPersistenceEffects } from '../solid-data/solid-metric-persistence.effects';
@@ -131,6 +132,7 @@ import {
   declarations: [],
   imports: [
     EffectsModule.forFeature([OperationLogEffects]),
+    EffectsModule.forFeature([SolidBoardPersistenceEffects]),
     EffectsModule.forFeature([SolidTaskPersistenceEffects]),
     EffectsModule.forFeature([SolidEmbeddedTaskPersistenceEffects]),
     EffectsModule.forFeature([SolidPlannerPersistenceEffects]),

@@ -2,6 +2,12 @@ import { TestBed } from '@angular/core/testing';
 import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
 import { ActionType, OpType } from '../op-log/core/operation.types';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
+import {
+  BoardCfg,
+  BoardPanelCfgScheduledState,
+  BoardPanelCfgTaskDoneState,
+} from '../features/boards/boards.model';
+import { addBoard, updatePanelCfg } from '../features/boards/store/boards.actions';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
 import { PlannerActions } from '../features/planner/store/planner.actions';
 import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
@@ -120,6 +126,24 @@ describe('SolidDataLayerStateService', () => {
       countOnDay: {},
       isOn: false,
     };
+    const board: BoardCfg = {
+      id: 'board-1',
+      title: 'Board',
+      cols: 1,
+      panels: [
+        {
+          id: 'panel-1',
+          title: 'Panel',
+          taskIds: ['task-1'],
+          includedTagIds: [],
+          excludedTagIds: [],
+          taskDoneState: BoardPanelCfgTaskDoneState.All,
+          scheduledState: BoardPanelCfgScheduledState.All,
+          isParentTasksOnly: false,
+          projectIds: ['project-1'],
+        },
+      ],
+    };
     const action = TaskSharedActions.addTask({
       task,
       workContextId: 'project-1',
@@ -134,6 +158,14 @@ describe('SolidDataLayerStateService', () => {
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
 
     expect(service.ownsPersistentAction(action)).toBe(true);
+    expect(service.ownsPersistentAction(addBoard({ board }) as PersistentAction)).toBe(
+      true,
+    );
+    expect(
+      service.ownsPersistentAction(
+        updatePanelCfg({ panelCfg: board.panels[0] }) as PersistentAction,
+      ),
+    ).toBe(false);
     expect(
       service.ownsPersistentAction({
         ...action,
