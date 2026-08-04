@@ -12,6 +12,7 @@ import { MenuTreeKind, MenuTreeState } from '../features/menu-tree/store/menu-tr
 import { Note } from '../features/note/note.model';
 import { IssueProvider } from '../features/issue/issue.model';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
+import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
 import {
   DEFAULT_TASK_REPEAT_CFG,
   TaskRepeatCfg,
@@ -50,6 +51,7 @@ import { SolidSimpleCounterRepository } from './solid-simple-counter.repository'
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
+import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 
 describe('SolidTaskHydrationService', () => {
   const TODAY = '2026-08-04';
@@ -195,6 +197,17 @@ describe('SolidTaskHydrationService', () => {
     },
     addPlannedTasksDialogLastShown: '2026-08-04',
   };
+  const timeTrackingState: TimeTrackingState = {
+    project: {
+      ['project-1']: {
+        [TODAY]: {
+          s: 1710000000000,
+          e: 1710003600000,
+        },
+      },
+    },
+    tag: {},
+  };
   const appState: SolidAppState = {
     id: SOLID_APP_STATE_ID,
     projectOrder: ['project-2', 'project-1'],
@@ -220,6 +233,7 @@ describe('SolidTaskHydrationService', () => {
       metrics: [metric],
       archivedTasks,
       plannerState,
+      timeTrackingState,
     });
 
     expect(appData.task.ids).toEqual(['task-1']);
@@ -246,6 +260,7 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.simpleCounter.entities['counter-1']).toEqual(simpleCounter);
     expect(appData.metric.ids).toEqual([TODAY]);
     expect(appData.metric.entities[TODAY]).toEqual(metric);
+    expect(appData.timeTracking).toEqual(timeTrackingState);
     expect(appData.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appData.archiveYoung.task.entities['archived-young-task-1']).toEqual(
       archivedYoungTask,
@@ -369,6 +384,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidAppStateRepository',
       ['loadAppState'],
     );
+    const timeTrackingRepository = jasmine.createSpyObj<SolidTimeTrackingRepository>(
+      'SolidTimeTrackingRepository',
+      ['loadTimeTrackingState'],
+    );
     taskRepository.loadTasks.and.resolveTo([task]);
     archivedTaskRepository.loadArchivedTasks.and.resolveTo(archivedTasks);
     boardRepository.loadBoards.and.resolveTo([board]);
@@ -384,6 +403,7 @@ describe('SolidTaskHydrationService', () => {
     metricRepository.loadMetrics.and.resolveTo([metric]);
     plannerRepository.loadPlannerState.and.resolveTo(plannerState);
     appStateRepository.loadAppState.and.resolveTo(appState);
+    timeTrackingRepository.loadTimeTrackingState.and.resolveTo(timeTrackingState);
 
     TestBed.configureTestingModule({
       providers: [
@@ -403,6 +423,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidSimpleCounterRepository, useValue: simpleCounterRepository },
         { provide: SolidMetricRepository, useValue: metricRepository },
         { provide: SolidAppStateRepository, useValue: appStateRepository },
+        { provide: SolidTimeTrackingRepository, useValue: timeTrackingRepository },
       ],
     });
 
@@ -443,6 +464,7 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.metric.ids).toEqual([TODAY]);
     expect(action.appDataComplete.metric.entities[TODAY]).toEqual(metric);
     const appDataComplete = action.appDataComplete as AppDataComplete;
+    expect(appDataComplete.timeTracking).toEqual(timeTrackingState);
     expect(appDataComplete.archiveYoung.task.ids).toEqual(['archived-young-task-1']);
     expect(appDataComplete.archiveOld.task.ids).toEqual(['archived-old-task-1']);
     expect(appDataComplete.planner).toEqual(plannerState);
@@ -457,5 +479,6 @@ describe('SolidTaskHydrationService', () => {
     expect(simpleCounterRepository.loadSimpleCounters).toHaveBeenCalledTimes(1);
     expect(metricRepository.loadMetrics).toHaveBeenCalledTimes(1);
     expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
+    expect(timeTrackingRepository.loadTimeTrackingState).toHaveBeenCalledTimes(1);
   });
 });

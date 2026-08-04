@@ -43,6 +43,7 @@ import { adapter as taskRepeatCfgAdapter } from '../features/task-repeat-cfg/sto
 import { initialTaskState } from '../features/tasks/store/task.reducer';
 import { taskAdapter } from '../features/tasks/store/task.adapter';
 import { initialTimeTrackingState } from '../features/time-tracking/store/time-tracking.reducer';
+import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
 import { TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { initialTagState, tagAdapter } from '../features/tag/store/tag.reducer';
@@ -65,6 +66,7 @@ import { SolidSimpleCounterRepository } from './solid-simple-counter.repository'
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
+import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 
 @Injectable({ providedIn: 'root' })
 export class SolidTaskHydrationService {
@@ -84,6 +86,7 @@ export class SolidTaskHydrationService {
   private readonly taskRepeatCfgRepository = inject(SolidTaskRepeatCfgRepository);
   private readonly simpleCounterRepository = inject(SolidSimpleCounterRepository);
   private readonly appStateRepository = inject(SolidAppStateRepository);
+  private readonly timeTrackingRepository = inject(SolidTimeTrackingRepository);
 
   async hydrateStore(): Promise<void> {
     const [
@@ -102,6 +105,7 @@ export class SolidTaskHydrationService {
       metrics,
       plannerState,
       appState,
+      timeTrackingState,
     ] = await Promise.all([
       this.taskRepository.loadTasks(),
       this.archivedTaskRepository.loadArchivedTasks(),
@@ -118,6 +122,7 @@ export class SolidTaskHydrationService {
       this.metricRepository.loadMetrics(),
       this.plannerRepository.loadPlannerState(),
       this.appStateRepository.loadAppState(),
+      this.timeTrackingRepository.loadTimeTrackingState(),
     ]);
     const appDataComplete = createSolidAppData({
       tasks,
@@ -135,6 +140,7 @@ export class SolidTaskHydrationService {
       archivedTasks,
       plannerState,
       appState,
+      timeTrackingState,
     });
 
     this.store.dispatch(loadAllData({ appDataComplete }));
@@ -150,7 +156,8 @@ export class SolidTaskHydrationService {
         `simple counter count: ${simpleCounters.length}, ` +
         `metric count: ${metrics.length}, ` +
         `archived task count: ${archivedTasks.length}, ` +
-        `planner day count: ${Object.keys(plannerState.days).length}`,
+        `planner day count: ${Object.keys(plannerState.days).length}, ` +
+        `time tracking project count: ${Object.keys(timeTrackingState.project).length}`,
     );
   }
 }
@@ -171,6 +178,7 @@ export const createSolidAppData = (input: {
   archivedTasks?: readonly SolidArchivedTask[];
   plannerState?: PlannerState;
   appState?: SolidAppState | null;
+  timeTrackingState?: TimeTrackingState;
 }): AppDataComplete => {
   const appDataComplete = Object.fromEntries(
     Object.entries(MODEL_CONFIGS).map(([key, config]) => [key, config.defaultData]),
@@ -216,6 +224,7 @@ export const createSolidAppData = (input: {
       initialSimpleCounterState,
     ),
     metric: metricAdapter.setAll([...(input.metrics ?? [])], initialMetricState),
+    timeTracking: input.timeTrackingState ?? appDataComplete.timeTracking,
     archiveYoung: {
       ...appDataComplete.archiveYoung,
       task: taskAdapter.setAll(archiveYoungTasks, initialTaskState),

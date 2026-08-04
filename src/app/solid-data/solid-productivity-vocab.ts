@@ -17,6 +17,7 @@ export const SOLID_PRODUCTIVITY_METRIC_TYPE = 'SuperProductivityMetric';
 export const SOLID_PRODUCTIVITY_BOARD_TYPE = 'SuperProductivityBoard';
 export const SOLID_PRODUCTIVITY_GLOBAL_CONFIG_TYPE = 'SuperProductivityGlobalConfig';
 export const SOLID_PRODUCTIVITY_MENU_TREE_TYPE = 'SuperProductivityMenuTree';
+export const SOLID_PRODUCTIVITY_TIME_TRACKING_TYPE = 'SuperProductivityTimeTracking';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
@@ -36,6 +37,8 @@ export const SOLID_PRODUCTIVITY_METRICS_CONTAINER = 'super-productivity/metrics'
 export const SOLID_PRODUCTIVITY_BOARDS_CONTAINER = 'super-productivity/boards';
 export const SOLID_PRODUCTIVITY_CONFIG_CONTAINER = 'super-productivity/config';
 export const SOLID_PRODUCTIVITY_MENU_TREE_CONTAINER = 'super-productivity/menu-tree';
+export const SOLID_PRODUCTIVITY_TIME_TRACKING_CONTAINER =
+  'super-productivity/time-tracking';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -57,6 +60,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     boards: SOLID_PRODUCTIVITY_BOARDS_CONTAINER,
     config: SOLID_PRODUCTIVITY_CONFIG_CONTAINER,
     menuTree: SOLID_PRODUCTIVITY_MENU_TREE_CONTAINER,
+    timeTracking: SOLID_PRODUCTIVITY_TIME_TRACKING_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -137,6 +141,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     [SOLID_PRODUCTIVITY_MENU_TREE_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}MenuTree`,
       container: 'menuTree',
+      defaultStatus: 'active',
+    },
+    [SOLID_PRODUCTIVITY_TIME_TRACKING_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}TimeTracking`,
+      container: 'timeTracking',
       defaultStatus: 'active',
     },
   },
@@ -334,5 +343,14 @@ export const SP_MENU_TREE = {
   id: `${SOLID_PRODUCTIVITY_NS}id`,
   projectTree: `${SOLID_PRODUCTIVITY_NS}projectTree`,
   tagTree: `${SOLID_PRODUCTIVITY_NS}tagTree`,
+  updated: `${SOLID_PRODUCTIVITY_NS}updated`,
+} as const;
+
+export const SP_TIME_TRACKING = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  contextType: `${SOLID_PRODUCTIVITY_NS}contextType`,
+  contextId: `${SOLID_PRODUCTIVITY_NS}contextId`,
+  date: `${SOLID_PRODUCTIVITY_NS}date`,
+  data: `${SOLID_PRODUCTIVITY_NS}timeTrackingData`,
   updated: `${SOLID_PRODUCTIVITY_NS}updated`,
 } as const;
