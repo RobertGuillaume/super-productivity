@@ -8,6 +8,7 @@ import {
 import { DEFAULT_GLOBAL_CONFIG } from '../features/config/default-global-config.const';
 import { GlobalConfigState } from '../features/config/global-config.model';
 import { Metric } from '../features/metric/metric.model';
+import { MenuTreeKind, MenuTreeState } from '../features/menu-tree/store/menu-tree.model';
 import { Note } from '../features/note/note.model';
 import { IssueProvider } from '../features/issue/issue.model';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
@@ -41,6 +42,7 @@ import {
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
 import { SolidMetricRepository } from './solid-metric.repository';
+import { SolidMenuTreeRepository } from './solid-menu-tree.repository';
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
@@ -151,6 +153,20 @@ describe('SolidTaskHydrationService', () => {
       isDisableAnimations: true,
     },
   };
+  const menuTree: MenuTreeState = {
+    projectTree: [
+      {
+        id: 'project-1',
+        k: MenuTreeKind.PROJECT,
+      },
+    ],
+    tagTree: [
+      {
+        id: 'tag-1',
+        k: MenuTreeKind.TAG,
+      },
+    ],
+  };
   const archivedYoungTask: Task = {
     ...task,
     id: 'archived-young-task-1',
@@ -193,6 +209,7 @@ describe('SolidTaskHydrationService', () => {
       tasks: [task],
       boards: [board],
       globalConfig,
+      menuTree,
       projects: [project],
       tags: [tag],
       notes: [note],
@@ -208,6 +225,7 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.task.ids).toEqual(['task-1']);
     expect(appData.boards.boardCfgs).toEqual([board]);
     expect(appData.globalConfig.misc.isDisableAnimations).toBe(true);
+    expect(appData.menuTree).toEqual(menuTree);
     expect(appData.task.entities['task-1']).toEqual(task);
     expect(appData.project.ids).toEqual([INBOX_PROJECT.id, 'project-1']);
     expect(appData.project.entities[INBOX_PROJECT.id]).toEqual(INBOX_PROJECT);
@@ -308,6 +326,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidGlobalConfigRepository',
       ['loadGlobalConfig'],
     );
+    const menuTreeRepository = jasmine.createSpyObj<SolidMenuTreeRepository>(
+      'SolidMenuTreeRepository',
+      ['loadMenuTree'],
+    );
     const projectRepository = jasmine.createSpyObj<SolidProjectRepository>(
       'SolidProjectRepository',
       ['loadProjects'],
@@ -351,6 +373,7 @@ describe('SolidTaskHydrationService', () => {
     archivedTaskRepository.loadArchivedTasks.and.resolveTo(archivedTasks);
     boardRepository.loadBoards.and.resolveTo([board]);
     globalConfigRepository.loadGlobalConfig.and.resolveTo(globalConfig);
+    menuTreeRepository.loadMenuTree.and.resolveTo(menuTree);
     projectRepository.loadProjects.and.resolveTo([project]);
     tagRepository.loadTags.and.resolveTo([tag]);
     noteRepository.loadNotes.and.resolveTo([note]);
@@ -369,6 +392,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
         { provide: SolidBoardRepository, useValue: boardRepository },
         { provide: SolidGlobalConfigRepository, useValue: globalConfigRepository },
+        { provide: SolidMenuTreeRepository, useValue: menuTreeRepository },
         { provide: SolidProjectRepository, useValue: projectRepository },
         { provide: SolidPlannerRepository, useValue: plannerRepository },
         { provide: SolidTagRepository, useValue: tagRepository },
@@ -393,6 +417,7 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.task.ids).toEqual(['task-1']);
     expect(action.appDataComplete.boards.boardCfgs).toEqual([board]);
     expect(action.appDataComplete.globalConfig.misc.isDisableAnimations).toBe(true);
+    expect(action.appDataComplete.menuTree).toEqual(menuTree);
     expect(action.appDataComplete.task.entities['task-1']).toEqual(task);
     expect(action.appDataComplete.project.ids).toEqual([INBOX_PROJECT.id, 'project-1']);
     expect(action.appDataComplete.project.entities['project-1']).toEqual(project);
@@ -424,6 +449,7 @@ describe('SolidTaskHydrationService', () => {
     expect(archivedTaskRepository.loadArchivedTasks).toHaveBeenCalledTimes(1);
     expect(boardRepository.loadBoards).toHaveBeenCalledTimes(1);
     expect(globalConfigRepository.loadGlobalConfig).toHaveBeenCalledTimes(1);
+    expect(menuTreeRepository.loadMenuTree).toHaveBeenCalledTimes(1);
     expect(plannerRepository.loadPlannerState).toHaveBeenCalledTimes(1);
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);
