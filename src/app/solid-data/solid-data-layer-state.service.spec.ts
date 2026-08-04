@@ -15,6 +15,12 @@ import { addBoard, updatePanelCfg } from '../features/boards/store/boards.action
 import { updateGlobalConfigSection } from '../features/config/store/global-config.actions';
 import { updateProjectTree } from '../features/menu-tree/store/menu-tree.actions';
 import { MenuTreeKind } from '../features/menu-tree/store/menu-tree.model';
+import {
+  deletePluginMetadata,
+  deletePluginUserData,
+  upsertPluginMetadata,
+  upsertPluginUserData,
+} from '../plugins/store/plugin.actions';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
 import { PlannerActions } from '../features/planner/store/planner.actions';
 import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
@@ -659,6 +665,36 @@ describe('SolidDataLayerStateService', () => {
           day: '2026-08-04',
           duration: 25,
         }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        upsertPluginUserData({
+          pluginUserData: {
+            id: 'plugin-a:doc-1',
+            data: 'payload',
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        deletePluginUserData({ pluginId: 'plugin-a:doc-1' }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        upsertPluginMetadata({
+          pluginMetadata: {
+            id: 'plugin-a',
+            isEnabled: true,
+          },
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        deletePluginMetadata({ pluginId: 'plugin-a' }) as PersistentAction,
       ),
     ).toBe(true);
     expect(

@@ -104,6 +104,7 @@ import { SolidMetricPersistenceEffects } from '../solid-data/solid-metric-persis
 import { SolidMenuTreePersistenceEffects } from '../solid-data/solid-menu-tree-persistence.effects';
 import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistence.effects';
 import { SolidPlannerPersistenceEffects } from '../solid-data/solid-planner-persistence.effects';
+import { SolidPluginDataPersistenceEffects } from '../solid-data/solid-plugin-data-persistence.effects';
 import { SolidProjectDeleteCascadeEffects } from '../solid-data/solid-project-delete-cascade.effects';
 import { SolidProjectPersistenceEffects } from '../solid-data/solid-project-persistence.effects';
 import { SolidSectionPersistenceEffects } from '../solid-data/solid-section-persistence.effects';
@@ -141,6 +142,7 @@ import {
     EffectsModule.forFeature([SolidTaskPersistenceEffects]),
     EffectsModule.forFeature([SolidEmbeddedTaskPersistenceEffects]),
     EffectsModule.forFeature([SolidPlannerPersistenceEffects]),
+    EffectsModule.forFeature([SolidPluginDataPersistenceEffects]),
     EffectsModule.forFeature([SolidProjectDeleteCascadeEffects]),
     EffectsModule.forFeature([SolidProjectPersistenceEffects]),
     EffectsModule.forFeature([SolidSectionPersistenceEffects]),

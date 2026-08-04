@@ -1,0 +1,140 @@
+import { inject, Injectable } from '@angular/core';
+import { createEffect } from '@ngrx/effects';
+import { Store } from '@ngrx/store';
+import { EMPTY, from, Observable } from 'rxjs';
+import { catchError, concatMap, filter, map, take } from 'rxjs/operators';
+import { Log } from '../core/log';
+import { SnackService } from '../core/snack/snack.service';
+import { PluginMetadata, PluginUserData } from '../plugins/plugin-persistence.model';
+import {
+  deletePluginMetadata,
+  deletePluginUserData,
+  upsertPluginUserData,
+} from '../plugins/store/plugin.actions';
+import { selectPluginMetadataFeatureState } from '../plugins/store/plugin-metadata.reducer';
+import { selectPluginUserDataFeatureState } from '../plugins/store/plugin-user-data.reducer';
+import { PersistentAction } from '../op-log/core/persistent-action.interface';
+import { T } from '../t.const';
+import { ALL_ACTIONS } from '../util/local-actions.token';
+import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import {
+  isSolidPluginDataDeleteAction,
+  isSolidPluginDataSaveAction,
+  SolidPluginDataDeleteAction,
+  SolidPluginDataSaveAction,
+} from './solid-plugin-data-action-types';
+import { SolidPluginDataRepository } from './solid-plugin-data.repository';
+
+@Injectable()
+export class SolidPluginDataPersistenceEffects {
+  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly store = inject(Store);
+  private readonly solidDataLayerState = inject(SolidDataLayerStateService);
+  private readonly solidPluginDataRepository = inject(SolidPluginDataRepository);
+  private readonly snackService = inject(SnackService);
+
+  persistPluginDataSave$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        filter(
+          (action): action is SolidPluginDataSaveAction & PersistentAction =>
+            isSolidPluginDataSaveAction(action) &&
+            !(action as PersistentAction).meta?.isRemote,
+        ),
+        filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
+        concatMap((action) =>
+          this.pluginDataForSaveAction(action).pipe(
+            concatMap((pluginData) =>
+              pluginData === null ? EMPTY : from(this.savePluginData(pluginData)),
+            ),
+            catchError((error) => this.handlePersistenceError(error)),
+          ),
+        ),
+      ),
+    { dispatch: false },
+  );
+
+  persistPluginDataDelete$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        filter(
+          (action): action is SolidPluginDataDeleteAction & PersistentAction =>
+            isSolidPluginDataDeleteAction(action) &&
+            !(action as PersistentAction).meta?.isRemote,
+        ),
+        filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
+        concatMap((action) =>
+          from(this.deletePluginData(action)).pipe(
+            catchError((error) => this.handlePersistenceError(error)),
+          ),
+        ),
+      ),
+    { dispatch: false },
+  );
+
+  private pluginDataForSaveAction(
+    action: SolidPluginDataSaveAction,
+  ): Observable<PluginUserData | PluginMetadata | null> {
+    if (action.type === upsertPluginUserData.type) {
+      return this.store.select(selectPluginUserDataFeatureState).pipe(
+        take(1),
+        map(
+          (pluginUserDataState) =>
+            pluginUserDataState.find(
+              (pluginUserData) => pluginUserData.id === action.pluginUserData.id,
+            ) ?? null,
+        ),
+      );
+    }
+
+    return this.store.select(selectPluginMetadataFeatureState).pipe(
+      take(1),
+      map(
+        (pluginMetadataState) =>
+          pluginMetadataState.find(
+            (pluginMetadata) => pluginMetadata.id === action.pluginMetadata.id,
+          ) ?? null,
+      ),
+    );
+  }
+
+  private savePluginData(
+    pluginData: PluginUserData | PluginMetadata,
+  ): Promise<PluginUserData | PluginMetadata> {
+    if ('data' in pluginData) {
+      return this.solidPluginDataRepository.savePluginUserData(pluginData);
+    }
+
+    return this.solidPluginDataRepository.savePluginMetadata(pluginData);
+  }
+
+  private deletePluginData(action: SolidPluginDataDeleteAction): Promise<void> {
+    if (action.type === deletePluginUserData.type) {
+      return this.solidPluginDataRepository.deletePluginUserData(action.pluginId);
+    }
+
+    if (action.type === deletePluginMetadata.type) {
+      return this.solidPluginDataRepository.deletePluginMetadata(action.pluginId);
+    }
+
+    return Promise.resolve();
+  }
+
+  private handlePersistenceError(error: unknown): typeof EMPTY {
+    Log.err('SolidPluginDataPersistenceEffects: failed to persist plugin data', {
+      name: (error as Error | undefined)?.name,
+    });
+    this.snackService.open({
+      type: 'ERROR',
+      msg: T.F.SYNC.S.PERSIST_FAILED,
+      actionStr: T.PS.RELOAD,
+      actionFn: (): void => {
+        window.location.reload();
+      },
+      config: {
+        duration: 0,
+      },
+    });
+    return EMPTY;
+  }
+}
