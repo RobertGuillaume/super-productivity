@@ -5,6 +5,8 @@ import {
   BoardPanelCfgScheduledState,
   BoardPanelCfgTaskDoneState,
 } from '../features/boards/boards.model';
+import { DEFAULT_GLOBAL_CONFIG } from '../features/config/default-global-config.const';
+import { GlobalConfigState } from '../features/config/global-config.model';
 import { Metric } from '../features/metric/metric.model';
 import { Note } from '../features/note/note.model';
 import { IssueProvider } from '../features/issue/issue.model';
@@ -31,6 +33,7 @@ import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SOLID_APP_STATE_ID, SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidBoardRepository } from './solid-board.repository';
+import { SolidGlobalConfigRepository } from './solid-global-config.repository';
 import {
   createSolidAppData,
   SolidTaskHydrationService,
@@ -141,6 +144,13 @@ describe('SolidTaskHydrationService', () => {
       },
     ],
   };
+  const globalConfig: GlobalConfigState = {
+    ...DEFAULT_GLOBAL_CONFIG,
+    misc: {
+      ...DEFAULT_GLOBAL_CONFIG.misc,
+      isDisableAnimations: true,
+    },
+  };
   const archivedYoungTask: Task = {
     ...task,
     id: 'archived-young-task-1',
@@ -182,6 +192,7 @@ describe('SolidTaskHydrationService', () => {
     const appData = createSolidAppData({
       tasks: [task],
       boards: [board],
+      globalConfig,
       projects: [project],
       tags: [tag],
       notes: [note],
@@ -196,6 +207,7 @@ describe('SolidTaskHydrationService', () => {
 
     expect(appData.task.ids).toEqual(['task-1']);
     expect(appData.boards.boardCfgs).toEqual([board]);
+    expect(appData.globalConfig.misc.isDisableAnimations).toBe(true);
     expect(appData.task.entities['task-1']).toEqual(task);
     expect(appData.project.ids).toEqual([INBOX_PROJECT.id, 'project-1']);
     expect(appData.project.entities[INBOX_PROJECT.id]).toEqual(INBOX_PROJECT);
@@ -292,6 +304,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidBoardRepository',
       ['loadBoards'],
     );
+    const globalConfigRepository = jasmine.createSpyObj<SolidGlobalConfigRepository>(
+      'SolidGlobalConfigRepository',
+      ['loadGlobalConfig'],
+    );
     const projectRepository = jasmine.createSpyObj<SolidProjectRepository>(
       'SolidProjectRepository',
       ['loadProjects'],
@@ -334,6 +350,7 @@ describe('SolidTaskHydrationService', () => {
     taskRepository.loadTasks.and.resolveTo([task]);
     archivedTaskRepository.loadArchivedTasks.and.resolveTo(archivedTasks);
     boardRepository.loadBoards.and.resolveTo([board]);
+    globalConfigRepository.loadGlobalConfig.and.resolveTo(globalConfig);
     projectRepository.loadProjects.and.resolveTo([project]);
     tagRepository.loadTags.and.resolveTo([tag]);
     noteRepository.loadNotes.and.resolveTo([note]);
@@ -351,6 +368,7 @@ describe('SolidTaskHydrationService', () => {
         { provide: SolidTaskRepository, useValue: taskRepository },
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
         { provide: SolidBoardRepository, useValue: boardRepository },
+        { provide: SolidGlobalConfigRepository, useValue: globalConfigRepository },
         { provide: SolidProjectRepository, useValue: projectRepository },
         { provide: SolidPlannerRepository, useValue: plannerRepository },
         { provide: SolidTagRepository, useValue: tagRepository },
@@ -374,6 +392,7 @@ describe('SolidTaskHydrationService', () => {
     expect(action.type).toBe(loadAllData.type);
     expect(action.appDataComplete.task.ids).toEqual(['task-1']);
     expect(action.appDataComplete.boards.boardCfgs).toEqual([board]);
+    expect(action.appDataComplete.globalConfig.misc.isDisableAnimations).toBe(true);
     expect(action.appDataComplete.task.entities['task-1']).toEqual(task);
     expect(action.appDataComplete.project.ids).toEqual([INBOX_PROJECT.id, 'project-1']);
     expect(action.appDataComplete.project.entities['project-1']).toEqual(project);
@@ -404,6 +423,7 @@ describe('SolidTaskHydrationService', () => {
     expect(appDataComplete.planner).toEqual(plannerState);
     expect(archivedTaskRepository.loadArchivedTasks).toHaveBeenCalledTimes(1);
     expect(boardRepository.loadBoards).toHaveBeenCalledTimes(1);
+    expect(globalConfigRepository.loadGlobalConfig).toHaveBeenCalledTimes(1);
     expect(plannerRepository.loadPlannerState).toHaveBeenCalledTimes(1);
     expect(sectionRepository.loadSections).toHaveBeenCalledTimes(1);
     expect(issueProviderRepository.loadIssueProviders).toHaveBeenCalledTimes(1);

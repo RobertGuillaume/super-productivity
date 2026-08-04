@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { Log } from '../core/log';
 import { BoardCfg } from '../features/boards/boards.model';
+import { GlobalConfigState } from '../features/config/global-config.model';
 import { Metric } from '../features/metric/metric.model';
 import {
   initialMetricState,
@@ -51,6 +52,7 @@ import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidBoardRepository } from './solid-board.repository';
+import { SolidGlobalConfigRepository } from './solid-global-config.repository';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
 import { SolidMetricRepository } from './solid-metric.repository';
@@ -68,6 +70,7 @@ export class SolidTaskHydrationService {
   private readonly taskRepository = inject(SolidTaskRepository);
   private readonly archivedTaskRepository = inject(SolidArchivedTaskRepository);
   private readonly boardRepository = inject(SolidBoardRepository);
+  private readonly globalConfigRepository = inject(SolidGlobalConfigRepository);
   private readonly projectRepository = inject(SolidProjectRepository);
   private readonly plannerRepository = inject(SolidPlannerRepository);
   private readonly tagRepository = inject(SolidTagRepository);
@@ -84,6 +87,7 @@ export class SolidTaskHydrationService {
       tasks,
       archivedTasks,
       boards,
+      globalConfig,
       projects,
       tags,
       notes,
@@ -98,6 +102,7 @@ export class SolidTaskHydrationService {
       this.taskRepository.loadTasks(),
       this.archivedTaskRepository.loadArchivedTasks(),
       this.boardRepository.loadBoards(),
+      this.globalConfigRepository.loadGlobalConfig(),
       this.projectRepository.loadProjects(),
       this.tagRepository.loadTags(),
       this.noteRepository.loadNotes(),
@@ -112,6 +117,7 @@ export class SolidTaskHydrationService {
     const appDataComplete = createSolidAppData({
       tasks,
       boards,
+      globalConfig,
       projects,
       tags,
       notes,
@@ -129,6 +135,7 @@ export class SolidTaskHydrationService {
     Log.normal(
       `Solid data layer hydrated task count: ${tasks.length}, ` +
         `board count: ${boards.length}, ` +
+        `global config loaded: ${globalConfig !== null}, ` +
         `project count: ${projects.length}, tag count: ${tags.length}, ` +
         `note count: ${notes.length}, section count: ${sections.length}, ` +
         `issue provider count: ${issueProviders.length}, ` +
@@ -144,6 +151,7 @@ export class SolidTaskHydrationService {
 export const createSolidAppData = (input: {
   tasks: readonly Task[];
   boards?: readonly BoardCfg[];
+  globalConfig?: GlobalConfigState | null;
   projects: readonly Project[];
   tags: readonly Tag[];
   notes: readonly Note[];
@@ -177,6 +185,7 @@ export const createSolidAppData = (input: {
     boards: {
       boardCfgs: [...(input.boards ?? [])],
     },
+    globalConfig: input.globalConfig ?? appDataComplete.globalConfig,
     task: taskAdapter.setAll([...input.tasks], initialTaskState),
     project: projectAdapter.setAll(projects, initialProjectState),
     tag: tagAdapter.setAll(tags, initialTagState),

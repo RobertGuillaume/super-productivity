@@ -10,6 +10,7 @@ import {
   SOLID_PRODUCTIVITY_APP_STATE_TYPE,
   SOLID_PRODUCTIVITY_ARCHIVED_TASK_TYPE,
   SOLID_PRODUCTIVITY_BOARD_TYPE,
+  SOLID_PRODUCTIVITY_GLOBAL_CONFIG_TYPE,
   SOLID_PRODUCTIVITY_ISSUE_PROVIDER_TYPE,
   SOLID_PRODUCTIVITY_METRIC_TYPE,
   SOLID_PRODUCTIVITY_NOTE_TYPE,
@@ -87,6 +88,10 @@ export class SolidRuntimeService {
 
   get boardProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_BOARD_TYPE] {
     return this.ensureLayout().types[SOLID_PRODUCTIVITY_BOARD_TYPE];
+  }
+
+  get globalConfigProfile(): RuntimeLayout['types'][typeof SOLID_PRODUCTIVITY_GLOBAL_CONFIG_TYPE] {
+    return this.ensureLayout().types[SOLID_PRODUCTIVITY_GLOBAL_CONFIG_TYPE];
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {

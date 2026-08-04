@@ -15,6 +15,7 @@ export const SOLID_PRODUCTIVITY_PLANNER_STATE_TYPE = 'SuperProductivityPlannerSt
 export const SOLID_PRODUCTIVITY_SIMPLE_COUNTER_TYPE = 'SuperProductivitySimpleCounter';
 export const SOLID_PRODUCTIVITY_METRIC_TYPE = 'SuperProductivityMetric';
 export const SOLID_PRODUCTIVITY_BOARD_TYPE = 'SuperProductivityBoard';
+export const SOLID_PRODUCTIVITY_GLOBAL_CONFIG_TYPE = 'SuperProductivityGlobalConfig';
 export const SOLID_PRODUCTIVITY_TASKS_CONTAINER = 'super-productivity/tasks';
 export const SOLID_PRODUCTIVITY_PROJECTS_CONTAINER = 'super-productivity/projects';
 export const SOLID_PRODUCTIVITY_TAGS_CONTAINER = 'super-productivity/tags';
@@ -32,6 +33,7 @@ export const SOLID_PRODUCTIVITY_SIMPLE_COUNTERS_CONTAINER =
   'super-productivity/simple-counters';
 export const SOLID_PRODUCTIVITY_METRICS_CONTAINER = 'super-productivity/metrics';
 export const SOLID_PRODUCTIVITY_BOARDS_CONTAINER = 'super-productivity/boards';
+export const SOLID_PRODUCTIVITY_CONFIG_CONTAINER = 'super-productivity/config';
 
 export const RDF_JSON_DATATYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON';
 
@@ -51,6 +53,7 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     simpleCounters: SOLID_PRODUCTIVITY_SIMPLE_COUNTERS_CONTAINER,
     metrics: SOLID_PRODUCTIVITY_METRICS_CONTAINER,
     boards: SOLID_PRODUCTIVITY_BOARDS_CONTAINER,
+    config: SOLID_PRODUCTIVITY_CONFIG_CONTAINER,
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
@@ -121,6 +124,11 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
     [SOLID_PRODUCTIVITY_BOARD_TYPE]: {
       classUri: `${SOLID_PRODUCTIVITY_NS}Board`,
       container: 'boards',
+      defaultStatus: 'active',
+    },
+    [SOLID_PRODUCTIVITY_GLOBAL_CONFIG_TYPE]: {
+      classUri: `${SOLID_PRODUCTIVITY_NS}GlobalConfig`,
+      container: 'config',
       defaultStatus: 'active',
     },
   },
@@ -306,4 +314,10 @@ export const SP_BOARD = {
   order: `${SOLID_PRODUCTIVITY_NS}order`,
   panels: `${SOLID_PRODUCTIVITY_NS}panels`,
   boardData: `${SOLID_PRODUCTIVITY_NS}boardData`,
+} as const;
+
+export const SP_GLOBAL_CONFIG = {
+  id: `${SOLID_PRODUCTIVITY_NS}id`,
+  configData: `${SOLID_PRODUCTIVITY_NS}configData`,
+  updated: `${SOLID_PRODUCTIVITY_NS}updated`,
 } as const;
