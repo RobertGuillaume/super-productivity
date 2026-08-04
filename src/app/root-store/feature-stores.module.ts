@@ -97,6 +97,7 @@ import { OperationLogEffects } from '../op-log/capture/operation-log.effects';
 import { SolidAppStatePersistenceEffects } from '../solid-data/solid-app-state-persistence.effects';
 import { SolidBoardPersistenceEffects } from '../solid-data/solid-board-persistence.effects';
 import { SolidEmbeddedTaskPersistenceEffects } from '../solid-data/solid-embedded-task-persistence.effects';
+import { SolidGlobalConfigPersistenceEffects } from '../solid-data/solid-global-config-persistence.effects';
 import { SolidIssueProviderPersistenceEffects } from '../solid-data/solid-issue-provider-persistence.effects';
 import { SolidMetricPersistenceEffects } from '../solid-data/solid-metric-persistence.effects';
 import { SolidNotePersistenceEffects } from '../solid-data/solid-note-persistence.effects';
@@ -148,6 +149,7 @@ import {
     EffectsModule.forFeature([SolidTaskRepeatCfgPersistenceEffects]),
     EffectsModule.forFeature([SolidTaskSchedulingPersistenceEffects]),
     EffectsModule.forFeature([SolidNotePersistenceEffects]),
+    EffectsModule.forFeature([SolidGlobalConfigPersistenceEffects]),
     EffectsModule.forFeature([SolidIssueProviderPersistenceEffects]),
     EffectsModule.forFeature([SolidMetricPersistenceEffects]),
     EffectsModule.forFeature([SolidAppStatePersistenceEffects]),

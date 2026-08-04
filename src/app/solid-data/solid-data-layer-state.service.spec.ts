@@ -8,6 +8,7 @@ import {
   BoardPanelCfgTaskDoneState,
 } from '../features/boards/boards.model';
 import { addBoard, updatePanelCfg } from '../features/boards/store/boards.actions';
+import { updateGlobalConfigSection } from '../features/config/store/global-config.actions';
 import { moveProjectTaskToBacklogList } from '../features/project/store/project.actions';
 import { PlannerActions } from '../features/planner/store/planner.actions';
 import { IssueProviderActions } from '../features/issue/store/issue-provider.actions';
@@ -647,6 +648,16 @@ describe('SolidDataLayerStateService', () => {
         logFocusSession({
           day: '2026-08-04',
           duration: 25,
+        }) as PersistentAction,
+      ),
+    ).toBe(true);
+    expect(
+      service.ownsPersistentAction(
+        updateGlobalConfigSection({
+          sectionKey: 'misc',
+          sectionCfg: {
+            isDisableAnimations: true,
+          },
         }) as PersistentAction,
       ),
     ).toBe(true);
