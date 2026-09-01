@@ -35,7 +35,6 @@ import {
   expandFadeInOnlyAnimation,
 } from '../../../ui/animations/expand.ani';
 import { fadeAnimation } from '../../../ui/animations/fade.ani';
-import { swirlAnimation } from '../../../ui/animations/swirl-in-out.ani';
 import { DialogTimeEstimateComponent } from '../dialog-time-estimate/dialog-time-estimate.component';
 import { MatDialog } from '@angular/material/dialog';
 import { TaskRepeatCfgService } from '../../task-repeat-cfg/task-repeat-cfg.service';
@@ -105,7 +104,6 @@ import { TaskContextMenuComponent } from '../task-context-menu/task-context-menu
     expandFadeAnimation,
     expandFadeInOnlyAnimation,
     fadeAnimation,
-    swirlAnimation,
   ],
   imports: [
     TaskTitleComponent,
@@ -384,6 +382,8 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
 
   showTimeEstimate = computed(() => !this.task().subTasks?.length);
 
+  hasTimeData = computed(() => !!(this.task().timeSpent || this.task().timeEstimate));
+
   hasAttachments = computed(() => {
     return this.issueAttachments().length > 0 || this.localAttachments().length > 0;
   });
@@ -416,7 +416,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
         ? this.T.F.TASK.ADDITIONAL_INFO.DEADLINE_OVERDUE
         : this.T.F.TASK.ADDITIONAL_INFO.DEADLINE_DUE_BY;
     }
-    return this.T.F.TASK.ADDITIONAL_INFO.DEADLINE;
+    return this.T.F.TASK.CMP.SET_DEADLINE;
   });
 
   // EFFECTS

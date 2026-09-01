@@ -53,6 +53,7 @@ import {
 import { TaskLog } from '../../../core/log';
 import { devError } from '../../../util/dev-error';
 import { moveValidIdsToFront } from '../util/move-valid-ids-to-front';
+import { applyClearedFields } from '../../../util/cleared-update-fields';
 
 export { taskAdapter };
 
@@ -171,6 +172,7 @@ export const initialTaskState: TaskState = taskAdapter.getInitialState({
   taskDetailTargetPanel: TaskDetailTargetPanel.Default,
   lastCurrentTaskId: null,
   isDataLoaded: false,
+  dismissedCalendarAutoImportEventIdsByProvider: {},
 }) as TaskState;
 
 export const taskReducer = createReducer<TaskState>(
@@ -197,6 +199,8 @@ export const taskReducer = createReducer<TaskState>(
         selectedTaskId: null,
         lastCurrentTaskId: task.currentTaskId,
         isDataLoaded: true,
+        dismissedCalendarAutoImportEventIdsByProvider:
+          sanitized.dismissedCalendarAutoImportEventIdsByProvider ?? {},
       } as TaskState),
     );
   }),
@@ -360,8 +364,16 @@ export const taskReducer = createReducer<TaskState>(
     return taskAdapter.updateMany(taskUpdates, state);
   }),
 
-  on(updateTaskUi, (state, { task }) => {
-    return taskAdapter.updateOne(task, state);
+  on(updateTaskUi, (state, { task, clearedFields }) => {
+    // Restore keys that JSON serialization dropped from a replayed op's
+    // changes (`{ someField: undefined }`) — see issue #9776.
+    return taskAdapter.updateOne(
+      {
+        id: task.id as string,
+        changes: applyClearedFields(task.changes, clearedFields),
+      },
+      state,
+    );
   }),
 
   // Bulk task updates - used for archive task batch operations
@@ -541,7 +553,12 @@ export const taskReducer = createReducer<TaskState>(
     const isLimitToProject: boolean = !!projectId || projectId === null;
 
     const idsToUpdateDirectly: string[] = taskIds.filter((id) => {
-      const task: Task = getTaskById(id, state);
+      // A remote/replayed op may list tasks this client archived or deleted
+      // meanwhile — skip them instead of aborting the whole rounding (#9601).
+      const task: Task | undefined = state.entities[id];
+      if (!task) {
+        return false;
+      }
       return (
         (task.subTaskIds.length === 0 || !!task.parentId) &&
         (!isLimitToProject || task.projectId === projectId)

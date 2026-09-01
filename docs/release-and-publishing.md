@@ -102,11 +102,10 @@ For a non-prerelease release, publishing the draft starts:
 | Google Play | `.github/workflows/auto-publish-google-play-on-release.yml` | Promote `internal` to `production`              |
 | Snap Store  | `.github/workflows/build-publish-to-snap-on-release.yml`    | Publish the release Snap to `edge` and `stable` |
 | Web app     | `.github/workflows/build-update-web-app-on-release.yml`     | Build and deploy production web assets          |
-| AUR         | `.github/workflows/build-publish-to-aur-on-release.yml`     | Update `superproductivity-bin`                  |
 | Docker Hub  | `.github/workflows/publish-to-hub-docker.yml`               | Build and publish the application image         |
 
 The Docker Hub workflow runs for any published GitHub release and does not contain
-the prerelease guard used by the web, Play, Snap, and AUR workflows. Account for
+the prerelease guard used by the web, Play, and Snap workflows. Account for
 that before publishing a pre-release.
 
 The Microsoft Store upload remains manual: download the `WinStoreRelease` artifact
@@ -141,7 +140,7 @@ for secret names. The main operational groups are:
   `.github/workflows/build.yml`.
 - Snap: `SNAPCRAFT_STORE_CREDENTIALS`; see
   [credential refresh](howto-refresh-snap-credentials.md).
-- Web, Docker Hub, AUR, and Microsoft Store credentials are named at their exact
+- Web, Docker Hub, and Microsoft Store credentials are named at their exact
   use sites in the corresponding workflows.
 
 ## Store listing assets
@@ -165,3 +164,26 @@ for development-only labels, secrets, and personal data before upload.
   release.
 - Record the release URL and any intentionally skipped or manually completed
   channel in the release discussion.
+- A failing SignPath step prints only what the connector returns, which can be a
+  bare `Invalid request to SignPath API.` with no detail (v18.20.0, run
+  31883046355). The workflow log cannot say more: diagnose it in the SignPath
+  web UI, where the signing request record carries the real reason. SignPath's
+  byte allowance is an annual quota, not a per-request limit: splitting the same
+  executables across requests does not save quota. The v18.20.0 request was
+  rejected after the old pipeline submitted six executables (about 892 MB) and
+  exhausted the allowance. The workflow now submits only the universal installer
+  and portable (about 448 MB), after checking that both x64 and arm64 payloads are
+  embedded. It creates the old architecture-specific download names only after
+  signing, so those compatibility copies consume no signing quota.
+- Reducing a new request does not restore quota already consumed. Check the
+  SignPath organization page for the active quota period and remaining bytes;
+  request an exception from SignPath or wait for the period reset if necessary.
+  Also verify that `SIGNPATH_API_TOKEN` is valid, that the `super-productivity`
+  project, `release-signing` policy, and `github-zip-pe` artifact configuration
+  still exist under those exact slugs, and that the GitHub trusted build system
+  is authorized for the organization. If those checks do not explain a rejection,
+  report the run URL and submission timestamp to SignPath support so they can
+  inspect the server-side request record.
+- Windows signing runs only on a `v*` tag, so a signing fix can only be
+  exercised by re-running `windows-bin` or by pushing a pre-release tag. Never
+  move a released tag to retest.

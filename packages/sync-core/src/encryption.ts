@@ -6,6 +6,8 @@
  *   encryption/argon2.ts        — Argon2id params, deriveKeyFromPassword, DerivedKey
  *   encryption/legacy.ts        — backward-compat PBKDF2 decryption + warning handler
  *   encryption/session-cache.ts — session-level key caches
+ *   encryption/transport-shape.ts — dependency-free ciphertext-shape classifier
+ *                                   (exported directly via the package barrel)
  *   encryption.ts (this file)   — public API: encrypt/decrypt/encryptBatch/decryptBatch
  *
  * ## Wire format (public contract — do not change without a version-byte migration)
@@ -16,6 +18,11 @@
  * Ciphertext is base64-encoded for transport. `detectFormat()` discriminates
  * by length: < 28 bytes is invalid, < 44 bytes is unambiguously legacy,
  * >= 44 bytes is treated as Argon2id with a legacy fallback on auth failure.
+ * The Android background sync reads the Argon2id format independently
+ * (android `crypto/OpPayloadDecryptor.kt`) — changes here must be mirrored
+ * there and its fixtures regenerated (see the note in encryption/argon2.ts).
+ * CI verifies the round-trip live: tools/generate-android-crypto-fixtures.mjs
+ * feeds fresh encrypt() output to the Kotlin tests on every Android CI run.
  *
  * ## Salt and IV semantics
  *

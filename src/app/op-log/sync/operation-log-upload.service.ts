@@ -32,7 +32,7 @@ import {
   UploadOptions,
 } from '../core/types/sync-results.types';
 import { isRetryableUploadError } from '@sp/sync-providers/http';
-import { handleStorageQuotaError } from './sync-error-utils';
+import { getSyncErrorCode, handleStorageQuotaError } from './sync-error-utils';
 import {
   DecryptNoPasswordError,
   EncryptNoPasswordError,
@@ -132,6 +132,10 @@ export class OperationLogUploadService {
     // unsynced, so the caller can report an honest not-in-sync status (not IN_SYNC).
     let encryptionRequiredKeyMissing = false;
     let blockedByRejectedFullState = false;
+    // Set when a full-state op hit a retryable server error (e.g. a Postgres
+    // serialization conflict). The op stays pending, but nothing reached the
+    // server this round, so the caller must not report IN_SYNC.
+    let fullStateUploadDeferred = false;
     let rejectedFullStateBarrierSeq: number | undefined;
 
     await this.lockService.request(LOCK_NAMES.UPLOAD, async () => {
@@ -334,6 +338,7 @@ export class OperationLogUploadService {
               `OperationLogUploadService: Full-state op ${entry.op.id} failed due to network error, will retry: ${result.error}`,
             );
             // Don't mark as rejected - leave as unsynced for retry
+            fullStateUploadDeferred = true;
           } else {
             // Keep the op pending until OperationLogSyncService has processed
             // piggybacked ops and the central rejection handler has classified
@@ -458,7 +463,7 @@ export class OperationLogUploadService {
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error';
           OpLog.error(`OperationLogUploadService: Upload failed: ${message}`);
-          handleStorageQuotaError(message);
+          handleStorageQuotaError(err);
           throw err; // Re-throw to propagate the error
         }
 
@@ -614,6 +619,7 @@ export class OperationLogUploadService {
       ...(lastServerSeqToPersist !== undefined ? { lastServerSeqToPersist } : {}),
       ...(encryptionRequiredKeyMissing ? { encryptionRequiredKeyMissing: true } : {}),
       ...(blockedByRejectedFullState ? { blockedByRejectedFullState: true } : {}),
+      ...(fullStateUploadDeferred ? { fullStateUploadDeferred: true } : {}),
       ...(options?.deferAcknowledgement
         ? { selectedPendingOps, pendingAcknowledgementSeqs }
         : {}),
@@ -808,16 +814,19 @@ export class OperationLogUploadService {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       OpLog.error(`OperationLogUploadService: Snapshot upload failed: ${message}`);
-      handleStorageQuotaError(message);
+      handleStorageQuotaError(err);
 
-      // Extract errorCode from error message if present (server returns JSON with errorCode)
-      let errorCode: string | undefined;
-      if (message.includes('SYNC_IMPORT_EXISTS')) {
-        errorCode = 'SYNC_IMPORT_EXISTS';
-      }
+      const errorCode = getSyncErrorCode(err) ?? this._getLegacyErrorCode(message);
 
       return { accepted: false, error: message, errorCode };
     }
+  }
+
+  private _getLegacyErrorCode(message: string): string | undefined {
+    if (message.includes('SYNC_IMPORT_EXISTS')) {
+      return 'SYNC_IMPORT_EXISTS';
+    }
+    return undefined;
   }
 
   /**

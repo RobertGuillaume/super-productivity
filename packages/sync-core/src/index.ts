@@ -34,6 +34,7 @@ export { classifyOpAgainstSyncImport } from './sync-import-filter';
 // Host-configured sync file prefix helpers.
 export { createSyncFilePrefixHelpers } from './sync-file-prefix';
 export type {
+  SyncFileHeadShape,
   SyncFilePrefixInvalidPrefixDetails,
   SyncFilePrefixParams,
   SyncFilePrefixParamsOutput,
@@ -64,6 +65,13 @@ export {
   setLegacyKdfWarningHandler,
 } from './encryption';
 export type { DerivedKey, DecryptSettledItem } from './encryption';
+
+// Structural ciphertext-transport classifier — used by the SuperSync server's
+// encrypted-only ingress gate (E2EE_REQUIRED). Shape check only, never proof.
+export {
+  isEncryptedPayloadTransportShape,
+  MIN_ENCRYPTED_PAYLOAD_TRANSPORT_BYTES,
+} from './encryption/transport-shape';
 
 // Generic error helpers.
 export { extractErrorMessage } from './error.util';

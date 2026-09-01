@@ -257,9 +257,19 @@ export const createSimulatedClient = async (
     viewport: { width: 1920, height: 1080 },
   });
 
+  // Install the devError/beforeunload fallback on EVERY page this context ever
+  // creates, not just the first one: several import specs close the page and
+  // re-open it via `context.newPage()`. On such a listener-less page Playwright
+  // auto-DISMISSES native dialogs, silently answering sync confirmations with
+  // "cancel" (the import dialog then never closes). The strict sync helpers
+  // also deliberately leave beforeunload/devERR dialogs to this fallback and
+  // block the renderer if it is missing.
+  context.on('page', (contextPage) => {
+    installDevErrorDialogHandler(contextPage, `Client ${clientName}`);
+  });
+
   const page = await context.newPage();
   const runtimeErrors = attachPageErrorCollector(page, `Client ${clientName}`);
-  installDevErrorDialogHandler(page, `Client ${clientName}`);
 
   // Skip onboarding, hints, and example tasks before the app boots.
   // This runs before any page JavaScript, so Angular sees the flags immediately.
@@ -1070,6 +1080,123 @@ export const waitForTaskTimeSpent = async (
 };
 
 /**
+ * Poll until a task's persisted timeSpent equals the exact expected value.
+ *
+ * @param client - The simulated E2E client
+ * @param taskName - The task name
+ * @param expectedTimeSpent - The expected timeSpent in milliseconds
+ */
+export const expectExactTaskTime = async (
+  client: SimulatedE2EClient,
+  taskName: string,
+  expectedTimeSpent: number,
+): Promise<void> => {
+  await expect
+    .poll(() => getTaskTimeSpentFromState(client, taskName), {
+      timeout: 30000,
+      intervals: [250, 500, 1000],
+    })
+    .toBe(expectedTimeSpent);
+};
+
+/**
+ * Record an exact local time delta through the same two actions used by the
+ * production timer: one updates local state, the other writes the replayable op.
+ *
+ * @param client - The simulated E2E client
+ * @param taskName - The task name to record time on
+ * @param date - The worklog day string (YYYY-MM-DD) to book the time on
+ * @param duration - The time delta in milliseconds
+ */
+export const recordTaskTimeDelta = async (
+  client: SimulatedE2EClient,
+  taskName: string,
+  date: string,
+  duration: number,
+): Promise<void> => {
+  await client.page.evaluate(
+    async ({ name, taskDate, delta }) => {
+      const isRecordInPage = (value: unknown): value is Record<string, unknown> =>
+        typeof value === 'object' && value !== null;
+
+      type StoreSubscription = { unsubscribe: () => void };
+      type StoreLike = {
+        subscribe: (next: (state: unknown) => void) => StoreSubscription;
+        dispatch: (action: unknown) => void;
+      };
+
+      const store = (
+        window as unknown as {
+          __e2eTestHelpers?: { store?: StoreLike };
+        }
+      ).__e2eTestHelpers?.store;
+
+      if (!store) {
+        throw new Error('E2E store helper is unavailable');
+      }
+
+      const rootState = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        const subscriptionRef: { current?: StoreSubscription } = {};
+        let isDone = false;
+        const timeoutId = window.setTimeout(() => {
+          if (!isDone) {
+            isDone = true;
+            subscriptionRef.current?.unsubscribe();
+            reject(new Error('Timed out reading the NgRx state'));
+          }
+        }, 1000);
+
+        subscriptionRef.current = store.subscribe((state) => {
+          if (isDone || !isRecordInPage(state)) {
+            return;
+          }
+          isDone = true;
+          window.clearTimeout(timeoutId);
+          window.setTimeout(() => subscriptionRef.current?.unsubscribe());
+          resolve(state);
+        });
+      });
+
+      const taskState = rootState.tasks ?? rootState.task;
+      if (!isRecordInPage(taskState) || !isRecordInPage(taskState.entities)) {
+        throw new Error('Task state is unavailable');
+      }
+
+      const task = Object.values(taskState.entities).find(
+        (value) =>
+          isRecordInPage(value) &&
+          typeof value.title === 'string' &&
+          value.title.includes(name),
+      );
+      if (!isRecordInPage(task) || typeof task.id !== 'string') {
+        throw new Error(`Task not found: ${name}`);
+      }
+
+      store.dispatch({
+        type: '[TimeTracking] Add time spent',
+        task,
+        date: taskDate,
+        duration: delta,
+        isFromTrackingReminder: false,
+      });
+      store.dispatch({
+        type: '[TimeTracking] Sync time spent',
+        taskId: task.id,
+        date: taskDate,
+        duration: delta,
+        meta: {
+          isPersistent: true,
+          entityType: 'TASK',
+          entityId: task.id,
+          opType: 'UPD',
+        },
+      });
+    },
+    { name: taskName, taskDate: date, delta: duration },
+  );
+};
+
+/**
  * Check if a task has the given text (exists on client).
  *
  * @param client - The simulated E2E client
@@ -1205,18 +1332,29 @@ export const markTaskDoneByKey = async (
  * @param client - The simulated E2E client
  */
 export const archiveDoneTasks = async (client: SimulatedE2EClient): Promise<void> => {
-  // Click the "Finish Day" button to go to Daily Summary.
-  // The button is a routerLink inside an @if (hasDoneTasks()) / @else swap, so
-  // marking a task done re-creates the element; a single click can land in the
-  // window before Angular wires up the routerLink and silently no-ops (30s hang).
-  // Racing waitForURL against a one-shot click doesn't cover that gap, so re-issue
-  // the click until navigation actually starts.
+  // Click the "Finish Day" button to go to Daily Summary, re-issuing the click
+  // until navigation actually starts. The button itself no longer swaps on
+  // hasDoneTasks() (fixed in the finish-day-btn template), but it still sits
+  // inside work-view's own @if, so a click can land while Angular re-creates
+  // the element and silently no-op before the routerLink is wired.
   const finishDayBtn = client.page.locator('.e2e-finish-day');
   await finishDayBtn.waitFor({ state: 'visible', timeout: UI_VISIBLE_TIMEOUT });
+  let finishDayAttempts = 0;
   await expect(async () => {
-    await finishDayBtn.click();
+    finishDayAttempts++;
+    // Skip the click once we are already navigating: the button is gone by
+    // then, and clicking a missing element would report a click timeout for a
+    // navigation that actually succeeded. Bound it for the same reason.
+    if (!/daily-summary/.test(client.page.url())) {
+      await finishDayBtn.click({ timeout: 2000 });
+    }
     await client.page.waitForURL(/daily-summary/, { timeout: 2000 });
-  }).toPass({ timeout: UI_VISIBLE_TIMEOUT });
+  }).toPass({ timeout: UI_VISIBLE_TIMEOUT_LONG });
+  if (finishDayAttempts > 1) {
+    // Surface the retry: the suite runs with retries: 0 so that non-determinism
+    // stays visible, and a silent in-test retry would defeat that.
+    console.warn(`[archiveDoneTasks] Finish Day took ${finishDayAttempts} attempts`);
+  }
 
   // Click "Save & Go Home" button (has sun icon wb_sunny)
   const saveAndGoHomeBtn = client.page.locator(

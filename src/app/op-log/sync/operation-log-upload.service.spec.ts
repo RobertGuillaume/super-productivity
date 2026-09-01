@@ -466,6 +466,9 @@ describe('OperationLogUploadService', () => {
           actionPayload: {
             taskIds: ['task-1'],
             tasks: [{ id: 'task-1', title: 'local recovery snapshot' }],
+            calendarAutoImportDismissals: [
+              { issueProviderId: 'calendar-1', issueId: 'event-1' },
+            ],
           },
           entityChanges: [],
         };
@@ -480,13 +483,21 @@ describe('OperationLogUploadService', () => {
 
         const uploadedOps = mockApiProvider.uploadOps.calls.mostRecent().args[0];
         expect(uploadedOps[0].payload).toEqual({
-          actionPayload: { taskIds: ['task-1'] },
+          actionPayload: {
+            taskIds: ['task-1'],
+            calendarAutoImportDismissals: [
+              { issueProviderId: 'calendar-1', issueId: 'event-1' },
+            ],
+          },
           entityChanges: [],
         });
         expect(entry.op.payload).toEqual({
           actionPayload: {
             taskIds: ['task-1'],
             tasks: [{ id: 'task-1', title: 'local recovery snapshot' }],
+            calendarAutoImportDismissals: [
+              { issueProviderId: 'calendar-1', issueId: 'event-1' },
+            ],
           },
           entityChanges: [],
         });
@@ -1496,6 +1507,49 @@ describe('OperationLogUploadService', () => {
         expect(result.blockedByRejectedFullState).toBe(true);
       });
 
+      it('should flag a deferred full-state upload when the server returns a retryable error', async () => {
+        // Observed in CI (scheduled run 32683405598): a server-migration
+        // SYNC_IMPORT was answered with a Postgres serialization conflict.
+        // Nothing was uploaded, so the caller must be able to tell the
+        // difference between this and a clean zero-op sync.
+        const syncImport = createFullStateEntry(
+          1,
+          'migration-import',
+          'client-1',
+          OpType.SyncImport,
+        );
+        const laterOp = createMockEntry(2, 'later-op', 'client-1');
+        mockOpLogStore.getUnsynced.and.resolveTo([syncImport, laterOp]);
+        mockApiProvider.uploadSnapshot.and.resolveTo({
+          accepted: false,
+          error: 'Concurrent transaction conflict - please retry',
+        });
+
+        const result = await service.uploadPendingOps(mockApiProvider);
+
+        expect(result.fullStateUploadDeferred).toBe(true);
+        expect(result.uploadedCount).toBe(0);
+        expect(result.rejectedCount).toBe(0);
+        expect(mockApiProvider.uploadOps).not.toHaveBeenCalled();
+        expect(mockOpLogStore.markSynced).not.toHaveBeenCalled();
+      });
+
+      it('should not flag a deferred full-state upload when the snapshot is accepted', async () => {
+        const syncImport = createFullStateEntry(
+          1,
+          'migration-import',
+          'client-1',
+          OpType.SyncImport,
+        );
+        mockOpLogStore.getUnsynced.and.resolveTo([syncImport]);
+        mockApiProvider.uploadSnapshot.and.resolveTo({ accepted: true, serverSeq: 1 });
+
+        const result = await service.uploadPendingOps(mockApiProvider);
+
+        expect(result.fullStateUploadDeferred).toBeUndefined();
+        expect(result.uploadedCount).toBe(1);
+      });
+
       it('should update server seq after snapshot upload', async () => {
         const entry = createFullStateEntry(1, 'op-1', 'client-1', OpType.SyncImport);
         mockOpLogStore.getUnsynced.and.returnValue(Promise.resolve([entry]));
@@ -1755,9 +1809,9 @@ describe('OperationLogUploadService', () => {
           expect(mockOpLogStore.markSynced).toHaveBeenCalledWith([2]);
         });
 
-        it('should detect SYNC_IMPORT_EXISTS from thrown error when exception contains the code', async () => {
-          // When uploadSnapshot throws an error (e.g., from HTTP client), the error message
-          // is parsed to extract errorCode. This tests that code path.
+        it('should detect SYNC_IMPORT_EXISTS from thrown structured error code', async () => {
+          // When uploadSnapshot throws an HTTP error, the provider keeps the server errorCode
+          // on the Error object so handling does not depend on message substrings.
           const entry = createFullStateEntry(
             1,
             'my-import',
@@ -1765,7 +1819,26 @@ describe('OperationLogUploadService', () => {
             OpType.SyncImport,
           );
           mockOpLogStore.getUnsynced.and.returnValue(Promise.resolve([entry]));
-          // Mock throwing an error with SYNC_IMPORT_EXISTS in the message
+          const error = Object.assign(new Error('HTTP 409 Conflict'), {
+            code: 'SYNC_IMPORT_EXISTS',
+          });
+          mockApiProvider.uploadSnapshot.and.rejectWith(error);
+
+          await service.uploadPendingOps(mockApiProvider);
+
+          // Should still be handled gracefully - delete local op, don't mark rejected
+          expect(mockOpLogStore.deleteOpsWhere).toHaveBeenCalled();
+          expect(mockOpLogStore.markRejected).not.toHaveBeenCalled();
+        });
+
+        it('keeps legacy SYNC_IMPORT_EXISTS message fallback for older providers', async () => {
+          const entry = createFullStateEntry(
+            1,
+            'my-import',
+            'client-1',
+            OpType.SyncImport,
+          );
+          mockOpLogStore.getUnsynced.and.returnValue(Promise.resolve([entry]));
           mockApiProvider.uploadSnapshot.and.rejectWith(
             new Error('SYNC_IMPORT_EXISTS: Another client already uploaded'),
           );

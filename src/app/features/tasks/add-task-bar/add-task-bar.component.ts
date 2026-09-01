@@ -45,7 +45,7 @@ import {
   timeout,
   withLatestFrom,
 } from 'rxjs/operators';
-import { IS_ANDROID_WEB_VIEW } from '../../../util/is-android-web-view';
+import { IS_ANDROID_WEB_VIEW_TOKEN } from '../../../util/is-android-web-view';
 import { BehaviorSubject, combineLatest, from, Observable } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { DialogConfirmComponent } from '../../../ui/dialog-confirm/dialog-confirm.component';
@@ -62,6 +62,7 @@ import { truncate } from '../../../util/truncate';
 import { SnackService } from '../../../core/snack/snack.service';
 import { AddTaskBarStateService } from './add-task-bar-state.service';
 import { AddTaskBarParserService } from './add-task-bar-parser.service';
+import { rollWeekendDateForRepeat } from './roll-weekend-date-for-repeat';
 import { ShortSyntaxSegment, splitTextByRanges } from '../short-syntax-ranges';
 import { AddTaskBarActionsComponent } from './add-task-bar-actions/add-task-bar-actions.component';
 import { MarkdownPasteService } from '../markdown-paste.service';
@@ -331,6 +332,10 @@ export class AddTaskBarComponent implements AfterViewInit, OnInit, OnDestroy {
     this.syncHighlightScroll();
   });
 
+  // Injected rather than read from the constant so the two focus paths below
+  // are reachable from tests (see IS_ANDROID_WEB_VIEW_TOKEN).
+  private readonly _isAndroidWebView = inject(IS_ANDROID_WEB_VIEW_TOKEN);
+
   private _focusTimeout?: number;
   private _autocompleteTimeout?: number;
   private _processingAutocompleteSelection = false;
@@ -538,10 +543,29 @@ export class AddTaskBarComponent implements AfterViewInit, OnInit, OnDestroy {
         }
       }
 
+      // One day for the whole submit. A Monday-to-Friday schedule has no
+      // weekend occurrence, so a weekend day is one the task never starts on:
+      // the occurrence engine moves it to the following Monday off the config's
+      // weekday flags (getFirstRepeatOccurrence), while the weekend day stays
+      // behind in the config's `startDate` — where the repeat dialog re-derives
+      // every later quick setting from it, turning "weekly on current weekday"
+      // into a Saturday recurrence.
+      //
+      // Rolled here rather than on the date chip, so the day the user picked
+      // stays the day the bar shows and the repeat menu's labels are built
+      // from. Computed once, so the task's due day and the config's start date
+      // cannot disagree across a logical-day rollover between two `todayStr()`
+      // calls. The effects would correct the due day anyway; writing it here
+      // just spares the user a task that first appears on the Saturday.
+      const startDay = rollWeekendDateForRepeat(
+        state.date || this._dateService.todayStr(),
+        state.repeat,
+      );
+
       if (state.date) {
         // Parse date components to create date in local timezone
         // This avoids timezone issues when parsing date strings like "2024-01-15"
-        const [year, month, day] = state.date.split('-').map(Number);
+        const [year, month, day] = startDay.split('-').map(Number);
         const date = new Date(year, month - 1, day);
 
         if (state.time) {
@@ -551,12 +575,12 @@ export class AddTaskBarComponent implements AfterViewInit, OnInit, OnDestroy {
           taskData.dueWithTime = date.getTime();
           taskData.hasPlannedTime = true;
         } else {
-          taskData.dueDay = state.date;
+          taskData.dueDay = startDay;
         }
       } else if (state.repeat && state.repeat.type !== 'DIALOG') {
         // When a recurrence is set without an explicit date, set dueDay to today
         // so the first task instance appears as today's occurrence instead of staying in inbox
-        taskData.dueDay = this._dateService.todayStr();
+        taskData.dueDay = startDay;
       } else {
         // Explicitly set dueDay to undefined when no date is selected
         // This prevents automatic assignment of today's date in TODAY context
@@ -601,8 +625,7 @@ export class AddTaskBarComponent implements AfterViewInit, OnInit, OnDestroy {
         if (repeat.type === 'DIALOG') {
           this._openRepeatDialogForTask(taskId, resolvedRemindOption);
         } else {
-          const startDate = state.date || this._dateService.todayStr();
-          const referenceDate = dateStrToUtcDate(startDate);
+          const referenceDate = dateStrToUtcDate(startDay);
           // An interval ("@every 2 days") has no preset to expand — it maps to a
           // CUSTOM config carrying the cycle and interval directly.
           const repeatUpdates =
@@ -618,7 +641,7 @@ export class AddTaskBarComponent implements AfterViewInit, OnInit, OnDestroy {
                 };
           const newRepeatCfg = {
             ...DEFAULT_TASK_REPEAT_CFG,
-            startDate,
+            startDate: startDay,
             ...repeatUpdates,
             title,
             notes: taskData.notes,
@@ -989,31 +1012,46 @@ export class AddTaskBarComponent implements AfterViewInit, OnInit, OnDestroy {
       window.clearTimeout(this._focusTimeout);
     }
 
+    const focus = (): void => {
+      const inputElement = this.inputEl()?.nativeElement;
+      if (!inputElement) {
+        return;
+      }
+      inputElement.focus();
+      if (selectAll) {
+        inputElement.select();
+      }
+    };
+
     document.body.focus();
     this.inputEl()?.nativeElement.focus();
-    window.setTimeout(() => this.inputEl()?.nativeElement.focus());
 
-    // Set new timeout
-    if (IS_ANDROID_WEB_VIEW) {
+    if (this._isAndroidWebView) {
+      // Unchanged: this web view needs the repeated blur → focus cycle to raise
+      // the IME reliably, and it has no iOS focusin scroll handler to disturb.
+      window.setTimeout(() => this.inputEl()?.nativeElement.focus());
       this._focusTimeout = window.setTimeout(() => {
         document.body.focus();
-        this.inputEl()?.nativeElement.focus();
-        if (selectAll) {
-          this.inputEl()?.nativeElement.select();
-        }
+        focus();
         this._focusTimeout = undefined;
       }, 200);
-    } else {
-      this._focusTimeout = window.setTimeout(() => {
-        const inputElement = this.inputEl()?.nativeElement;
-        if (inputElement) {
-          inputElement.focus();
-          if (selectAll) {
-            inputElement.select();
-          }
-        }
-      }, 50);
+      return;
     }
+
+    if (selectAll) {
+      this.inputEl()?.nativeElement.select();
+    }
+    // A web view can drop a focus() issued while the bar is still animating in,
+    // so retry once — but only when the field really did not take focus:
+    // re-focusing an already-focused input re-fires the global focusin handler,
+    // which re-runs its scroll-into-view in the middle of the iOS keyboard
+    // animation, one of the sources of the jumping in #9779.
+    this._focusTimeout = window.setTimeout(() => {
+      this._focusTimeout = undefined;
+      if (document.activeElement !== this.inputEl()?.nativeElement) {
+        focus();
+      }
+    }, 50);
   }
 
   toggleNote(): void {
