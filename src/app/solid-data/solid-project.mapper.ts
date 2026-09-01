@@ -84,7 +84,6 @@ export const solidThingToProject = (thing: Thing): Project => {
     icon: stringOrNullProp(thing, SP_PROJECT.icon),
     created: numberProp(thing, SP_PROJECT.created),
     updated: numberProp(thing, SP_PROJECT.updated),
-    folderId: stringOrNullProp(thing, SP_PROJECT.folderId),
   };
 
   return project;
@@ -122,7 +121,6 @@ const buildProjectSolidProperties = (
   addOptionalLiteral(properties, SP_PROJECT.icon, project.icon);
   addOptionalLiteral(properties, SP_PROJECT.created, project.created);
   addOptionalLiteral(properties, SP_PROJECT.updated, project.updated);
-  addOptionalLiteral(properties, SP_PROJECT.folderId, project.folderId);
   addOptionalJson(
     properties,
     SP_PROJECT.issueIntegrationCfgs,
@@ -139,7 +137,6 @@ const projectToSolidDeleteProperties = (project: Project): ThingRdfPropertyInput
   deleteAbsentValue(properties, SP_PROJECT.icon, project.icon);
   deleteAbsentValue(properties, SP_PROJECT.created, project.created);
   deleteAbsentValue(properties, SP_PROJECT.updated, project.updated);
-  deleteAbsentValue(properties, SP_PROJECT.folderId, project.folderId);
   deleteAbsentValue(
     properties,
     SP_PROJECT.issueIntegrationCfgs,
