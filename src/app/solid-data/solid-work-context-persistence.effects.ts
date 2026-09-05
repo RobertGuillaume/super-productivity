@@ -69,6 +69,7 @@ export class SolidWorkContextPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidWorkContextPersistenceEffects: failed to persist work-context order',
     });
   }

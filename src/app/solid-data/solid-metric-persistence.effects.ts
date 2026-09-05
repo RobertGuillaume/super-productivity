@@ -91,6 +91,7 @@ export class SolidMetricPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidMetricPersistenceEffects: failed to persist metric',
     });
   }

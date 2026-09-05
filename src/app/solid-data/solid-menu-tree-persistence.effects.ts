@@ -49,6 +49,7 @@ export class SolidMenuTreePersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidMenuTreePersistenceEffects: failed to persist menu tree',
     });
   }

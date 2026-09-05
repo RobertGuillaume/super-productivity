@@ -200,6 +200,7 @@ export class SolidSectionPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidSectionPersistenceEffects: failed to persist section change',
     });
   }

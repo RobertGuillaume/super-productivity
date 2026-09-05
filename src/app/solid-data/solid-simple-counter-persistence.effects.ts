@@ -176,6 +176,7 @@ export class SolidSimpleCounterPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidSimpleCounterPersistenceEffects: failed to persist simple counter',
     });
   }

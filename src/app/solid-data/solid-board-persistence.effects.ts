@@ -109,6 +109,7 @@ export class SolidBoardPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidBoardPersistenceEffects: failed to persist board',
     });
   }

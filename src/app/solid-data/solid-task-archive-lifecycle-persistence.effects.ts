@@ -138,6 +138,7 @@ export class SolidTaskArchiveLifecyclePersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source:
         'SolidTaskArchiveLifecyclePersistenceEffects: failed to persist task lifecycle',
     });

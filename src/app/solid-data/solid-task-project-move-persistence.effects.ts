@@ -82,6 +82,7 @@ export class SolidTaskProjectMovePersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidTaskProjectMovePersistenceEffects: failed to persist project move',
     });
   }

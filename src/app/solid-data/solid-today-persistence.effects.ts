@@ -91,6 +91,7 @@ export class SolidTodayPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidTodayPersistenceEffects: failed to persist Today changes',
     });
   }

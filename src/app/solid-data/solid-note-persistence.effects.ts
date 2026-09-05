@@ -98,6 +98,7 @@ export class SolidNotePersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidNotePersistenceEffects: failed to persist note change',
     });
   }

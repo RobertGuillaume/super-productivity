@@ -107,6 +107,7 @@ export class SolidProjectDeleteCascadeEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidProjectDeleteCascadeEffects: failed to persist project delete',
     });
   }

@@ -84,6 +84,7 @@ export class SolidPlannerPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidPlannerPersistenceEffects: failed to persist planner state',
     });
   }

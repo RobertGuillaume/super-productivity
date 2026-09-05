@@ -159,6 +159,7 @@ export class SolidTaskPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidTaskPersistenceEffects: failed to persist task change',
     });
   }

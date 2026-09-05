@@ -115,6 +115,7 @@ export class SolidTagPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidTagPersistenceEffects: failed to persist tag change',
     });
   }

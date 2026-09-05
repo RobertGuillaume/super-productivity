@@ -94,6 +94,7 @@ export class SolidArchiveStatePersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidArchiveStatePersistenceEffects: failed to persist archive state',
     });
   }

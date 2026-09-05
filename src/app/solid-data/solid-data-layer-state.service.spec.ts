@@ -82,12 +82,18 @@ import {
 } from './solid-data-layer-feature-flag';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidSessionRecoveryService } from './solid-session-recovery.service';
 
 describe('SolidDataLayerStateService', () => {
   let authState: AuthState;
+  let sessionRecovery: jasmine.SpyObj<SolidSessionRecoveryService>;
 
   beforeEach(() => {
     authState = { status: 'anonymous' };
+    sessionRecovery = jasmine.createSpyObj<SolidSessionRecoveryService>(
+      'SolidSessionRecoveryService',
+      ['handleAuthenticationError'],
+    );
 
     TestBed.configureTestingModule({
       providers: [
@@ -101,6 +107,7 @@ describe('SolidDataLayerStateService', () => {
             } as SolidRuntime,
           },
         },
+        { provide: SolidSessionRecoveryService, useValue: sessionRecovery },
       ],
     });
   });
@@ -124,6 +131,16 @@ describe('SolidDataLayerStateService', () => {
 
     localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
     expect(service.isActive()).toBe(true);
+  });
+
+  it('delegates authentication error recovery lazily', () => {
+    const error = new Error('Authentication session expired');
+    sessionRecovery.handleAuthenticationError.and.returnValue(true);
+
+    expect(
+      TestBed.inject(SolidDataLayerStateService).handleAuthenticationError(error),
+    ).toBe(true);
+    expect(sessionRecovery.handleAuthenticationError).toHaveBeenCalledOnceWith(error);
   });
 
   it('owns Solid-backed write actions only while active', () => {

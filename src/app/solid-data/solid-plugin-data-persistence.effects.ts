@@ -123,6 +123,7 @@ export class SolidPluginDataPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidPluginDataPersistenceEffects: failed to persist plugin data',
     });
   }

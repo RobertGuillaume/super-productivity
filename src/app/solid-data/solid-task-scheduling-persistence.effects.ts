@@ -90,6 +90,7 @@ export class SolidTaskSchedulingPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidTaskSchedulingPersistenceEffects: failed to persist task scheduling',
     });
   }

@@ -132,6 +132,7 @@ export class SolidAppStatePersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidAppStatePersistenceEffects: failed to persist app order change',
     });
   }

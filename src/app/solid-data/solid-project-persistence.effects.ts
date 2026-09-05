@@ -110,6 +110,7 @@ export class SolidProjectPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidProjectPersistenceEffects: failed to persist project change',
     });
   }

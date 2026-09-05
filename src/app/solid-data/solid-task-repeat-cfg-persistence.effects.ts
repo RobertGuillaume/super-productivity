@@ -158,6 +158,7 @@ export class SolidTaskRepeatCfgPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source:
         'SolidTaskRepeatCfgPersistenceEffects: failed to persist repeat config change',
     });

@@ -2,11 +2,16 @@ import { TestBed } from '@angular/core/testing';
 import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidStartupService } from './solid-startup.service';
-import { SOLID_DATA_LAYER_ENABLED_STORAGE_KEY } from './solid-data-layer-feature-flag';
+import {
+  SOLID_DATA_LAYER_ENABLED_STORAGE_KEY,
+  SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY,
+} from './solid-data-layer-feature-flag';
+import { SolidSessionRecoveryService } from './solid-session-recovery.service';
 
 describe('SolidStartupService', () => {
   let solidRuntime: jasmine.SpyObj<SolidRuntimeService>;
   let authState: AuthState;
+  let sessionRecovery: jasmine.SpyObj<SolidSessionRecoveryService>;
 
   beforeEach(() => {
     authState = { status: 'anonymous' };
@@ -21,15 +26,33 @@ describe('SolidStartupService', () => {
         } as SolidRuntime,
       },
     );
+    sessionRecovery = jasmine.createSpyObj<SolidSessionRecoveryService>(
+      'SolidSessionRecoveryService',
+      ['promptForLogin'],
+    );
 
     TestBed.configureTestingModule({
-      providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
+      providers: [
+        { provide: SolidRuntimeService, useValue: solidRuntime },
+        { provide: SolidSessionRecoveryService, useValue: sessionRecovery },
+      ],
     });
   });
 
   afterEach(() => {
     localStorage.removeItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY);
+    localStorage.removeItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY);
     TestBed.resetTestingModule();
+  });
+
+  it('prompts for login when a primary Solid session cannot be restored', async () => {
+    localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
+    localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
+    const service = TestBed.inject(SolidStartupService);
+
+    await expectAsync(service.bootIfEnabled()).toBeResolvedTo({ status: 'anonymous' });
+
+    expect(sessionRecovery.promptForLogin).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing when the Solid data layer is disabled', async () => {

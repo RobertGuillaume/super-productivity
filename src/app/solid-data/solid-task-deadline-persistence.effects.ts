@@ -83,6 +83,7 @@ export class SolidTaskDeadlinePersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidTaskDeadlinePersistenceEffects: failed to persist task deadlines',
     });
   }

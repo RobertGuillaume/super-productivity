@@ -96,6 +96,7 @@ export class SolidTaskBatchPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidTaskBatchPersistenceEffects: failed to persist task batch mutation',
     });
   }

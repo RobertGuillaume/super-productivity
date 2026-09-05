@@ -49,6 +49,7 @@ export class SolidGlobalConfigPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidGlobalConfigPersistenceEffects: failed to persist global config',
     });
   }

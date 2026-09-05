@@ -102,6 +102,7 @@ export class SolidTimeTrackingPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidTimeTrackingPersistenceEffects: failed to persist time tracking',
     });
   }

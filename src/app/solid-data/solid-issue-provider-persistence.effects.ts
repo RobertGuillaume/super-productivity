@@ -123,6 +123,7 @@ export class SolidIssueProviderPersistenceEffects {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
+      sessionRecovery: this.solidDataLayerState,
       source: 'SolidIssueProviderPersistenceEffects: failed to persist provider change',
     });
   }
