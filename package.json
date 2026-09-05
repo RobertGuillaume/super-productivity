@@ -195,7 +195,7 @@
     "@inrupt/solid-client-authn-core": "^2.5.0",
     "@material-symbols/font-400": "^0.45.5",
     "@noble/ciphers": "^2.2.0",
-    "@solid-intents/runtime": "file:vendor/solid-intents-runtime-1.0.2.tgz",
+    "@solid-intents/runtime": "file:vendor/solid-intents-runtime-1.0.3.tgz",
     "capacitor-plugin-safe-area": "^5.0.0",
     "electron-dl": "^3.5.2",
     "electron-localshortcut": "^3.2.1",
