@@ -66,7 +66,7 @@ describe('SolidDataLayerPanelComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  it('renders the experimental Solid control surface', () => {
+  it('renders the primary Solid control surface', () => {
     const component = fixture.componentInstance;
 
     expect(component.statusLabel()).toBe(T.PS.SOLID.STATUS_OFF);
@@ -104,5 +104,26 @@ describe('SolidDataLayerPanelComponent', () => {
       type: 'ERROR',
       msg: T.PS.SOLID.REMOTE_NOT_EMPTY,
     });
+  });
+
+  it('can use an existing Pod without uploading local data first', () => {
+    const component = fixture.componentInstance;
+    component.authState.set({
+      status: 'authenticated',
+      webId: 'https://pod.example/profile/card#me',
+    });
+    const reloadFromPod = spyOn(component, 'reloadFromPod');
+    (window.confirm as jasmine.Spy).and.returnValue(true);
+    fixture.detectChanges();
+
+    component.activatePod();
+
+    expect(localStorage.getItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY)).toBe('true');
+    expect(localStorage.getItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY)).toBe(
+      'true',
+    );
+    expect(uploadService.uploadCurrentDataToEmptyPod).not.toHaveBeenCalled();
+    expect(reloadFromPod).toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain(T.PS.SOLID.ACTIVATE);
   });
 });

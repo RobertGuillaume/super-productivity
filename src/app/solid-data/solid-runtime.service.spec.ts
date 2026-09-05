@@ -1,0 +1,358 @@
+import { TestBed } from '@angular/core/testing';
+import type {
+  AuthState,
+  RuntimeBootOptions,
+  RuntimeDiagnostics,
+  RuntimeLayout,
+  RuntimeLayoutInput,
+  RuntimeLayoutTypeInput,
+  SolidRuntime,
+  ThingWriteProfile,
+} from '@solid-intents/runtime';
+import { SolidRuntimeService } from './solid-runtime.service';
+import { SOLID_RUNTIME } from './solid-runtime.token';
+import {
+  ICAL_VTODO_CLASS,
+  SOLID_PRODUCTIVITY_LAYOUT,
+  SOLID_PRODUCTIVITY_LEGACY_TASK_CLASS,
+  SOLID_PRODUCTIVITY_TASK_TYPE,
+} from './solid-productivity-vocab';
+
+describe('SolidRuntimeService', () => {
+  let authState: AuthState;
+  let podUrl: string;
+  let existingContainerUris: Set<string>;
+  let fetchRequests: Array<{ uri: string; method: string }>;
+
+  const mockPodUrl = 'https://mock-pod.local/';
+  const authenticatedWebId = 'https://id.example/profile/card#me';
+  const runtimeResolvedPodUrl = 'https://id.example/';
+  const discoveredStorageRoot = 'https://pod.example/';
+
+  beforeEach(() => {
+    authState = { status: 'anonymous' };
+    podUrl = mockPodUrl;
+    existingContainerUris = new Set([mockPodUrl, discoveredStorageRoot]);
+    fetchRequests = [];
+
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: SOLID_RUNTIME,
+          useFactory: (): SolidRuntime => createRuntimeStub(),
+        },
+      ],
+    });
+  });
+
+  it('defines the layout against the booted pod', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+
+    await service.boot({ podUrl: discoveredStorageRoot });
+
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://pod.example/super-productivity/tasks/',
+    );
+  });
+
+  it('writes native Vtodo tasks while retaining the legacy task class alias', () => {
+    expect(SOLID_PRODUCTIVITY_TASK_TYPE).toBe('Task');
+    expect(SOLID_PRODUCTIVITY_LAYOUT.types.Task).toEqual(
+      jasmine.objectContaining({
+        classUri: ICAL_VTODO_CLASS,
+        classUris: [SOLID_PRODUCTIVITY_LEGACY_TASK_CLASS],
+      }),
+    );
+  });
+
+  it('rebuilds a cached layout when the runtime reboots from mock mode to a pod', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+
+    await service.boot();
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://mock-pod.local/super-productivity/tasks/',
+    );
+
+    await service.boot({ podUrl: discoveredStorageRoot });
+
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://pod.example/super-productivity/tasks/',
+    );
+  });
+
+  it('rebuilds a cached layout when session restore moves the runtime to the discovered storage root', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+
+    await service.boot();
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://mock-pod.local/super-productivity/tasks/',
+    );
+
+    await service.restoreSession();
+
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://pod.example/super-productivity/tasks/',
+    );
+  });
+
+  it('rebuilds a cached layout when boot restore moves the runtime to the discovered storage root', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+
+    await service.boot();
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://mock-pod.local/super-productivity/tasks/',
+    );
+
+    await service.boot({ restoreSession: true });
+
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://pod.example/super-productivity/tasks/',
+    );
+  });
+
+  it('rebuilds a cached layout if the runtime pod changes internally', () => {
+    const service = TestBed.inject(SolidRuntimeService);
+
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://mock-pod.local/super-productivity/tasks/',
+    );
+
+    podUrl = discoveredStorageRoot;
+
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://pod.example/super-productivity/tasks/',
+    );
+  });
+
+  it('creates the app container tree before upload writes', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+    await service.boot({ podUrl: discoveredStorageRoot });
+
+    await service.ensureAppContainers();
+
+    const createdContainerUris = putUris();
+    expect(createdContainerUris).toEqual(
+      jasmine.arrayContaining([
+        'https://pod.example/super-productivity/',
+        'https://pod.example/super-productivity/app/',
+        'https://pod.example/super-productivity/tags/',
+        'https://pod.example/super-productivity/tasks/',
+        'https://pod.example/super-productivity/notes/',
+        'https://pod.example/super-productivity/boards/',
+        'https://pod.example/super-productivity/config/',
+        'https://pod.example/super-productivity/metrics/',
+        'https://pod.example/super-productivity/planner/',
+        'https://pod.example/super-productivity/projects/',
+        'https://pod.example/super-productivity/sections/',
+        'https://pod.example/super-productivity/archive/',
+        'https://pod.example/super-productivity/menu-tree/',
+        'https://pod.example/super-productivity/time-tracking/',
+        'https://pod.example/super-productivity/simple-counters/',
+        'https://pod.example/super-productivity/issue-providers/',
+        'https://pod.example/super-productivity/repeat-configs/',
+        'https://pod.example/super-productivity/plugins/',
+        'https://pod.example/super-productivity/archive/tasks/',
+        'https://pod.example/super-productivity/archive/state/',
+        'https://pod.example/super-productivity/plugins/user-data/',
+        'https://pod.example/super-productivity/plugins/metadata/',
+      ]),
+    );
+    expect(createdContainerUris.length).toBe(22);
+    expect(createdContainerUris.indexOf('https://pod.example/super-productivity/'))
+      .withContext('root app container should be created first')
+      .toBe(0);
+    expect(
+      createdContainerUris.indexOf('https://pod.example/super-productivity/archive/'),
+    )
+      .withContext('archive parent should be created before archive children')
+      .toBeLessThan(
+        createdContainerUris.indexOf(
+          'https://pod.example/super-productivity/archive/tasks/',
+        ),
+      );
+    expect(
+      createdContainerUris.indexOf('https://pod.example/super-productivity/plugins/'),
+    )
+      .withContext('plugins parent should be created before plugin children')
+      .toBeLessThan(
+        createdContainerUris.indexOf(
+          'https://pod.example/super-productivity/plugins/user-data/',
+        ),
+      );
+  });
+
+  const createRuntimeStub = (): SolidRuntime =>
+    ({
+      boot: async (options: RuntimeBootOptions = {}): Promise<void> => {
+        if (options.restoreSession === true) {
+          authState = {
+            status: 'authenticated',
+            webId: authenticatedWebId,
+          };
+          podUrl = runtimeResolvedPodUrl;
+          return;
+        }
+
+        podUrl = normalizeContainerUrl(options.podUrl ?? mockPodUrl);
+      },
+      auth: {
+        state: (): AuthState => authState,
+        capabilities: () => ({
+          browserSessionRestore: true,
+          headlessSessionRestore: false,
+          suppliedFetch: podUrl !== mockPodUrl,
+          message: '',
+        }),
+        subscribe: (listener: (state: AuthState) => void) => {
+          listener(authState);
+          return (): void => undefined;
+        },
+        login: async (): Promise<void> => undefined,
+        handleRedirect: async (): Promise<void> => undefined,
+        restoreSession: async (): Promise<AuthState> => {
+          authState = {
+            status: 'authenticated',
+            webId: authenticatedWebId,
+          };
+          podUrl = runtimeResolvedPodUrl;
+          return authState;
+        },
+        logout: async (): Promise<void> => {
+          authState = { status: 'anonymous' };
+        },
+        fetch: (): typeof fetch => authenticatedFetch,
+      },
+      layouts: {
+        define: (input: RuntimeLayoutInput): RuntimeLayout => createLayout(input, podUrl),
+      },
+      diagnostics: {
+        status: (): RuntimeDiagnostics => ({
+          podUrl,
+          storageRoots: [podUrl],
+          catalog: {
+            thingRecords: 0,
+            resourceRecords: 0,
+            staleResources: 0,
+            refreshingResources: 0,
+            inaccessibleResources: 0,
+            invalidResources: 0,
+            missingResources: 0,
+          },
+          discovery: {
+            state: 'idle',
+            queuedJobs: 0,
+            inFlightJobs: 0,
+            completedJobs: 0,
+            maxConcurrentJobs: 0,
+          },
+          auth: authState,
+          authCapabilities: {
+            browserSessionRestore: true,
+            headlessSessionRestore: false,
+            suppliedFetch: podUrl !== mockPodUrl,
+            message: '',
+          },
+          typeIndexWrites: {
+            recent: [],
+          },
+        }),
+        typeIndexes: async () => ({
+          available: false,
+          typeIndexUris: [],
+          registrations: [],
+          failures: [],
+        }),
+        inspectThing: async () => {
+          throw new Error('Not implemented');
+        },
+        explainQuery: async () => {
+          throw new Error('Not implemented');
+        },
+      },
+    }) as unknown as SolidRuntime;
+
+  const createLayout = (
+    input: RuntimeLayoutInput,
+    currentPodUrl: string,
+  ): RuntimeLayout => {
+    const containers = Object.fromEntries(
+      Object.entries(input.containers).map(([name, containerUri]) => [
+        name,
+        normalizeContainerUrl(new URL(containerUri, currentPodUrl).toString()),
+      ]),
+    );
+    const typeEntries = Object.entries(input.types ?? {}) as ReadonlyArray<
+      [string, RuntimeLayoutTypeInput]
+    >;
+    const types = Object.fromEntries(
+      typeEntries.map(([type, typeInput]) => {
+        const target =
+          typeInput.container === undefined
+            ? undefined
+            : {
+                containerUri: getContainerUri(containers, typeInput.container),
+              };
+
+        return [
+          type,
+          {
+            name: type,
+            type,
+            defaultStatus: typeInput.defaultStatus,
+            target,
+          } satisfies ThingWriteProfile,
+        ];
+      }),
+    );
+
+    return {
+      namespace: input.namespace,
+      containers,
+      types,
+    };
+  };
+
+  const normalizeContainerUrl = (uri: string): string =>
+    uri.endsWith('/') ? uri : `${uri}/`;
+
+  const authenticatedFetch: typeof fetch = async (input, init) => {
+    const uri = typeof input === 'string' ? input : input.url;
+    const method = init?.method ?? 'GET';
+    fetchRequests.push({ uri, method });
+
+    if (method === 'HEAD') {
+      return new Response(null, {
+        status: existingContainerUris.has(uri) ? 200 : 404,
+      });
+    }
+
+    if (method === 'PUT') {
+      existingContainerUris.add(uri);
+      return new Response(null, { status: 201 });
+    }
+
+    return new Response(
+      `@prefix pim: <http://www.w3.org/ns/pim/space#> .
+<${authenticatedWebId}> pim:storage <${discoveredStorageRoot}> .`,
+      {
+        headers: new Headers([['Content-Type', 'text/turtle']]),
+      },
+    );
+  };
+
+  const putUris = (): string[] =>
+    fetchRequests
+      .filter((request) => request.method === 'PUT')
+      .map((request) => request.uri);
+
+  const getContainerUri = (
+    containers: Record<string, string>,
+    containerName: string,
+  ): string => {
+    const containerUri = containers[containerName];
+    if (containerUri === undefined) {
+      throw new Error(`Unknown container ${containerName}`);
+    }
+    return containerUri;
+  };
+});

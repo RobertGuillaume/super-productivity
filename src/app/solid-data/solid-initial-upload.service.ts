@@ -106,6 +106,8 @@ export class SolidInitialUploadService {
       return { type: 'not-authenticated' };
     }
 
+    await this.solidRuntime.ensureAppContainers();
+
     if (await this.hasExistingSolidData()) {
       return { type: 'remote-not-empty' };
     }

@@ -6,16 +6,20 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 
 - Start from a fresh Super Productivity profile with representative local data
   or create the core test data before upload.
-- Open Settings -> Sync & Export -> Solid Pod.
-- Enter the disposable Solid identity provider and enable Solid.
-- Log in to the disposable pod or restore the existing session.
+- Open Settings -> Sync & Backup -> Solid Pod.
+- Enter the disposable Solid identity provider and sign in, or restore the
+  existing session.
 - Run **Upload current data to Solid** and confirm the app reloads into Solid
   primary mode.
+- For an existing Pod, choose **Use this Pod** instead and confirm compatible
+  tasks hydrate without an upload.
 - Keep a second browser profile ready for cross-profile reload verification.
 
 ## Expected Resource Roots
 
-- Tasks: `/super-productivity/tasks/<task-id>.ttl#it`
+- New tasks default to `/super-productivity/tasks/<task-id>.ttl#it`.
+- Compatible iCalendar `Vtodo` tasks elsewhere in the Pod should also appear
+  after choosing **Use this Pod** or **Reload from Pod**.
 - Projects: `/super-productivity/projects/<project-id>.ttl#it`
 - Tags: `/super-productivity/tags/<tag-id>.ttl#it`
 - Notes: `/super-productivity/notes/<note-id>.ttl#it`
@@ -39,6 +43,8 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 
 - Create a project, tag, note, section, task, and subtask.
 - Edit titles and details for each model.
+- Mark a newly created task complete and confirm its original resource is updated
+  in place with `ical:status` set to `COMPLETED` and `sp:isDone` set to `true`.
 - Reorder projects, tags, notes pinned to Today, sections, tasks, and subtasks.
 - Reload the same profile and confirm all edits and ordering return from Solid.
 - Open the second profile, log in to the same pod, and confirm the same state hydrates without import.

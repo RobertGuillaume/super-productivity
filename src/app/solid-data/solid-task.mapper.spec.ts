@@ -1,6 +1,7 @@
 import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
-import { SP_TASK } from './solid-productivity-vocab';
+import { INBOX_PROJECT } from '../features/project/project.const';
+import { ICAL_TASK, SP_TASK } from './solid-productivity-vocab';
 import {
   solidThingToTask,
   taskToSolidChanges,
@@ -30,7 +31,7 @@ describe('solidTask.mapper', () => {
   it('maps a task to Solid runtime create input', () => {
     const input = taskToSolidCreateInput(task, {
       name: 'Task',
-      type: 'SuperProductivityTask',
+      type: 'Task',
       target: {
         containerUri: 'https://pod.example/super-productivity/tasks/',
       },
@@ -42,6 +43,8 @@ describe('solidTask.mapper', () => {
       resourceName: 'task-1',
     });
     expect(input.facets?.status).toBe('done');
+    expect(input.properties?.[ICAL_TASK.summary]).toEqual([task.title]);
+    expect(input.properties?.[ICAL_TASK.status]).toEqual(['COMPLETED']);
     expect(input.properties?.[SP_TASK.id]).toEqual(['task-1']);
     expect(input.properties?.[SP_TASK.tagId]).toEqual(['tag-1', 'tag-2']);
   });
@@ -60,6 +63,7 @@ describe('solidTask.mapper', () => {
     expect(changes.replaceProperties?.[SP_TASK.subTaskId]).toEqual([]);
     expect(changes.replaceProperties?.[SP_TASK.tagId]).toEqual([]);
     expect(changes.deleteProperties?.[SP_TASK.dueDay]).toEqual([]);
+    expect(changes.deleteProperties?.[ICAL_TASK.due]).toEqual([]);
     expect(changes.deleteProperties?.[SP_TASK.reminderId]).toEqual([]);
   });
 
@@ -93,14 +97,36 @@ describe('solidTask.mapper', () => {
     expect(mapped.tagIds).toEqual(task.tagIds);
     expect(mapped.timeSpentOnDay).toEqual(task.timeSpentOnDay);
   });
+
+  it('maps a native Pod task without Super Productivity properties', () => {
+    const due = new Date('2026-09-07T09:30:00.000Z');
+    const thing = createThing(
+      {
+        [ICAL_TASK.summary]: [literal('Task found through the Pod type index')],
+        [ICAL_TASK.status]: [literal('COMPLETED')],
+        [ICAL_TASK.due]: [literal(due)],
+      },
+      {},
+      'https://pod.example/calendar/tasks.ttl#todo-1',
+    );
+
+    const mapped = solidThingToTask(thing);
+
+    expect(mapped.id).toBe(thing.uri);
+    expect(mapped.title).toBe('Task found through the Pod type index');
+    expect(mapped.projectId).toBe(INBOX_PROJECT.id);
+    expect(mapped.isDone).toBe(true);
+    expect(mapped.dueWithTime).toBe(due.getTime());
+  });
 });
 
 const createThing = (
   properties: Readonly<Record<string, readonly RdfValue[]>>,
   facets: Thing['facets'],
+  uri = 'https://pod.example/super-productivity/tasks/task-1#it',
 ): Thing => {
   const thing: Thing = {
-    uri: 'https://pod.example/super-productivity/tasks/task-1#it',
+    uri,
     content: {
       uri: 'https://pod.example/super-productivity/tasks/task-1',
       kind: 'rdf',
@@ -110,7 +136,7 @@ const createThing = (
       uri: 'https://pod.example/super-productivity/tasks/task-1',
       kind: 'runtime-managed',
     },
-    types: ['SuperProductivityTask'],
+    types: ['Task'],
     facets,
     properties,
     links: {},

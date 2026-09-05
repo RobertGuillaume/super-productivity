@@ -235,6 +235,13 @@
             <h2 class="mat-h2 section-title">
               {{ 'PS.TABS.SYNC_BACKUP' | translate }}
             </h2>
+            <section class="config-section solid-data-layer-section">
+              <solid-data-layer-panel></solid-data-layer-panel>
+            </section>
+
+            <h3 class="sync-providers-title">
+              {{ 'PS.SYNC.OTHER_PROVIDERS' | translate }}
+            </h3>
             <section class="config-section sync-summary">
               @let status = syncStatus();
               @if (!status.providerId) {
@@ -298,10 +305,6 @@
                   </button>
                 </div>
               }
-            </section>
-
-            <section class="config-section solid-data-layer-section">
-              <solid-data-layer-panel></solid-data-layer-panel>
             </section>
 
             @for (section of globalImexFormCfg; track section.key) {

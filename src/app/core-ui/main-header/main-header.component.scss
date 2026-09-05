@@ -524,6 +524,19 @@ button {
   }
 }
 
+.solid-btn {
+  position: relative;
+  color: var(--text-color-muted);
+
+  &:is(:hover, :focus-visible) {
+    color: var(--text-color);
+  }
+
+  &.is-active {
+    color: var(--c-primary);
+  }
+}
+
 .sync-state-ico {
   // Positioning - center within sync button
   position: absolute !important;

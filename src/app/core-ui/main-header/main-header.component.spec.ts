@@ -40,6 +40,7 @@ import { GlobalTrackingIntervalService } from '../../core/global-tracking-interv
 import { BannerService } from '../../core/banner/banner.service';
 import { NavigateToTaskService } from '../navigate-to-task/navigate-to-task.service';
 import { FocusModeService } from '../../features/focus-mode/focus-mode.service';
+import { SolidDataLayerSettingsService } from '../../solid-data/solid-data-layer-settings.service';
 
 // Regression test for #7477: in a project view a long title pushed the
 // right-side header actions (simple-counter / habit buttons) off screen.
@@ -420,6 +421,9 @@ describe('MainHeaderComponent action placement', () => {
   let pluginSidePanelButtons = signal<unknown[]>([]);
   let currentTaskId = signal<string | null>(null);
   let isShowNotes = signal(false);
+  let solidEnabled = signal(false);
+  let solidPrimaryEnabled = signal(false);
+  let routerNavigate: jasmine.Spy;
 
   const configureTestBed = (): void => {
     const cfg = {
@@ -497,7 +501,17 @@ describe('MainHeaderComponent action placement', () => {
             hasPendingPersistentAction: jasmine.createSpy('hasPendingPersistentAction'),
           },
         },
-        { provide: Router, useValue: { events: EMPTY } },
+        {
+          provide: Router,
+          useValue: { events: EMPTY, navigate: routerNavigate },
+        },
+        {
+          provide: SolidDataLayerSettingsService,
+          useValue: {
+            isEnabled: solidEnabled,
+            isPrimaryEnabled: solidPrimaryEnabled,
+          },
+        },
         {
           provide: GlobalConfigService,
           useValue: {
@@ -560,6 +574,9 @@ describe('MainHeaderComponent action placement', () => {
     pluginSidePanelButtons = signal<unknown[]>([]);
     currentTaskId = signal<string | null>(null);
     isShowNotes = signal(false);
+    solidEnabled = signal(false);
+    solidPrimaryEnabled = signal(false);
+    routerNavigate = jasmine.createSpy('navigate');
   });
 
   afterEach(() => {
@@ -666,6 +683,22 @@ describe('MainHeaderComponent action placement', () => {
     expect(host.querySelector('plugin-side-panel-btns')).toBeTruthy();
     expect(host.querySelector('desktop-panel-buttons')).toBeTruthy();
     expect(host.querySelector('.tour-addBtn')).toBeTruthy();
+  });
+
+  it('keeps the active Solid Pod visible in the app header', async () => {
+    solidEnabled.set(true);
+    solidPrimaryEnabled.set(true);
+
+    const host = await mountAtWidth(1400);
+    const solidButton = host.querySelector('.solid-btn') as HTMLButtonElement;
+
+    expect(solidButton).toBeTruthy();
+    expect(solidButton.classList.contains('is-active')).toBe(true);
+
+    solidButton.click();
+    expect(routerNavigate).toHaveBeenCalledOnceWith(['/config'], {
+      queryParams: { tab: 5 },
+    });
   });
 
   it('scrolls the actions and never the nav, at any width (#9480)', async () => {

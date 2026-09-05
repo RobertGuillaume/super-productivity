@@ -1,7 +1,15 @@
 import type { RuntimeLayoutInput } from '@solid-intents/runtime';
 
 export const SOLID_PRODUCTIVITY_NS = 'https://super-productivity.com/ns#';
-export const SOLID_PRODUCTIVITY_TASK_TYPE = 'SuperProductivityTask';
+export const SOLID_PRODUCTIVITY_TASK_TYPE = 'Task';
+export const SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE = 'SuperProductivityTask';
+export const SOLID_PRODUCTIVITY_LEGACY_TASK_CLASS = `${SOLID_PRODUCTIVITY_NS}Task`;
+export const ICAL_VTODO_CLASS = 'http://www.w3.org/2002/12/cal/ical#Vtodo';
+export const ICAL_TASK = {
+  summary: 'http://www.w3.org/2002/12/cal/ical#summary',
+  due: 'http://www.w3.org/2002/12/cal/ical#due',
+  status: 'http://www.w3.org/2002/12/cal/ical#status',
+} as const;
 export const SOLID_PRODUCTIVITY_PROJECT_TYPE = 'SuperProductivityProject';
 export const SOLID_PRODUCTIVITY_TAG_TYPE = 'SuperProductivityTag';
 export const SOLID_PRODUCTIVITY_NOTE_TYPE = 'SuperProductivityNote';
@@ -76,7 +84,8 @@ export const SOLID_PRODUCTIVITY_LAYOUT = {
   },
   types: {
     [SOLID_PRODUCTIVITY_TASK_TYPE]: {
-      classUri: `${SOLID_PRODUCTIVITY_NS}Task`,
+      classUri: ICAL_VTODO_CLASS,
+      classUris: [SOLID_PRODUCTIVITY_LEGACY_TASK_CLASS],
       container: 'tasks',
       defaultStatus: 'open',
     },

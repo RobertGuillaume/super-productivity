@@ -120,6 +120,21 @@
           }
         </div>
 
+        <button
+          class="solid-btn secondary-header-action"
+          [class.is-active]="isSolidPrimaryEnabled()"
+          [attr.aria-label]="solidStatusTooltip() | translate"
+          [matTooltip]="solidStatusTooltip() | translate"
+          (click)="openSolidSettings()"
+          mat-icon-button
+          type="button"
+        >
+          <mat-icon>database</mat-icon>
+          @if (isSolidPrimaryEnabled()) {
+            <mat-icon class="sync-state-ico">check</mat-icon>
+          }
+        </button>
+
         @if (isSyncIconEnabled()) {
           <!--
             matBadgeHidden only hides the badge VISUALLY (CSS) — MatBadge keeps

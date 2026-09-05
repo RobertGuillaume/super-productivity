@@ -85,6 +85,7 @@ import { SolidDataLayerPanelComponent } from '../../solid-data/solid-data-layer-
 
 /** Kept in sync with `animationDuration` on the settings `mat-tab-group`. */
 const TAB_ANIMATION_DURATION_MS = 200;
+const SETTINGS_TAB_COUNT = 6;
 
 @Component({
   selector: 'config-page',
@@ -272,7 +273,7 @@ export class ConfigPageComponent implements OnInit {
       .subscribe((params) => {
         if (params['tab'] !== undefined) {
           const tabIndex = parseInt(params['tab'], 10);
-          if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex < 5) {
+          if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex < SETTINGS_TAB_COUNT) {
             this.selectedTabIndex = tabIndex;
             this._cd.detectChanges();
           }

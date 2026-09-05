@@ -212,6 +212,17 @@
   }
 }
 
+.page-settings .config-section.solid-data-layer-section {
+  border-color: var(--c-primary);
+}
+
+.sync-providers-title {
+  margin: var(--s4) 0 var(--s2);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+}
+
 // The autocomplete panel renders in an overlay outside this component, so it
 // can only be reached from here via ::ng-deep on its own panel class — same
 // approach as `.add-task-bar-panel`.

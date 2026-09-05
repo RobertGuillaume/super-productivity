@@ -116,6 +116,35 @@ describe('SolidTaskPersistenceEffects', () => {
     subscription.unsubscribe();
   });
 
+  it('persists task completion with the post-reducer completion fields', async () => {
+    const completedTask: Task = {
+      ...task,
+      isDone: true,
+      doneOn: 1710000005000,
+      modified: 1710000005000,
+    };
+    solidDataLayerState.ownsPersistentAction.and.returnValue(true);
+    solidTaskRepository.saveTask.and.resolveTo(completedTask);
+    store.select.and.returnValue(of([completedTask]));
+    const effects = TestBed.inject(SolidTaskPersistenceEffects);
+    const subscription = effects.persistTaskUpdate$.subscribe();
+
+    actions$.next(
+      TaskSharedActions.updateTask({
+        task: {
+          id: task.id,
+          changes: {
+            isDone: true,
+          },
+        },
+      }),
+    );
+    await Promise.resolve();
+
+    expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(completedTask);
+    subscription.unsubscribe();
+  });
+
   it('persists bulk task updates to Solid', async () => {
     const secondTask: Task = {
       ...task,

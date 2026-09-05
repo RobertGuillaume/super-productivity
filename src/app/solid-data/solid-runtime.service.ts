@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { getSolidDataset, getThing, getUrlAll } from '@inrupt/solid-client';
 import type {
   AuthState,
   AuthSessionOptions,
@@ -6,6 +7,7 @@ import type {
   RuntimeLayout,
   SolidRuntime,
 } from '@solid-intents/runtime';
+import { Log } from '../core/log';
 import {
   SOLID_PRODUCTIVITY_LAYOUT,
   SOLID_PRODUCTIVITY_APP_STATE_TYPE,
@@ -31,10 +33,14 @@ import {
 } from './solid-productivity-vocab';
 import { SOLID_RUNTIME } from './solid-runtime.token';
 
+const PIM_STORAGE = 'http://www.w3.org/ns/pim/space#storage';
+const LDP_BASIC_CONTAINER = 'http://www.w3.org/ns/ldp#BasicContainer';
+
 @Injectable({ providedIn: 'root' })
 export class SolidRuntimeService {
   private readonly runtime = inject(SOLID_RUNTIME);
   private layout: RuntimeLayout | null = null;
+  private layoutPodUrl: string | null = null;
 
   get client(): SolidRuntime {
     return this.runtime;
@@ -121,16 +127,22 @@ export class SolidRuntimeService {
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
+    this.clearLayout();
     await this.runtime.boot(options);
+    await this.bootDiscoveredStorageRoot(this.runtime.auth.state());
+    this.clearLayout();
     this.ensureLayout();
   }
 
   async restoreSession(options: AuthSessionOptions = {}): Promise<AuthState> {
+    this.clearLayout();
     const state = await this.runtime.auth.restoreSession({
       clientName: 'Super Productivity',
       redirectUrl: window.location.href,
       ...options,
     });
+    await this.bootDiscoveredStorageRoot(state);
+    this.clearLayout();
     this.ensureLayout();
     return state;
   }
@@ -143,13 +155,154 @@ export class SolidRuntimeService {
 
   async logout(): Promise<void> {
     await this.runtime.auth.logout();
+    this.clearLayout();
   }
 
   ensureLayout(): RuntimeLayout {
-    if (this.layout === null) {
+    const podUrl = this.runtime.diagnostics.status().podUrl;
+
+    if (this.layout === null || this.layoutPodUrl !== podUrl) {
       this.layout = this.runtime.layouts.define(SOLID_PRODUCTIVITY_LAYOUT);
+      this.layoutPodUrl = podUrl;
     }
 
     return this.layout;
   }
+
+  async ensureAppContainers(): Promise<void> {
+    const layout = this.ensureLayout();
+    const podUrl = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
+    const fetchResource = this.runtime.auth.fetch();
+    const containerUris = collectContainerUris(podUrl, Object.values(layout.containers));
+
+    for (const containerUri of containerUris) {
+      await ensureContainer(fetchResource, containerUri);
+    }
+  }
+
+  private clearLayout(): void {
+    this.layout = null;
+    this.layoutPodUrl = null;
+  }
+
+  private async bootDiscoveredStorageRoot(state: AuthState): Promise<void> {
+    if (state.status !== 'authenticated') {
+      return;
+    }
+
+    const storageRoot = await this.discoverStorageRoot(state.webId);
+    if (storageRoot === null) {
+      return;
+    }
+
+    const currentPodUrl = this.runtime.diagnostics.status().podUrl;
+    if (normalizeContainerUrl(currentPodUrl) === storageRoot) {
+      return;
+    }
+
+    await this.runtime.boot({
+      podUrl: storageRoot,
+      fetch: this.runtime.auth.fetch(),
+    });
+  }
+
+  private async discoverStorageRoot(webId: string): Promise<string | null> {
+    try {
+      const profileDataset = await getSolidDataset(webId, {
+        fetch: this.runtime.auth.fetch(),
+      });
+      const profileThing = getThing(profileDataset, webId);
+      const storageRoots =
+        profileThing === null ? [] : getUrlAll(profileThing, PIM_STORAGE);
+      const storageRoot = storageRoots[0];
+
+      return storageRoot === undefined ? null : normalizeContainerUrl(storageRoot);
+    } catch (error) {
+      Log.err('SolidRuntimeService: Failed to discover Solid storage root', {
+        name: error instanceof Error ? error.name : 'UnknownError',
+      });
+      return null;
+    }
+  }
 }
+
+const normalizeContainerUrl = (uri: string): string =>
+  uri.endsWith('/') ? uri : `${uri}/`;
+
+const collectContainerUris = (podUrl: string, appContainerUris: string[]): string[] => {
+  const rootUrl = new URL(podUrl);
+  const containerUris = new Set<string>();
+
+  for (const containerUri of appContainerUris) {
+    const parsedContainer = new URL(containerUri);
+    const containerPath = normalizeContainerPath(parsedContainer.pathname);
+    const rootPath = normalizeContainerPath(rootUrl.pathname);
+
+    if (
+      parsedContainer.origin !== rootUrl.origin ||
+      !containerPath.startsWith(rootPath)
+    ) {
+      containerUris.add(normalizeContainerUrl(parsedContainer.toString()));
+      continue;
+    }
+
+    const relativePath = containerPath.slice(rootPath.length);
+    const segments = relativePath.split('/').filter(Boolean);
+    let currentPath = rootPath;
+
+    for (const segment of segments) {
+      currentPath = `${currentPath}${segment}/`;
+      const currentUrl = new URL(rootUrl.toString());
+      currentUrl.pathname = currentPath;
+      currentUrl.search = '';
+      currentUrl.hash = '';
+      containerUris.add(currentUrl.toString());
+    }
+  }
+
+  return [...containerUris].sort((a, b) => a.length - b.length);
+};
+
+const normalizeContainerPath = (path: string): string =>
+  path.endsWith('/') ? path : `${path}/`;
+
+const ensureContainer = async (
+  fetchResource: typeof fetch,
+  containerUri: string,
+): Promise<void> => {
+  const existing = await fetchResource(containerUri, { method: 'HEAD' });
+  if (existing.ok) {
+    return;
+  }
+
+  if (existing.status !== 404 && existing.status !== 410 && existing.status !== 405) {
+    throw new Error(`Failed to inspect Solid container: HTTP ${existing.status}`);
+  }
+
+  if (existing.status === 405 && (await canReadContainer(fetchResource, containerUri))) {
+    return;
+  }
+
+  const created = await fetchResource(containerUri, {
+    method: 'PUT',
+    headers: new Headers([['Link', `<${LDP_BASIC_CONTAINER}>; rel="type"`]]),
+  });
+
+  if (created.ok || created.status === 201) {
+    return;
+  }
+
+  if (created.status === 409 && (await canReadContainer(fetchResource, containerUri))) {
+    return;
+  }
+
+  throw new Error(`Failed to create Solid container: HTTP ${created.status}`);
+};
+
+const canReadContainer = async (
+  fetchResource: typeof fetch,
+  containerUri: string,
+): Promise<boolean> => {
+  const response = await fetchResource(containerUri, { method: 'GET' });
+  return response.ok;
+};

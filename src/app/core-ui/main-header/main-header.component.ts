@@ -50,6 +50,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { FocusButtonComponent } from './focus-button/focus-button.component';
 import { EmlDropDirective } from '../../core/drop-paste-input/eml-drop.directive';
 import { ConflictJournalService } from '../../op-log/sync/conflict-journal.service';
+import { Router } from '@angular/router';
+import { SolidDataLayerSettingsService } from '../../solid-data/solid-data-layer-settings.service';
 
 /** One `DOM_DELTA_LINE` notch, in CSS pixels. Matches the row's icon metrics. */
 const WHEEL_LINE_HEIGHT_PX = 16;
@@ -105,6 +107,19 @@ export class MainHeaderComponent implements OnDestroy {
   private readonly _configService = inject(GlobalConfigService);
   private readonly _dataInitStateService = inject(DataInitStateService);
   private readonly _conflictJournal = inject(ConflictJournalService);
+  private readonly _router = inject(Router);
+  private readonly _solidSettings = inject(SolidDataLayerSettingsService);
+
+  readonly isSolidEnabled = this._solidSettings.isEnabled;
+  readonly isSolidPrimaryEnabled = this._solidSettings.isPrimaryEnabled;
+  readonly solidStatusTooltip = computed(() => {
+    if (this.isSolidPrimaryEnabled()) {
+      return T.PS.SOLID.HEADER_STATUS_ACTIVE;
+    }
+    return this.isSolidEnabled()
+      ? T.PS.SOLID.HEADER_STATUS_ENABLED
+      : T.PS.SOLID.HEADER_STATUS_OFF;
+  });
 
   readonly isDataLoaded = toSignal(this._dataInitStateService.isAllDataLoadedInitially$, {
     initialValue: false,
@@ -654,6 +669,10 @@ export class MainHeaderComponent implements OnDestroy {
         });
       }
     });
+  }
+
+  openSolidSettings(): void {
+    void this._router.navigate(['/config'], { queryParams: { tab: 5 } });
   }
 
   onSyncButtonClick(): void {

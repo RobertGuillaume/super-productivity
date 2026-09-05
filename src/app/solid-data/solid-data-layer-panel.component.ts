@@ -46,6 +46,10 @@ export class SolidDataLayerPanelComponent {
   readonly isBusy = signal(false);
   readonly isEnabled = this.settings.isEnabled;
   readonly isPrimaryEnabled = this.settings.isPrimaryEnabled;
+  readonly webId = computed(() => {
+    const authState = this.authState();
+    return authState.status === 'authenticated' ? authState.webId : null;
+  });
   readonly statusLabel = computed(() => {
     const authState = this.authState();
     if (this.isPrimaryEnabled() && authState.status === 'authenticated') {
@@ -69,11 +73,6 @@ export class SolidDataLayerPanelComponent {
     this.destroyRef.onDestroy(unsubscribe);
   }
 
-  enable(): void {
-    this.settings.setIssuer(this.issuer);
-    this.settings.setEnabled(true);
-  }
-
   disable(): void {
     if (!confirmDialog(this.translateService.instant(T.PS.SOLID.CONFIRM_DISABLE))) {
       return;
@@ -86,6 +85,27 @@ export class SolidDataLayerPanelComponent {
       actionStr: T.PS.RELOAD,
       actionFn: (): void => window.location.reload(),
     });
+  }
+
+  activatePod(): void {
+    if (this.authState().status !== 'authenticated') {
+      this.snackService.open({
+        type: 'ERROR',
+        msg: T.PS.SOLID.SIGN_IN_REQUIRED,
+      });
+      return;
+    }
+    if (!confirmDialog(this.translateService.instant(T.PS.SOLID.CONFIRM_ACTIVATE))) {
+      return;
+    }
+
+    this.settings.setEnabled(true);
+    this.settings.setPrimaryEnabled(true);
+    this.reloadFromPod();
+  }
+
+  reloadFromPod(): void {
+    window.location.reload();
   }
 
   async login(): Promise<void> {

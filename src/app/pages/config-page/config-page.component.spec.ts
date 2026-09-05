@@ -26,6 +26,7 @@ describe('ConfigPageComponent', () => {
   const setup = async (
     isAndroidWebView: boolean = false,
     lastBackupTime: number | null = null,
+    queryParams: Record<string, string> = {},
   ): Promise<void> => {
     const mockSyncConfigService = jasmine.createSpyObj(
       'SyncConfigService',
@@ -72,7 +73,7 @@ describe('ConfigPageComponent', () => {
             sync$: of({}),
           }),
         },
-        { provide: ActivatedRoute, useValue: { queryParams: of({}) } },
+        { provide: ActivatedRoute, useValue: { queryParams: of(queryParams) } },
         { provide: PluginBridgeService, useValue: { shortcuts: signal([]) } },
         { provide: SyncWrapperService, useValue: mockSyncWrapperService },
         { provide: ShareService, useValue: {} },
@@ -109,6 +110,15 @@ describe('ConfigPageComponent', () => {
   it('openSyncCfgDialog() should open DialogSyncCfgComponent', async () => {
     await component.openSyncCfgDialog();
     expect(mockMatDialog.open).toHaveBeenCalled();
+  });
+
+  it('opens the Data & Sync tab directly for the Solid header action', async () => {
+    TestBed.resetTestingModule();
+    await setup(false, null, { tab: '5' });
+
+    component.ngOnInit();
+
+    expect(component.selectedTabIndex).toBe(5);
   });
 
   it('should expose Android automatic backup restore action', async () => {

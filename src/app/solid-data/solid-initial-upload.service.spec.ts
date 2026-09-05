@@ -53,9 +53,13 @@ describe('SolidInitialUploadService', () => {
   let timeTrackingRepository: jasmine.SpyObj<SolidTimeTrackingRepository>;
   let validateSnapshot: jasmine.Spy<SolidInitialUploadValidator>;
   let authState: AuthState;
+  let ensureAppContainers: jasmine.Spy<() => Promise<void>>;
 
   beforeEach(() => {
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
+    ensureAppContainers = jasmine
+      .createSpy<() => Promise<void>>('ensureAppContainers')
+      .and.resolveTo();
     appStateRepository = jasmine.createSpyObj<SolidAppStateRepository>(
       'SolidAppStateRepository',
       ['loadAppState', 'saveAppStateOrder'],
@@ -167,6 +171,7 @@ describe('SolidInitialUploadService', () => {
         {
           provide: SolidRuntimeService,
           useValue: {
+            ensureAppContainers,
             client: {
               auth: {
                 state: () => authState,
@@ -190,6 +195,7 @@ describe('SolidInitialUploadService', () => {
     ).uploadCurrentDataToEmptyPod();
 
     expect(result).toEqual({ type: 'not-authenticated' });
+    expect(ensureAppContainers).not.toHaveBeenCalled();
     expect(snapshotService.getStateSnapshotForOperationLogAsync).not.toHaveBeenCalled();
   });
 
@@ -201,6 +207,7 @@ describe('SolidInitialUploadService', () => {
     ).uploadCurrentDataToEmptyPod();
 
     expect(result).toEqual({ type: 'remote-not-empty' });
+    expect(ensureAppContainers).toHaveBeenCalledOnceWith();
     expect(snapshotService.getStateSnapshotForOperationLogAsync).not.toHaveBeenCalled();
   });
 
@@ -219,6 +226,7 @@ describe('SolidInitialUploadService', () => {
     ).uploadCurrentDataToEmptyPod();
 
     expect(result).toEqual({ type: 'uploaded' });
+    expect(ensureAppContainers).toHaveBeenCalledOnceWith();
     expect(validateSnapshot).toHaveBeenCalledOnceWith(snapshot);
     expect(taskRepository.saveTask).toHaveBeenCalledOnceWith(task);
     expect(globalConfigRepository.saveGlobalConfig).toHaveBeenCalledOnceWith(

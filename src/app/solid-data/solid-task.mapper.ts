@@ -5,6 +5,7 @@ import type {
   ThingRdfPropertyInput,
   ThingWriteProfile,
 } from '@solid-intents/runtime';
+import { INBOX_PROJECT } from '../features/project/project.const';
 import {
   DEFAULT_TASK,
   HideSubTasksMode,
@@ -12,6 +13,8 @@ import {
   TaskCopy,
 } from '../features/tasks/task.model';
 import {
+  ICAL_TASK,
+  SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
   SOLID_PRODUCTIVITY_TASKS_CONTAINER,
   SOLID_PRODUCTIVITY_TASK_TYPE,
   SP_TASK,
@@ -69,6 +72,15 @@ const buildTaskSolidProperties = (
 ): ThingRdfPropertyInput => {
   const properties: SolidRdfPropertyMap = {};
 
+  addLiteral(properties, ICAL_TASK.summary, task.title);
+  addLiteral(properties, ICAL_TASK.status, task.isDone ? 'COMPLETED' : 'NEEDS-ACTION');
+  addOptionalLiteral(
+    properties,
+    ICAL_TASK.due,
+    task.dueWithTime === null || task.dueWithTime === undefined
+      ? undefined
+      : new Date(task.dueWithTime),
+  );
   addLiteral(properties, SP_TASK.id, task.id);
   addLiteral(properties, SP_TASK.projectId, task.projectId);
   addLiteral(properties, SP_TASK.isDone, task.isDone);
@@ -113,6 +125,7 @@ const buildTaskSolidProperties = (
 const taskToSolidDeleteProperties = (task: Task): ThingRdfPropertyInput => {
   const properties: SolidRdfPropertyMap = {};
 
+  deleteAbsentValue(properties, ICAL_TASK.due, task.dueWithTime);
   deleteAbsentValue(properties, SP_TASK.modified, task.modified);
   deleteAbsentValue(properties, SP_TASK.doneOn, task.doneOn);
   deleteAbsentValue(properties, SP_TASK.parentId, task.parentId);
@@ -144,13 +157,20 @@ const taskToSolidDeleteProperties = (task: Task): ThingRdfPropertyInput => {
 };
 
 export const solidThingToTask = (thing: Thing): Task => {
+  const nativeDue = dateProp(thing, ICAL_TASK.due)?.getTime();
+  const nativeStatus = stringProp(thing, ICAL_TASK.status)?.toLowerCase();
+  const facetStatus = thing.facets.status?.toLowerCase();
   const task: TaskCopy = {
     ...DEFAULT_TASK,
     id: stringProp(thing, SP_TASK.id) ?? thing.uri,
-    title: thing.facets.title ?? '',
-    projectId: stringProp(thing, SP_TASK.projectId) ?? '',
-    isDone: booleanProp(thing, SP_TASK.isDone) ?? thing.facets.status === 'done',
-    created: numberProp(thing, SP_TASK.created) ?? Date.now(),
+    title: thing.facets.title ?? stringProp(thing, ICAL_TASK.summary) ?? '',
+    projectId: stringProp(thing, SP_TASK.projectId) ?? INBOX_PROJECT.id,
+    isDone:
+      booleanProp(thing, SP_TASK.isDone) ??
+      (facetStatus === 'done' ||
+        facetStatus === 'completed' ||
+        nativeStatus === 'completed'),
+    created: numberProp(thing, SP_TASK.created) ?? thing.facets.createdAt?.getTime() ?? 0,
     modified: numberProp(thing, SP_TASK.modified),
     doneOn: numberProp(thing, SP_TASK.doneOn),
     parentId: stringProp(thing, SP_TASK.parentId),
@@ -160,7 +180,7 @@ export const solidThingToTask = (thing: Thing): Task => {
     timeEstimate: numberProp(thing, SP_TASK.timeEstimate) ?? 0,
     timeSpentOnDay:
       jsonProp<TaskCopy['timeSpentOnDay']>(thing, SP_TASK.timeSpentOnDay) ?? {},
-    dueWithTime: numberOrNullProp(thing, SP_TASK.dueWithTime),
+    dueWithTime: numberOrNullProp(thing, SP_TASK.dueWithTime) ?? nativeDue,
     dueDay: stringOrNullProp(thing, SP_TASK.dueDay),
     hasPlannedTime: booleanProp(thing, SP_TASK.hasPlannedTime),
     deadlineDay: stringOrNullProp(thing, SP_TASK.deadlineDay),
@@ -191,8 +211,24 @@ export const solidThingToTask = (thing: Thing): Task => {
   return task;
 };
 
+const dateProp = (thing: Thing, predicate: string): Date | undefined => {
+  const value = thing.property(predicate)[0];
+  if (value?.kind !== 'literal') {
+    return undefined;
+  }
+  if (value.value instanceof Date) {
+    return value.value;
+  }
+  if (typeof value.value !== 'string') {
+    return undefined;
+  }
+
+  const parsed = new Date(value.value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
 export const solidTaskQuery = {
-  type: SOLID_PRODUCTIVITY_TASK_TYPE,
+  type: [SOLID_PRODUCTIVITY_TASK_TYPE, SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE],
 } as const;
 
 const hideSubTasksModeProp = (

@@ -1,73 +1,97 @@
 <div class="solid-panel__header">
-  <div>
-    <h3>{{ T.PS.SOLID.TITLE | translate }}</h3>
-    <p>{{ T.PS.SOLID.SUBTITLE | translate }}</p>
+  <div class="solid-panel__identity">
+    <mat-icon class="solid-panel__mark">database</mat-icon>
+    <div>
+      <h3>{{ T.PS.SOLID.TITLE | translate }}</h3>
+      <p>{{ T.PS.SOLID.SUBTITLE | translate }}</p>
+    </div>
   </div>
-  <span class="solid-panel__status">
-    <mat-icon>database</mat-icon>
+  <span
+    class="solid-panel__status"
+    [class.solid-panel__status--active]="isPrimaryEnabled()"
+    aria-live="polite"
+  >
+    <mat-icon>{{ isPrimaryEnabled() ? 'check_circle' : 'database' }}</mat-icon>
     {{ statusLabel() | translate }}
   </span>
 </div>
 
-<mat-form-field
-  appearance="outline"
-  subscriptSizing="dynamic"
->
-  <mat-label>{{ T.PS.SOLID.ISSUER | translate }}</mat-label>
-  <input
-    [(ngModel)]="issuer"
-    [disabled]="isBusy()"
-    matInput
-    type="url"
-  />
-</mat-form-field>
+<div class="callout callout--info solid-panel__discovery">
+  <mat-icon aria-hidden="true">travel_explore</mat-icon>
+  <p>{{ T.PS.SOLID.DISCOVERY_INFO | translate }}</p>
+</div>
 
-@if (authState().status === 'authenticated') {
-  <p class="solid-panel__web-id">{{ authState().webId }}</p>
+@if (authState().status !== 'authenticated') {
+  <mat-form-field
+    appearance="outline"
+    subscriptSizing="dynamic"
+  >
+    <mat-label>{{ T.PS.SOLID.ISSUER | translate }}</mat-label>
+    <input
+      [(ngModel)]="issuer"
+      [disabled]="isBusy()"
+      matInput
+      type="url"
+    />
+  </mat-form-field>
+} @else {
+  <div class="solid-panel__account">
+    <span>{{ T.PS.SOLID.SIGNED_IN_AS | translate }}</span>
+    <strong>{{ webId() }}</strong>
+  </div>
 }
 
 <div class="solid-panel__actions">
-  @if (!isEnabled()) {
-    <button
-      (click)="enable()"
-      [disabled]="isBusy()"
-      mat-stroked-button
-      type="button"
-    >
-      <mat-icon>power_settings_new</mat-icon>
-      {{ T.PS.SOLID.ENABLE | translate }}
-    </button>
-  } @else {
-    <button
-      (click)="disable()"
-      [disabled]="isBusy()"
-      mat-stroked-button
-      type="button"
-    >
-      <mat-icon>power_off</mat-icon>
-      {{ T.PS.SOLID.DISABLE | translate }}
-    </button>
-  }
-
   @if (authState().status === 'authenticated') {
+    @if (isPrimaryEnabled()) {
+      <button
+        (click)="reloadFromPod()"
+        [disabled]="isBusy()"
+        color="primary"
+        mat-flat-button
+        type="button"
+      >
+        <mat-icon>refresh</mat-icon>
+        {{ T.PS.SOLID.RELOAD_FROM_POD | translate }}
+      </button>
+      <button
+        (click)="disable()"
+        [disabled]="isBusy()"
+        mat-stroked-button
+        type="button"
+      >
+        <mat-icon>storage</mat-icon>
+        {{ T.PS.SOLID.USE_LOCAL_DATA | translate }}
+      </button>
+    } @else {
+      <button
+        (click)="activatePod()"
+        [disabled]="isBusy()"
+        color="primary"
+        mat-flat-button
+        type="button"
+      >
+        <mat-icon>database</mat-icon>
+        {{ T.PS.SOLID.ACTIVATE | translate }}
+      </button>
+      <button
+        (click)="uploadCurrentData()"
+        [disabled]="isBusy()"
+        mat-stroked-button
+        type="button"
+      >
+        <mat-icon>cloud_upload</mat-icon>
+        {{ T.PS.SOLID.UPLOAD_CURRENT_DATA | translate }}
+      </button>
+    }
     <button
       (click)="logout()"
       [disabled]="isBusy()"
-      mat-stroked-button
+      mat-button
       type="button"
     >
       <mat-icon>logout</mat-icon>
       {{ T.PS.SOLID.LOGOUT | translate }}
-    </button>
-    <button
-      (click)="uploadCurrentData()"
-      [disabled]="isBusy() || isPrimaryEnabled()"
-      color="primary"
-      mat-flat-button
-      type="button"
-    >
-      <mat-icon>cloud_upload</mat-icon>
-      {{ T.PS.SOLID.UPLOAD_CURRENT_DATA | translate }}
     </button>
   } @else {
     <button
@@ -89,6 +113,16 @@
       <mat-icon>refresh</mat-icon>
       {{ T.PS.SOLID.RESTORE_SESSION | translate }}
     </button>
+    @if (isEnabled()) {
+      <button
+        (click)="disable()"
+        [disabled]="isBusy()"
+        mat-button
+        type="button"
+      >
+        {{ T.PS.SOLID.USE_LOCAL_DATA | translate }}
+      </button>
+    }
   }
 
   @if (isBusy()) {

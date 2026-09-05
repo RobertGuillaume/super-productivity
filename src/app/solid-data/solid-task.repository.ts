@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
-import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
+import type { Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Task } from '../features/tasks/task.model';
-import { SP_TASK } from './solid-productivity-vocab';
+import { SOLID_PRODUCTIVITY_TASK_TYPE, SP_TASK } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import {
   solidTaskQuery,
@@ -10,40 +10,62 @@ import {
   taskToSolidCreateInput,
 } from './solid-task.mapper';
 
-type SolidTaskContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
-
 @Injectable({ providedIn: 'root' })
 export class SolidTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly taskThingUris = new Map<string, string>();
+  private readonly taskOperations = new Map<string, Promise<void>>();
 
   async loadTasks(): Promise<Task[]> {
-    const taskContainerScope = this.taskContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [taskContainerScope.uri],
-      mode: 'balanced',
+    await this.solidRuntime.client.discovery.refresh({
+      uris: [this.solidRuntime.ensureLayout().containers.tasks],
     });
+    await this.solidRuntime.client.discovery.discoverType(SOLID_PRODUCTIVITY_TASK_TYPE);
 
     const result = await this.solidRuntime.client.things.query(solidTaskQuery, {
-      scope: taskContainerScope,
-      autoDiscover: true,
+      scope: { kind: 'runtime-graph' },
+      autoDiscover: false,
     });
 
-    return result.things.map(solidThingToTask);
+    return result.things.map((thing) => this.rememberTaskThing(thing));
   }
 
-  async saveTask(task: Task): Promise<Task> {
-    const existingThing = await this.findTaskThing(task.id);
+  saveTask(task: Task): Promise<Task> {
+    return this.enqueueTaskOperation(task.id, () => this.saveTaskNow(task));
+  }
 
-    if (existingThing === null) {
+  deleteTask(taskId: string): Promise<void> {
+    return this.enqueueTaskOperation(taskId, async () => {
+      const existingThingUri = await this.findTaskThingUri(taskId);
+      if (existingThingUri !== null) {
+        await this.solidRuntime.client.things.delete(existingThingUri);
+        this.taskThingUris.delete(taskId);
+      }
+    });
+  }
+
+  subscribeTasks(listener: (tasks: Task[]) => void): Unsubscribe {
+    return this.solidRuntime.client.things.subscribe(
+      solidTaskQuery,
+      (result) => listener(result.things.map((thing) => this.rememberTaskThing(thing))),
+      {
+        emitInitial: true,
+      },
+    );
+  }
+
+  private async saveTaskNow(task: Task): Promise<Task> {
+    const existingThingUri = await this.findTaskThingUri(task.id);
+
+    if (existingThingUri === null) {
       const created = await this.solidRuntime.client.things.create(
         taskToSolidCreateInput(task, this.solidRuntime.taskProfile),
       );
-      return solidThingToTask(created);
+      return this.rememberTaskThing(created);
     }
 
     const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
+      existingThingUri,
       taskToSolidChanges(task),
     );
     const commit = await this.solidRuntime.client.writes.commit(plan);
@@ -52,27 +74,19 @@ export class SolidTaskRepository {
       throw new Error(`Expected Solid task update commit, received ${commit.kind}`);
     }
 
-    return solidThingToTask(commit.result);
+    return this.rememberTaskThing(commit.result);
   }
 
-  async deleteTask(taskId: string): Promise<void> {
-    const existingThing = await this.findTaskThing(taskId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
+  private async findTaskThingUri(taskId: string): Promise<string | null> {
+    const knownThingUri = this.taskThingUris.get(taskId);
+    if (knownThingUri !== undefined) {
+      return knownThingUri;
     }
-  }
 
-  subscribeTasks(listener: (tasks: Task[]) => void): Unsubscribe {
-    return this.solidRuntime.client.things.subscribe(
-      solidTaskQuery,
-      (result) => listener(result.things.map(solidThingToTask)),
-      {
-        emitInitial: true,
-      },
-    );
-  }
+    if (isAbsoluteUri(taskId)) {
+      return taskId;
+    }
 
-  private async findTaskThing(taskId: string): Promise<Thing | null> {
     const result = await this.solidRuntime.client.things.query(
       {
         ...solidTaskQuery,
@@ -86,19 +100,51 @@ export class SolidTaskRepository {
       },
       {
         limit: 1,
-        scope: this.taskContainerScope(),
+        scope: { kind: 'runtime-graph' },
         autoDiscover: true,
       },
     );
 
-    return result.things[0] ?? null;
+    const thing = result.things[0];
+    if (thing === undefined) {
+      return null;
+    }
+    this.rememberTaskThing(thing);
+    return thing.uri;
   }
 
-  private taskContainerScope(): SolidTaskContainerScope {
-    const layout = this.solidRuntime.ensureLayout();
-    return {
-      kind: 'container',
-      uri: layout.containers.tasks,
-    };
+  private rememberTaskThing(thing: Thing): Task {
+    const task = solidThingToTask(thing);
+    this.taskThingUris.set(task.id, thing.uri);
+    return task;
+  }
+
+  private async enqueueTaskOperation<Result>(
+    taskId: string,
+    operation: () => Promise<Result>,
+  ): Promise<Result> {
+    const previous = this.taskOperations.get(taskId) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(operation);
+    const settled = current.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.taskOperations.set(taskId, settled);
+
+    try {
+      return await current;
+    } finally {
+      if (this.taskOperations.get(taskId) === settled) {
+        this.taskOperations.delete(taskId);
+      }
+    }
   }
 }
+
+const isAbsoluteUri = (value: string): boolean => {
+  try {
+    return new URL(value).protocol !== '';
+  } catch {
+    return false;
+  }
+};
