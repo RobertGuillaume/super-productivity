@@ -39,12 +39,26 @@ describe('SolidPlannerPersistenceEffects', () => {
     projectId: 'project-1',
     created: 1710000000000,
   };
+  const unrelatedTask: Task = {
+    ...DEFAULT_TASK,
+    id: 'task-2',
+    title: 'Unrelated task',
+    projectId: 'project-1',
+    created: 1710000000050,
+  };
   const todayTag: Tag = {
     ...DEFAULT_TAG,
     id: TODAY_TAG.id,
     title: TODAY_TAG.title,
     created: 1710000000100,
     taskIds: ['task-1'],
+  };
+  const unrelatedTag: Tag = {
+    ...DEFAULT_TAG,
+    id: 'tag-1',
+    title: 'Unrelated tag',
+    created: 1710000000150,
+    taskIds: ['task-2'],
   };
 
   beforeEach(() => {
@@ -55,7 +69,7 @@ describe('SolidPlannerPersistenceEffects', () => {
     );
     solidPlannerRepository = jasmine.createSpyObj<SolidPlannerRepository>(
       'SolidPlannerRepository',
-      ['replacePlannerState'],
+      ['reconcilePlannerDays'],
     );
     solidTagRepository = jasmine.createSpyObj<SolidTagRepository>('SolidTagRepository', [
       'saveTag',
@@ -67,13 +81,13 @@ describe('SolidPlannerPersistenceEffects', () => {
     snackService = jasmine.createSpyObj<SnackService>('SnackService', ['open']);
     store = jasmine.createSpyObj<Store>('Store', ['select']);
 
-    solidPlannerRepository.replacePlannerState.and.resolveTo(plannerState);
+    solidPlannerRepository.reconcilePlannerDays.and.resolveTo(plannerState);
     solidTagRepository.saveTag.and.callFake((savedTag) => Promise.resolve(savedTag));
     solidTaskRepository.saveTask.and.callFake((savedTask) => Promise.resolve(savedTask));
     store.select.and.callFake((selector: unknown) => {
       if (selector === selectPlannerState) return of(plannerState);
-      if (selector === selectAllTasks) return of([task]);
-      if (selector === selectAllTags) return of([todayTag]);
+      if (selector === selectAllTasks) return of([task, unrelatedTask]);
+      if (selector === selectAllTags) return of([todayTag, unrelatedTag]);
       return of([]);
     });
 
@@ -109,7 +123,7 @@ describe('SolidPlannerPersistenceEffects', () => {
     );
     await Promise.resolve();
 
-    expect(solidPlannerRepository.replacePlannerState).toHaveBeenCalledOnceWith(
+    expect(solidPlannerRepository.reconcilePlannerDays).toHaveBeenCalledOnceWith(
       plannerState,
     );
     expect(solidTaskRepository.saveTask).not.toHaveBeenCalled();
@@ -130,7 +144,7 @@ describe('SolidPlannerPersistenceEffects', () => {
     );
     await Promise.resolve();
 
-    expect(solidPlannerRepository.replacePlannerState).toHaveBeenCalledOnceWith(
+    expect(solidPlannerRepository.reconcilePlannerDays).toHaveBeenCalledOnceWith(
       plannerState,
     );
     expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(task);
@@ -156,7 +170,7 @@ describe('SolidPlannerPersistenceEffects', () => {
     await Promise.resolve();
 
     expect(store.select).not.toHaveBeenCalled();
-    expect(solidPlannerRepository.replacePlannerState).not.toHaveBeenCalled();
+    expect(solidPlannerRepository.reconcilePlannerDays).not.toHaveBeenCalled();
     subscription.unsubscribe();
   });
 });

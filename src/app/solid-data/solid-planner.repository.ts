@@ -68,6 +68,45 @@ export class SolidPlannerRepository {
     return plannerState;
   }
 
+  async reconcilePlannerDays(plannerState: PlannerState): Promise<PlannerState> {
+    const result = await this.solidRuntime.client.things.query(solidPlannerDayQuery, {
+      scope: this.plannerContainerScope(),
+      autoDiscover: true,
+    });
+    const existingByDay = new Map(
+      result.things.map((thing) => [solidThingToPlannerDay(thing).day, thing]),
+    );
+
+    const operations: Promise<unknown>[] = [];
+
+    for (const thing of result.things) {
+      const existingDay = solidThingToPlannerDay(thing);
+      const nextTaskIds = plannerState.days[existingDay.day];
+
+      if (nextTaskIds === undefined) {
+        operations.push(this.solidRuntime.client.things.delete(thing.uri));
+      } else if (!arraysEqual(existingDay.taskIds, nextTaskIds)) {
+        operations.push(
+          this.updatePlannerDayThing(thing, {
+            day: existingDay.day,
+            taskIds: nextTaskIds,
+            updated: Date.now(),
+          }),
+        );
+      }
+    }
+
+    for (const [day, taskIds] of Object.entries(plannerState.days)) {
+      if (!existingByDay.has(day)) {
+        operations.push(this.createPlannerDay({ day, taskIds, updated: Date.now() }));
+      }
+    }
+
+    await Promise.all(operations);
+
+    return plannerState;
+  }
+
   async loadPlannerDays(): Promise<SolidPlannerDay[]> {
     const result = await this.solidRuntime.client.things.query(solidPlannerDayQuery, {
       scope: this.plannerContainerScope(),
@@ -81,12 +120,23 @@ export class SolidPlannerRepository {
     const existingThing = await this.findPlannerDayThing(plannerDay.day);
 
     if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        plannerDayToSolidCreateInput(plannerDay, this.solidRuntime.plannerDayProfile),
-      );
-      return solidThingToPlannerDay(created);
+      return this.createPlannerDay(plannerDay);
     }
 
+    return this.updatePlannerDayThing(existingThing, plannerDay);
+  }
+
+  private async createPlannerDay(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
+    const created = await this.solidRuntime.client.things.create(
+      plannerDayToSolidCreateInput(plannerDay, this.solidRuntime.plannerDayProfile),
+    );
+    return solidThingToPlannerDay(created);
+  }
+
+  private async updatePlannerDayThing(
+    existingThing: Thing,
+    plannerDay: SolidPlannerDay,
+  ): Promise<SolidPlannerDay> {
     const plan = this.solidRuntime.client.writes.planUpdate(
       existingThing.uri,
       plannerDayToSolidChanges(plannerDay),
@@ -205,3 +255,6 @@ export class SolidPlannerRepository {
     };
   }
 }
+
+const arraysEqual = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index]);

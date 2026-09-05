@@ -168,6 +168,47 @@ describe('SolidPlannerRepository', () => {
     expect(saved.taskIds).toEqual(['task-2']);
   });
 
+  it('reconciles only planner days whose task order changed', async () => {
+    const unchangedThing = createPlannerDayThing('2026-08-04', ['task-1']);
+    const changedThing = createPlannerDayThing('2026-08-05', ['task-1', 'task-2']);
+    const plan = {
+      id: 'write-plan-2',
+      kind: 'thing.update',
+      request: {
+        kind: 'thing.update',
+        uri: changedThing.uri,
+        changes: {},
+      },
+      operations: [],
+      affectedResources: [],
+      diagnostics: [],
+    } as RuntimeWritePlan;
+    things.query.and.resolveTo({ things: [unchangedThing, changedThing] });
+    writes.planUpdate.and.returnValue(plan);
+    writes.commit.and.resolveTo({
+      planId: plan.id,
+      kind: 'thing.update',
+      result: createPlannerDayThing('2026-08-05', ['task-2', 'task-1']),
+    });
+
+    await TestBed.inject(SolidPlannerRepository).reconcilePlannerDays({
+      days: {
+        ['2026-08-04']: ['task-1'],
+        ['2026-08-05']: ['task-2', 'task-1'],
+      },
+      addPlannedTasksDialogLastShown: undefined,
+    });
+
+    expect(things.query).toHaveBeenCalledTimes(1);
+    expect(writes.planUpdate).toHaveBeenCalledOnceWith(
+      changedThing.uri,
+      jasmine.objectContaining({ replaceProperties: jasmine.any(Object) }),
+    );
+    expect(writes.commit).toHaveBeenCalledOnceWith(plan);
+    expect(things.create).not.toHaveBeenCalled();
+    expect(things.delete).not.toHaveBeenCalled();
+  });
+
   it('deletes planner day resources through the runtime', async () => {
     const existingThing = createPlannerDayThing('2026-08-04', ['task-1']);
     things.query.and.resolveTo({ things: [existingThing] });
