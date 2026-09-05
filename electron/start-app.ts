@@ -171,7 +171,10 @@ export const startApp = (): void => {
     // moment a `productName` is added to package.json, detaching every window
     // from `superproductivity.desktop`. Must run before the first window is
     // created. #9674, #9450.
-    app.setDesktopName(LINUX_DESKTOP_NAME);
+    const appWithDesktopName = app as typeof app & {
+      setDesktopName?: (desktopName: string) => void;
+    };
+    appWithDesktopName.setDesktopName?.(LINUX_DESKTOP_NAME);
 
     // Preserve the historical userData path based on package.json `name`, while
     // exposing a human-readable app name to Linux desktop environments (#8640).
