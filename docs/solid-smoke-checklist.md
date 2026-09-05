@@ -4,15 +4,14 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 
 ## Setup
 
-- Start from a fresh Super Productivity profile with representative local data
-  or create the core test data before upload.
-- Open Settings -> Sync & Backup -> Solid Pod.
-- Enter the disposable Solid identity provider and sign in, or restore the
-  existing session.
-- Run **Upload current data to Solid** and confirm the app reloads into Solid
-  primary mode.
-- For an existing Pod, choose **Use this Pod** instead and confirm compatible
-  tasks hydrate without an upload.
+- Start from a fresh Super Productivity profile.
+- On the first screen, enter the disposable Solid identity provider and choose
+  **Continue with Solid**.
+- Complete the identity-provider redirect and confirm the app opens with Solid
+  as the active data source and compatible Pod tasks loaded.
+- Separately test local migration by choosing **Use this device only**, creating
+  representative local data, then opening Settings -> Sync & Backup -> Solid
+  Pod and running **Upload current data** against an empty disposable Pod.
 - Keep a second browser profile ready for cross-profile reload verification.
 
 ## Expected Resource Roots
@@ -104,6 +103,16 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 
 ## Final Checks
 
+- While creating and editing tasks, confirm authenticated Pod requests are
+  serialized rather than sent as a burst. If the disposable Pod can be
+  configured to return HTTP 429, confirm Super Productivity honors
+  `Retry-After`, pauses later requests, and resumes without showing **Failed to
+  save changes** when a retry succeeds.
+- Revoke or expire the active Solid session, attempt a task edit, and confirm a
+  single persistent **Sign in again** prompt appears. Complete login and confirm
+  the Pod remains the primary data source.
+- Start the app with Solid still marked primary but no restorable session and
+  confirm the same login prompt appears during startup.
 - Confirm no unexpected local-only changes appear after a full browser refresh.
 - Confirm a second profile can hydrate from Solid with IndexedDB cleared.
 - Inspect the pod and confirm resources are under the expected roots.
