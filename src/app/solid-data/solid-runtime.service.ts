@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import type {
+  AuthState,
   AuthSessionOptions,
   RuntimeBootOptions,
   RuntimeLayout,
@@ -124,19 +125,24 @@ export class SolidRuntimeService {
     this.ensureLayout();
   }
 
-  async restoreSession(options: AuthSessionOptions = {}): Promise<void> {
-    await this.runtime.auth.restoreSession({
+  async restoreSession(options: AuthSessionOptions = {}): Promise<AuthState> {
+    const state = await this.runtime.auth.restoreSession({
       clientName: 'Super Productivity',
       redirectUrl: window.location.href,
       ...options,
     });
     this.ensureLayout();
+    return state;
   }
 
   async login(issuer: string): Promise<void> {
     await this.runtime.auth.login({
       issuer,
     });
+  }
+
+  async logout(): Promise<void> {
+    await this.runtime.auth.logout();
   }
 
   ensureLayout(): RuntimeLayout {

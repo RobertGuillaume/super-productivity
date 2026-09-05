@@ -81,6 +81,7 @@ import {
   searchSettings,
   SettingsSearchTarget,
 } from '../../features/config/settings-search.util';
+import { SolidDataLayerPanelComponent } from '../../solid-data/solid-data-layer-panel.component';
 
 /** Kept in sync with `animationDuration` on the settings `mat-tab-group`. */
 const TAB_ANIMATION_DURATION_MS = 200;
@@ -114,6 +115,7 @@ const TAB_ANIMATION_DURATION_MS = 200;
     MatAutocomplete,
     MatAutocompleteTrigger,
     MatOption,
+    SolidDataLayerPanelComponent,
   ],
 })
 export class ConfigPageComponent implements OnInit {

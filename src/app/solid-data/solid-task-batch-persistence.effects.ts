@@ -5,7 +5,6 @@ import { BatchTaskDelete } from '@super-productivity/plugin-api';
 import { EMPTY, forkJoin, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
-import { Log } from '../core/log';
 import { Project } from '../features/project/project.model';
 import { selectAllProjects } from '../features/project/store/project.selectors';
 import { Section } from '../features/section/section.model';
@@ -16,9 +15,9 @@ import { Task } from '../features/tasks/task.model';
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -94,20 +93,10 @@ export class SolidTaskBatchPersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidTaskBatchPersistenceEffects: failed to persist task batch mutation', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidTaskBatchPersistenceEffects: failed to persist task batch mutation',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

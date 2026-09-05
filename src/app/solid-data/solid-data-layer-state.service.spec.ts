@@ -76,7 +76,10 @@ import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { moveTaskInTodayList } from '../features/work-context/store/work-context-meta.actions';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
-import { SOLID_DATA_LAYER_ENABLED_STORAGE_KEY } from './solid-data-layer-feature-flag';
+import {
+  SOLID_DATA_LAYER_ENABLED_STORAGE_KEY,
+  SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY,
+} from './solid-data-layer-feature-flag';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidRuntimeService } from './solid-runtime.service';
 
@@ -104,10 +107,11 @@ describe('SolidDataLayerStateService', () => {
 
   afterEach(() => {
     localStorage.removeItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY);
+    localStorage.removeItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY);
     TestBed.resetTestingModule();
   });
 
-  it('is inactive unless the flag is enabled and the runtime is authenticated', () => {
+  it('is inactive unless Solid is enabled, primary, and authenticated', () => {
     const service = TestBed.inject(SolidDataLayerStateService);
 
     expect(service.isActive()).toBe(false);
@@ -116,6 +120,9 @@ describe('SolidDataLayerStateService', () => {
     expect(service.isActive()).toBe(false);
 
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
+    expect(service.isActive()).toBe(false);
+
+    localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
     expect(service.isActive()).toBe(true);
   });
 
@@ -172,6 +179,7 @@ describe('SolidDataLayerStateService', () => {
     expect(service.ownsPersistentAction(action)).toBe(false);
 
     localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
+    localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
 
     expect(service.ownsPersistentAction(action)).toBe(true);

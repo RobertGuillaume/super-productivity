@@ -6,6 +6,7 @@ import { allDataWasLoaded } from '../../root-store/meta/all-data-was-loaded.acti
 import { DataInitStateService } from './data-init-state.service';
 import { OperationLogHydratorService } from '../../op-log/persistence/operation-log-hydrator.service';
 import { OpLog } from '../log';
+import { isSolidDataLayerPrimaryEnabled } from '../../solid-data/solid-data-layer-feature-flag';
 import { SolidStartupService } from '../../solid-data/solid-startup.service';
 import { SolidTaskHydrationService } from '../../solid-data/solid-task-hydration.service';
 
@@ -41,7 +42,7 @@ export class DataInitService {
   async reInit(): Promise<void> {
     const solidAuthState = await this._solidStartupService.bootIfEnabled();
 
-    if (solidAuthState?.status === 'authenticated') {
+    if (solidAuthState?.status === 'authenticated' && isSolidDataLayerPrimaryEnabled()) {
       await this._solidTaskHydrationService.hydrateStore();
       return;
     }

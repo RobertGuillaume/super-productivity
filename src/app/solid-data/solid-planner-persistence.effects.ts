@@ -4,7 +4,6 @@ import { Store } from '@ngrx/store';
 import { EMPTY, forkJoin, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
-import { Log } from '../core/log';
 import { PlannerActions } from '../features/planner/store/planner.actions';
 import { PlannerState } from '../features/planner/store/planner.reducer';
 import { selectPlannerState } from '../features/planner/store/planner.selectors';
@@ -13,9 +12,9 @@ import { selectAllTags } from '../features/tag/store/tag.reducer';
 import { Task } from '../features/tasks/task.model';
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import { isSolidPlannerAction, SolidPlannerAction } from './solid-planner-action-types';
@@ -82,20 +81,10 @@ export class SolidPlannerPersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidPlannerPersistenceEffects: failed to persist planner state', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidPlannerPersistenceEffects: failed to persist planner state',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

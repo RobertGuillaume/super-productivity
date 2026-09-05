@@ -3,7 +3,6 @@ import { createEffect } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { EMPTY, from, Observable } from 'rxjs';
 import { catchError, concatMap, filter, map, take } from 'rxjs/operators';
-import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
 import { SimpleCounter } from '../features/simple-counter/simple-counter.model';
 import {
@@ -14,9 +13,9 @@ import {
 } from '../features/simple-counter/store/simple-counter.actions';
 import { selectSimpleCounterFeatureState } from '../features/simple-counter/store/simple-counter.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
   isSolidSimpleCounterDeleteAction,
   isSolidSimpleCounterSaveAction,
@@ -174,20 +173,10 @@ export class SolidSimpleCounterPersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidSimpleCounterPersistenceEffects: failed to persist simple counter', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidSimpleCounterPersistenceEffects: failed to persist simple counter',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

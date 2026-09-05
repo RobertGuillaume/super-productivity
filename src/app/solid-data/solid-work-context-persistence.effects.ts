@@ -4,16 +4,15 @@ import { Store } from '@ngrx/store';
 import { EMPTY, from, Observable } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
-import { Log } from '../core/log';
 import { Project } from '../features/project/project.model';
 import { selectProjectById } from '../features/project/store/project.selectors';
 import { Tag } from '../features/tag/tag.model';
 import { selectTagById } from '../features/tag/store/tag.reducer';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import {
@@ -67,20 +66,10 @@ export class SolidWorkContextPersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidWorkContextPersistenceEffects: failed to persist work-context order', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidWorkContextPersistenceEffects: failed to persist work-context order',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

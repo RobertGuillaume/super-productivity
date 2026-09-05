@@ -4,7 +4,6 @@ import { Store } from '@ngrx/store';
 import { EMPTY, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
-import { Log } from '../core/log';
 import { syncTimeSpent } from '../features/time-tracking/store/time-tracking.actions';
 import {
   __updateMultipleTaskSimple,
@@ -25,9 +24,9 @@ import {
   updateTaskAttachment,
 } from '../features/tasks/task-attachment/task-attachment.actions';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
   isSolidEmbeddedTaskAction,
   SolidEmbeddedTaskAction,
@@ -130,20 +129,10 @@ export class SolidEmbeddedTaskPersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidEmbeddedTaskPersistenceEffects: failed to persist task change', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidEmbeddedTaskPersistenceEffects: failed to persist task change',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

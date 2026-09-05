@@ -4,14 +4,12 @@ import { Store } from '@ngrx/store';
 import { EMPTY, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { ArchiveDbAdapter } from '../core/persistence/archive-db-adapter.service';
-import { Log } from '../core/log';
 import { ArchiveModel } from '../features/archive/archive.model';
 import { selectTimeTrackingState } from '../features/time-tracking/store/time-tracking.selectors';
 import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
 import { initialTimeTrackingState } from '../features/time-tracking/store/time-tracking.reducer';
 import { Task, TaskArchive } from '../features/tasks/task.model';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidArchiveStateRepository } from './solid-archive-state.repository';
 import {
@@ -23,6 +21,7 @@ import {
 import { SolidArchivedTask, SolidArchiveBucket } from './solid-archived-task.mapper';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 import { SnackService } from '../core/snack/snack.service';
 
@@ -92,21 +91,11 @@ export class SolidArchiveStatePersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidArchiveStatePersistenceEffects: failed to persist archive state', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidArchiveStatePersistenceEffects: failed to persist archive state',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }
 

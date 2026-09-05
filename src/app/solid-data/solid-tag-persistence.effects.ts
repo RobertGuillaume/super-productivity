@@ -4,7 +4,6 @@ import { Store } from '@ngrx/store';
 import { EMPTY, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
-import { Log } from '../core/log';
 import { Tag } from '../features/tag/tag.model';
 import {
   addTag,
@@ -16,9 +15,9 @@ import {
 import { selectTagById } from '../features/tag/store/tag.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidTagRepository } from './solid-tag.repository';
 
 type SolidTagUpdateAction =
@@ -113,21 +112,11 @@ export class SolidTagPersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidTagPersistenceEffects: failed to persist tag change', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidTagPersistenceEffects: failed to persist tag change',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }
 

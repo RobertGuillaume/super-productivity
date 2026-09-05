@@ -3189,6 +3189,28 @@
       "NEEDS_AUTH": "Authentication required",
       "SET_UP_SYNC": "Set up sync"
     },
+    "SOLID": {
+      "ACTION_FAILED": "Solid action failed",
+      "CONFIRM_DISABLE": "Disable the Solid data layer on this device?",
+      "DISABLE": "Disable Solid",
+      "DISABLED": "Solid data layer disabled",
+      "ENABLE": "Enable Solid",
+      "INVALID_STATE": "Current data is not valid for upload ({{errorCount}} errors).",
+      "ISSUER": "Solid identity provider",
+      "LOGIN": "Sign in",
+      "LOGOUT": "Sign out",
+      "REMOTE_NOT_EMPTY": "This pod already contains Super Productivity data.",
+      "RESTORE_SESSION": "Restore session",
+      "SIGN_IN_REQUIRED": "Sign in to Solid first.",
+      "STATUS_ACTIVE": "Active",
+      "STATUS_CONNECTED": "Connected",
+      "STATUS_ENABLED": "Enabled",
+      "STATUS_OFF": "Off",
+      "SUBTITLE": "Experimental native Solid backend",
+      "TITLE": "Solid Pod",
+      "UPLOAD_CURRENT_DATA": "Upload current data",
+      "UPLOAD_SUCCESS": "Solid upload complete"
+    },
     "SYNC_EXPORT": "Sync & Export",
     "TABS": {
       "GENERAL": "General",

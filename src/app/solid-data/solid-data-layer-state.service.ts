@@ -1,6 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { isSolidDataLayerEnabled } from './solid-data-layer-feature-flag';
+import {
+  isSolidDataLayerEnabled,
+  isSolidDataLayerPrimaryEnabled,
+} from './solid-data-layer-feature-flag';
 import { SOLID_OWNED_PERSISTENT_ACTION_TYPES } from './solid-persistent-action-ownership';
 import { SolidRuntimeService } from './solid-runtime.service';
 
@@ -11,6 +14,7 @@ export class SolidDataLayerStateService {
   isActive(): boolean {
     return (
       isSolidDataLayerEnabled() &&
+      isSolidDataLayerPrimaryEnabled() &&
       this.solidRuntime.client.auth.state().status === 'authenticated'
     );
   }

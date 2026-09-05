@@ -3,11 +3,9 @@ import { createEffect } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { EMPTY, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
-import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
 import { selectConfigFeatureState } from '../features/config/store/global-config.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import {
   isSolidGlobalConfigSaveAction,
@@ -15,6 +13,7 @@ import {
 } from './solid-global-config-action-types';
 import { SolidGlobalConfigRepository } from './solid-global-config.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 
 @Injectable()
 export class SolidGlobalConfigPersistenceEffects {
@@ -47,20 +46,10 @@ export class SolidGlobalConfigPersistenceEffects {
   );
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidGlobalConfigPersistenceEffects: failed to persist global config', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidGlobalConfigPersistenceEffects: failed to persist global config',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

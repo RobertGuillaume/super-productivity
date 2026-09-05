@@ -4,9 +4,13 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 
 ## Setup
 
-- Enable the Solid data layer feature flag.
-- Log in to the disposable pod.
-- Start from an empty profile and confirm the app loads without local backup/import data.
+- Start from a fresh Super Productivity profile with representative local data
+  or create the core test data before upload.
+- Open Settings -> Sync & Export -> Solid Pod.
+- Enter the disposable Solid identity provider and enable Solid.
+- Log in to the disposable pod or restore the existing session.
+- Run **Upload current data to Solid** and confirm the app reloads into Solid
+  primary mode.
 - Keep a second browser profile ready for cross-profile reload verification.
 
 ## Expected Resource Roots

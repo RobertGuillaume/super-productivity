@@ -3,13 +3,12 @@ import { createEffect } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { EMPTY, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
-import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
 import { selectMenuTreeState } from '../features/menu-tree/store/menu-tree.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
   isSolidMenuTreeSaveAction,
   SolidMenuTreeSaveAction,
@@ -47,20 +46,10 @@ export class SolidMenuTreePersistenceEffects {
   );
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidMenuTreePersistenceEffects: failed to persist menu tree', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidMenuTreePersistenceEffects: failed to persist menu tree',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

@@ -1,0 +1,97 @@
+<div class="solid-panel__header">
+  <div>
+    <h3>{{ T.PS.SOLID.TITLE | translate }}</h3>
+    <p>{{ T.PS.SOLID.SUBTITLE | translate }}</p>
+  </div>
+  <span class="solid-panel__status">
+    <mat-icon>database</mat-icon>
+    {{ statusLabel() | translate }}
+  </span>
+</div>
+
+<mat-form-field
+  appearance="outline"
+  subscriptSizing="dynamic"
+>
+  <mat-label>{{ T.PS.SOLID.ISSUER | translate }}</mat-label>
+  <input
+    [(ngModel)]="issuer"
+    [disabled]="isBusy()"
+    matInput
+    type="url"
+  />
+</mat-form-field>
+
+@if (authState().status === 'authenticated') {
+  <p class="solid-panel__web-id">{{ authState().webId }}</p>
+}
+
+<div class="solid-panel__actions">
+  @if (!isEnabled()) {
+    <button
+      (click)="enable()"
+      [disabled]="isBusy()"
+      mat-stroked-button
+      type="button"
+    >
+      <mat-icon>power_settings_new</mat-icon>
+      {{ T.PS.SOLID.ENABLE | translate }}
+    </button>
+  } @else {
+    <button
+      (click)="disable()"
+      [disabled]="isBusy()"
+      mat-stroked-button
+      type="button"
+    >
+      <mat-icon>power_off</mat-icon>
+      {{ T.PS.SOLID.DISABLE | translate }}
+    </button>
+  }
+
+  @if (authState().status === 'authenticated') {
+    <button
+      (click)="logout()"
+      [disabled]="isBusy()"
+      mat-stroked-button
+      type="button"
+    >
+      <mat-icon>logout</mat-icon>
+      {{ T.PS.SOLID.LOGOUT | translate }}
+    </button>
+    <button
+      (click)="uploadCurrentData()"
+      [disabled]="isBusy() || isPrimaryEnabled()"
+      color="primary"
+      mat-flat-button
+      type="button"
+    >
+      <mat-icon>cloud_upload</mat-icon>
+      {{ T.PS.SOLID.UPLOAD_CURRENT_DATA | translate }}
+    </button>
+  } @else {
+    <button
+      (click)="login()"
+      [disabled]="isBusy()"
+      color="primary"
+      mat-flat-button
+      type="button"
+    >
+      <mat-icon>login</mat-icon>
+      {{ T.PS.SOLID.LOGIN | translate }}
+    </button>
+    <button
+      (click)="restoreSession()"
+      [disabled]="isBusy()"
+      mat-stroked-button
+      type="button"
+    >
+      <mat-icon>refresh</mat-icon>
+      {{ T.PS.SOLID.RESTORE_SESSION | translate }}
+    </button>
+  }
+
+  @if (isBusy()) {
+    <mat-spinner diameter="24"></mat-spinner>
+  }
+</div>

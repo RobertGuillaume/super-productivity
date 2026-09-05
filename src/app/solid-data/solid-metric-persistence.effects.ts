@@ -3,15 +3,14 @@ import { createEffect } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { EMPTY, from, Observable } from 'rxjs';
 import { catchError, concatMap, filter, map, take } from 'rxjs/operators';
-import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
 import { Metric } from '../features/metric/metric.model';
 import { logFocusSession } from '../features/metric/store/metric.actions';
 import { selectMetricFeatureState } from '../features/metric/store/metric.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
   isSolidMetricDeleteAction,
   isSolidMetricSaveAction,
@@ -89,20 +88,10 @@ export class SolidMetricPersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidMetricPersistenceEffects: failed to persist metric', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidMetricPersistenceEffects: failed to persist metric',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

@@ -3,7 +3,6 @@ import { createEffect } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { EMPTY, from, Observable } from 'rxjs';
 import { catchError, concatMap, filter, map, take } from 'rxjs/operators';
-import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
 import { BoardCfg } from '../features/boards/boards.model';
 import {
@@ -12,10 +11,10 @@ import {
 } from '../features/boards/store/boards.actions';
 import { selectBoardsState } from '../features/boards/store/boards.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidBoardRepository } from './solid-board.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
   isSolidBoardDeleteAction,
   isSolidBoardSaveAction,
@@ -107,20 +106,10 @@ export class SolidBoardPersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidBoardPersistenceEffects: failed to persist board', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidBoardPersistenceEffects: failed to persist board',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

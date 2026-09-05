@@ -4,7 +4,6 @@ import { Store } from '@ngrx/store';
 import { EMPTY, forkJoin, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
-import { Log } from '../core/log';
 import { Project } from '../features/project/project.model';
 import { selectAllProjects } from '../features/project/store/project.selectors';
 import { Section } from '../features/section/section.model';
@@ -12,9 +11,9 @@ import { selectAllSections } from '../features/section/store/section.selectors';
 import { Task } from '../features/tasks/task.model';
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidProjectRepository } from './solid-project.repository';
 import {
   isSolidTaskProjectMoveAction,
@@ -80,20 +79,10 @@ export class SolidTaskProjectMovePersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err('SolidTaskProjectMovePersistenceEffects: failed to persist project move', {
-      name: (error as Error | undefined)?.name,
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source: 'SolidTaskProjectMovePersistenceEffects: failed to persist project move',
     });
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
-    });
-    return EMPTY;
   }
 }

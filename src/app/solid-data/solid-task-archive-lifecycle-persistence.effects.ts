@@ -4,7 +4,6 @@ import { Store } from '@ngrx/store';
 import { EMPTY, forkJoin, from } from 'rxjs';
 import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
-import { Log } from '../core/log';
 import { sanitizeTasksForArchiving } from '../features/archive/archive.service';
 import { Project } from '../features/project/project.model';
 import { selectAllProjects } from '../features/project/store/project.selectors';
@@ -16,10 +15,10 @@ import { Task, TaskWithSubTasks } from '../features/tasks/task.model';
 import { flattenTasks, selectAllTasks } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { T } from '../t.const';
 import { ALL_ACTIONS } from '../util/local-actions.token';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -136,23 +135,11 @@ export class SolidTaskArchiveLifecyclePersistenceEffects {
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {
-    Log.err(
-      'SolidTaskArchiveLifecyclePersistenceEffects: failed to persist task lifecycle',
-      {
-        name: (error as Error | undefined)?.name,
-      },
-    );
-    this.snackService.open({
-      type: 'ERROR',
-      msg: T.F.SYNC.S.PERSIST_FAILED,
-      actionStr: T.PS.RELOAD,
-      actionFn: (): void => {
-        window.location.reload();
-      },
-      config: {
-        duration: 0,
-      },
+    return handleSolidPersistenceError({
+      error,
+      snackService: this.snackService,
+      source:
+        'SolidTaskArchiveLifecyclePersistenceEffects: failed to persist task lifecycle',
     });
-    return EMPTY;
   }
 }
