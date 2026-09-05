@@ -426,9 +426,11 @@ export class StartupService {
             !granted &&
             !isNative &&
             !IS_ELECTRON &&
-            !OnboardingHintService.isOnboardingInProgress()
+            !OnboardingHintService.isOnboardingInProgress() &&
+            !localStorage.getItem(LS.PERSISTENCE_DISALLOWED_WARNING_SHOWN)
           ) {
             Log.warn('Persistence not allowed');
+            localStorage.setItem(LS.PERSISTENCE_DISALLOWED_WARNING_SHOWN, 'true');
             this._snackService.open({ msg: T.GLOBAL_SNACK.PERSISTENCE_DISALLOWED });
           }
         });

@@ -23,12 +23,14 @@ import { selectSyncConfig } from '../../features/config/store/global-config.redu
 import { selectEnabledIssueProviders } from '../../features/issue/store/issue-provider.selectors';
 import { RatePromptService } from '../../features/dialog-please-rate/rate-prompt.service';
 import { JiraElectronBridgeService } from '../../features/issue/providers/jira/jira-electron-bridge.service';
+import { OnboardingHintService } from '../../features/onboarding/onboarding-hint.service';
 
 describe('StartupService', () => {
   let service: StartupService;
   let pluginService: jasmine.SpyObj<PluginService>;
   let ratePromptService: jasmine.SpyObj<RatePromptService>;
   let jiraElectronBridge: jasmine.SpyObj<JiraElectronBridgeService>;
+  let snackService: jasmine.SpyObj<SnackService>;
 
   beforeEach(() => {
     // Mock localStorage
@@ -163,6 +165,7 @@ describe('StartupService', () => {
     jiraElectronBridge = TestBed.inject(
       JiraElectronBridgeService,
     ) as jasmine.SpyObj<JiraElectronBridgeService>;
+    snackService = TestBed.inject(SnackService) as jasmine.SpyObj<SnackService>;
   });
 
   describe('init', () => {
@@ -399,6 +402,33 @@ describe('StartupService', () => {
 
       expect(mockStorage.persisted).toHaveBeenCalled();
       expect(mockStorage.persist).not.toHaveBeenCalled();
+
+      flush();
+    }));
+
+    it('should warn only once when persistent storage is repeatedly denied', fakeAsync(() => {
+      spyOn(OnboardingHintService, 'isOnboardingInProgress').and.returnValue(false);
+      const mockStorage = {
+        persisted: jasmine.createSpy().and.returnValue(Promise.resolve(false)),
+        persist: jasmine.createSpy().and.returnValue(Promise.resolve(false)),
+        estimate: jasmine.createSpy(),
+      };
+      Object.defineProperty(navigator, 'storage', {
+        value: mockStorage,
+        configurable: true,
+      });
+
+      (service as any)._requestPersistence();
+      tick();
+      (service as any)._requestPersistence();
+      tick();
+
+      expect(mockStorage.persist).toHaveBeenCalledTimes(2);
+      expect(snackService.open).toHaveBeenCalledTimes(1);
+      expect(localStorage.setItem).toHaveBeenCalledOnceWith(
+        LS.PERSISTENCE_DISALLOWED_WARNING_SHOWN,
+        'true',
+      );
 
       flush();
     }));

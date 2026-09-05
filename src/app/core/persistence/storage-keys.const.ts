@@ -22,6 +22,7 @@ export enum LS {
   // prompt to hold off for a cooldown after a bad experience. Time only.
   LAST_CRITICAL_ERROR_TIME = 'SUP_LAST_CRITICAL_ERROR_TIME',
   LAST_LOCAL_SYNC_MODEL_CHANGE = 'SUP_LAST_LOCAL_SYNC_MODEL_CHANGE',
+  PERSISTENCE_DISALLOWED_WARNING_SHOWN = 'SUP_PERSISTENCE_DISALLOWED_WARNING_SHOWN',
   // Epoch ms of the last successful local (auto-)backup write. Recorded by
   // LocalBackupService._backup() only when a platform writer actually wrote (past
   // the meaningful-data and A3 near-empty guards), so it never advances on a
