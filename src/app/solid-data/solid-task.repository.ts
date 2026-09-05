@@ -101,7 +101,7 @@ export class SolidTaskRepository {
       {
         limit: 1,
         scope: { kind: 'runtime-graph' },
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

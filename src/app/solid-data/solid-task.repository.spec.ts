@@ -163,6 +163,22 @@ describe('SolidTaskRepository', () => {
 
     const saved = await TestBed.inject(SolidTaskRepository).saveTask(task);
 
+    expect(things.query).toHaveBeenCalledOnceWith(
+      jasmine.objectContaining({
+        where: [
+          {
+            kind: 'property',
+            predicateUri: SP_TASK.id,
+            value: task.id,
+          },
+        ],
+      }),
+      {
+        limit: 1,
+        scope: { kind: 'runtime-graph' },
+        autoDiscover: false,
+      },
+    );
     expect(things.create).not.toHaveBeenCalled();
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,
