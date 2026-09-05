@@ -112,14 +112,20 @@ export class SolidDataLayerPanelComponent {
     await this.runBusy(async () => {
       this.settings.setIssuer(this.issuer);
       this.settings.setEnabled(true);
-      await this.solidRuntime.boot({
-        restoreSession: false,
-        auth: {
-          clientName: 'Super Productivity',
-          redirectUrl: window.location.href,
-        },
-      });
-      await this.solidRuntime.login(this.settings.issuer());
+      this.settings.setPrimaryEnabled(true);
+      try {
+        await this.solidRuntime.boot({
+          restoreSession: false,
+          auth: {
+            clientName: 'Super Productivity',
+            redirectUrl: window.location.href,
+          },
+        });
+        await this.solidRuntime.login(this.settings.issuer());
+      } catch (error) {
+        this.settings.setPrimaryEnabled(false);
+        throw error;
+      }
     });
   }
 

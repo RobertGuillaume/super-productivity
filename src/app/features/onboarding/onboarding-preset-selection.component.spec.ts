@@ -12,16 +12,45 @@ import { ONBOARDING_PRESETS } from './onboarding-presets.const';
 import { GlobalConfigService } from '../config/global-config.service';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { LS } from '../../core/persistence/storage-keys.const';
+import { SolidRuntimeService } from '../../solid-data/solid-runtime.service';
+import { SnackService } from '../../core/snack/snack.service';
+import {
+  SOLID_DATA_LAYER_ENABLED_STORAGE_KEY,
+  SOLID_DATA_LAYER_ISSUER_STORAGE_KEY,
+  SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY,
+} from '../../solid-data/solid-data-layer-feature-flag';
+import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
 
 describe('OnboardingPresetSelectionComponent', () => {
   let component: OnboardingPresetSelectionComponent;
   let mockDialog: jasmine.SpyObj<MatDialog>;
   let cfgSignal: WritableSignal<{ sync: { isEnabled: boolean } }>;
   let afterClosed$: Subject<void>;
+  let authState: AuthState;
+  let solidRuntime: jasmine.SpyObj<Pick<SolidRuntimeService, 'boot' | 'login'>> & {
+    client: SolidRuntime;
+  };
+  let snackService: jasmine.SpyObj<SnackService>;
 
-  const setup = (): void => {
+  const setup = (initialAuthState: AuthState = { status: 'anonymous' }): void => {
     cfgSignal = signal({ sync: { isEnabled: false } });
     afterClosed$ = new Subject<void>();
+    authState = initialAuthState;
+
+    solidRuntime = {
+      boot: jasmine.createSpy('boot').and.resolveTo(undefined),
+      login: jasmine.createSpy('login').and.resolveTo(undefined),
+      client: {
+        auth: {
+          state: () => authState,
+          subscribe: (subscriber: (state: AuthState) => void) => {
+            subscriber(authState);
+            return (): void => undefined;
+          },
+        },
+      } as unknown as SolidRuntime,
+    };
+    snackService = jasmine.createSpyObj<SnackService>('SnackService', ['open']);
 
     mockDialog = jasmine.createSpyObj('MatDialog', ['open']);
     mockDialog.open.and.returnValue({
@@ -36,6 +65,8 @@ describe('OnboardingPresetSelectionComponent', () => {
       providers: [
         { provide: MatDialog, useValue: mockDialog },
         { provide: GlobalConfigService, useValue: mockGlobalConfig },
+        { provide: SolidRuntimeService, useValue: solidRuntime },
+        { provide: SnackService, useValue: snackService },
       ],
     });
 
@@ -47,12 +78,69 @@ describe('OnboardingPresetSelectionComponent', () => {
   beforeEach(() => {
     localStorage.removeItem(LS.ONBOARDING_PRESET_DONE);
     localStorage.removeItem(LS.ONBOARDING_HINTS_DONE);
+    localStorage.removeItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY);
+    localStorage.removeItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY);
+    localStorage.removeItem(SOLID_DATA_LAYER_ISSUER_STORAGE_KEY);
     setup();
   });
 
   afterEach(() => {
     localStorage.removeItem(LS.ONBOARDING_PRESET_DONE);
     localStorage.removeItem(LS.ONBOARDING_HINTS_DONE);
+    localStorage.removeItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY);
+    localStorage.removeItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY);
+    localStorage.removeItem(SOLID_DATA_LAYER_ISSUER_STORAGE_KEY);
+  });
+
+  describe('Solid setup', () => {
+    it('makes Solid primary and starts login from the onboarding screen', async () => {
+      component.issuer = 'https://issuer.example';
+
+      await component.connectSolid();
+
+      expect(localStorage.getItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY)).toBe('true');
+      expect(localStorage.getItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY)).toBe(
+        'true',
+      );
+      expect(localStorage.getItem(SOLID_DATA_LAYER_ISSUER_STORAGE_KEY)).toBe(
+        'https://issuer.example',
+      );
+      expect(solidRuntime.boot).toHaveBeenCalledOnceWith({
+        restoreSession: false,
+        auth: {
+          clientName: 'Super Productivity',
+          redirectUrl: window.location.href,
+        },
+      });
+      expect(solidRuntime.login).toHaveBeenCalledOnceWith('https://issuer.example');
+    });
+
+    it('dismisses onboarding after the primary Solid session is restored', async () => {
+      TestBed.resetTestingModule();
+      localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
+      setup({
+        status: 'authenticated',
+        webId: 'https://pod.example/profile/card#me',
+      });
+      let dismissedCount = 0;
+      component.dismissed.subscribe(() => dismissedCount++);
+
+      await Promise.resolve();
+
+      expect(localStorage.getItem(LS.ONBOARDING_PRESET_DONE)).toBe('true');
+      expect(localStorage.getItem(LS.ONBOARDING_HINTS_DONE)).toBe('true');
+      expect(dismissedCount).toBe(1);
+    });
+
+    it('keeps onboarding available when login fails', async () => {
+      solidRuntime.login.and.rejectWith(new Error('login failed'));
+
+      await component.connectSolid();
+
+      expect(localStorage.getItem(LS.ONBOARDING_PRESET_DONE)).toBeNull();
+      expect(component.isSolidSetupInProgress()).toBeFalse();
+      expect(snackService.open).toHaveBeenCalled();
+    });
   });
 
   describe('setupSync', () => {

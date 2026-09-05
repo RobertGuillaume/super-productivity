@@ -5,39 +5,98 @@
   <div class="onboarding-container">
     <h1>{{ 'ONBOARDING.TITLE' | translate }}</h1>
     <p class="subtitle">{{ 'ONBOARDING.SUBTITLE' | translate }}</p>
-    <div class="presets-grid">
-      @for (preset of presets; track preset.id) {
-        <button
-          class="preset-card"
-          [class.selected]="selectedPreset()?.id === preset.id"
-          [class.not-selected]="selectedPreset() && selectedPreset()?.id !== preset.id"
-          (click)="selectPreset(preset)"
-        >
-          <div class="icon-wrapper">
-            <mat-icon class="preset-icon">{{ preset.icon }}</mat-icon>
-            <mat-icon class="check-icon">check_circle</mat-icon>
-          </div>
-          <div class="card-text">
-            <h2>{{ preset.titleKey | translate }}</h2>
-            <p>{{ preset.descriptionKey | translate }}</p>
-          </div>
-        </button>
-      }
-    </div>
-    <p class="footer-hint">
-      <mat-icon class="lock-icon">lock</mat-icon>
-      {{ 'ONBOARDING.PRIVACY_HINT' | translate }}
-    </p>
-    <p class="sync-cta">
-      {{ 'ONBOARDING.SYNC_CTA' | translate }}
+
+    <section class="solid-setup">
+      <div class="solid-setup__heading">
+        <mat-icon aria-hidden="true">database</mat-icon>
+        <div>
+          <h2>{{ 'ONBOARDING.SOLID.TITLE' | translate }}</h2>
+          <p>{{ 'ONBOARDING.SOLID.DESCRIPTION' | translate }}</p>
+        </div>
+      </div>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+      >
+        <mat-label>{{ T.PS.SOLID.ISSUER | translate }}</mat-label>
+        <input
+          [(ngModel)]="issuer"
+          [disabled]="isSolidSetupInProgress()"
+          matInput
+          type="url"
+        />
+      </mat-form-field>
       <button
         type="button"
-        class="sync-cta-link"
-        [disabled]="!!selectedPreset() || isSyncSetupInProgress()"
-        (click)="setupSync()"
+        color="primary"
+        mat-flat-button
+        [disabled]="isSolidSetupInProgress()"
+        (click)="connectSolid()"
       >
-        {{ 'ONBOARDING.SYNC_CTA_LINK' | translate }}
+        @if (isSolidSetupInProgress()) {
+          <mat-spinner diameter="20"></mat-spinner>
+        } @else {
+          <mat-icon>login</mat-icon>
+        }
+        {{ 'ONBOARDING.SOLID.CONTINUE' | translate }}
       </button>
-    </p>
+      <p class="solid-setup__privacy">
+        <mat-icon aria-hidden="true">verified_user</mat-icon>
+        {{ 'ONBOARDING.SOLID.PRIVACY' | translate }}
+      </p>
+    </section>
+
+    @if (!isLocalSetupVisible()) {
+      <button
+        type="button"
+        class="local-setup-toggle"
+        mat-button
+        [disabled]="isSolidSetupInProgress()"
+        (click)="showLocalSetup()"
+      >
+        <mat-icon>computer</mat-icon>
+        {{ 'ONBOARDING.LOCAL_ACTION' | translate }}
+      </button>
+    } @else {
+      <div class="local-setup">
+        <h2>{{ 'ONBOARDING.LOCAL_TITLE' | translate }}</h2>
+        <div class="presets-grid">
+          @for (preset of presets; track preset.id) {
+            <button
+              class="preset-card"
+              [class.selected]="selectedPreset()?.id === preset.id"
+              [class.not-selected]="
+                selectedPreset() && selectedPreset()?.id !== preset.id
+              "
+              (click)="selectPreset(preset)"
+            >
+              <div class="icon-wrapper">
+                <mat-icon class="preset-icon">{{ preset.icon }}</mat-icon>
+                <mat-icon class="check-icon">check_circle</mat-icon>
+              </div>
+              <div class="card-text">
+                <h3>{{ preset.titleKey | translate }}</h3>
+                <p>{{ preset.descriptionKey | translate }}</p>
+              </div>
+            </button>
+          }
+        </div>
+        <p class="footer-hint">
+          <mat-icon class="lock-icon">lock</mat-icon>
+          {{ 'ONBOARDING.PRIVACY_HINT' | translate }}
+        </p>
+        <p class="sync-cta">
+          {{ 'ONBOARDING.SYNC_CTA' | translate }}
+          <button
+            type="button"
+            class="sync-cta-link"
+            [disabled]="!!selectedPreset() || isSyncSetupInProgress()"
+            (click)="setupSync()"
+          >
+            {{ 'ONBOARDING.SYNC_CTA_LINK' | translate }}
+          </button>
+        </p>
+      </div>
+    }
   </div>
 </div>

@@ -2951,11 +2951,19 @@
     "TASK_MARKED_DONE": "Task marked as done"
   },
   "ONBOARDING": {
-    "TITLE": "How do you want to use Super Productivity?",
-    "SUBTITLE": "Pick a setup that matches your workflow. You can always change this later in Settings.",
+    "TITLE": "Super Productivity",
+    "SUBTITLE": "Choose where your data lives.",
     "PRIVACY_HINT": "Your data stays securely on your device unless you choose to set up sync.",
     "SYNC_CTA": "Already using Super Productivity on another device?",
     "SYNC_CTA_LINK": "Set up sync",
+    "LOCAL_ACTION": "Use this device only",
+    "LOCAL_TITLE": "Choose a local setup",
+    "SOLID": {
+      "TITLE": "Start with your Solid Pod",
+      "DESCRIPTION": "Sign in to load your Pod tasks and keep your changes there.",
+      "CONTINUE": "Continue with Solid",
+      "PRIVACY": "Your Pod is the primary data source."
+    },
     "PRESETS": {
       "SIMPLE_TODO": {
         "TITLE": "Simple Todo List",
@@ -3205,12 +3213,14 @@
       "INVALID_STATE": "Current data is not valid for upload ({{errorCount}} errors).",
       "ISSUER": "Solid identity provider",
       "LOGIN": "Sign in",
+      "LOGIN_AGAIN": "Sign in again",
       "LOGOUT": "Sign out",
       "REMOTE_NOT_EMPTY": "This Pod already contains compatible task data. Use this Pod instead of uploading over it.",
       "RELOAD_FROM_POD": "Reload from Pod",
       "RESTORE_SESSION": "Restore session",
       "SIGNED_IN_AS": "Signed in as",
       "SIGN_IN_REQUIRED": "Sign in to Solid first.",
+      "SESSION_EXPIRED": "Your Solid session is no longer valid. Sign in again before making more changes.",
       "STATUS_ACTIVE": "Active",
       "STATUS_CONNECTED": "Connected",
       "STATUS_ENABLED": "Enabled",

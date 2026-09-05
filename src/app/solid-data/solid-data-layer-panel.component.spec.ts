@@ -81,6 +81,9 @@ describe('SolidDataLayerPanelComponent', () => {
     await component.login();
 
     expect(localStorage.getItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY)).toBe('true');
+    expect(localStorage.getItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY)).toBe(
+      'true',
+    );
     expect(localStorage.getItem(SOLID_DATA_LAYER_ISSUER_STORAGE_KEY)).toBe(
       'https://issuer.example',
     );
@@ -92,6 +95,18 @@ describe('SolidDataLayerPanelComponent', () => {
       },
     });
     expect(solidRuntime.login).toHaveBeenCalledOnceWith('https://issuer.example');
+  });
+
+  it('does not leave Solid primary when login fails', async () => {
+    solidRuntime.login.and.rejectWith(new Error('login failed'));
+
+    await fixture.componentInstance.login();
+
+    expect(localStorage.getItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY)).toBeNull();
+    expect(snackService.open).toHaveBeenCalledWith({
+      type: 'ERROR',
+      msg: T.PS.SOLID.ACTION_FAILED,
+    });
   });
 
   it('keeps Solid primary mode disabled when initial upload is refused', async () => {
