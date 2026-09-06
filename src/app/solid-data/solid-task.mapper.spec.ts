@@ -1,7 +1,7 @@
 import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { INBOX_PROJECT } from '../features/project/project.const';
-import { ICAL_TASK, SP_TASK } from './solid-productivity-vocab';
+import { ICAL_TASK, SCHEMA_THING, SP_TASK } from './solid-productivity-vocab';
 import {
   solidThingToTask,
   taskToSolidChanges,
@@ -59,6 +59,10 @@ describe('solidTask.mapper', () => {
     });
 
     expect(changes.properties).toBeUndefined();
+    expect(changes.title).toBeUndefined();
+    expect(changes.status).toBeUndefined();
+    expect(changes.replaceProperties?.[SCHEMA_THING.title]).toEqual([task.title]);
+    expect(changes.replaceProperties?.[SCHEMA_THING.status]).toEqual(['done']);
     expect(changes.replaceProperties?.[SP_TASK.id]).toEqual(['task-1']);
     expect(changes.replaceProperties?.[SP_TASK.subTaskId]).toEqual([]);
     expect(changes.replaceProperties?.[SP_TASK.tagId]).toEqual([]);

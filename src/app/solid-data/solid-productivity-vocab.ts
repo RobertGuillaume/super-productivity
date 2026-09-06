@@ -10,6 +10,10 @@ export const ICAL_TASK = {
   due: 'http://www.w3.org/2002/12/cal/ical#due',
   status: 'http://www.w3.org/2002/12/cal/ical#status',
 } as const;
+export const SCHEMA_THING = {
+  title: 'https://schema.org/name',
+  status: 'https://schema.org/creativeWorkStatus',
+} as const;
 export const SOLID_PRODUCTIVITY_PROJECT_TYPE = 'SuperProductivityProject';
 export const SOLID_PRODUCTIVITY_TAG_TYPE = 'SuperProductivityTag';
 export const SOLID_PRODUCTIVITY_NOTE_TYPE = 'SuperProductivityNote';

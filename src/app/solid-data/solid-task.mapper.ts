@@ -14,6 +14,7 @@ import {
 } from '../features/tasks/task.model';
 import {
   ICAL_TASK,
+  SCHEMA_THING,
   SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
   SOLID_PRODUCTIVITY_TASKS_CONTAINER,
   SOLID_PRODUCTIVITY_TASK_TYPE,
@@ -54,8 +55,6 @@ export const taskToSolidCreateInput = (
 });
 
 export const taskToSolidChanges = (task: Task): ThingChanges => ({
-  title: task.title,
-  status: task.isDone ? 'done' : 'open',
   replaceProperties: taskToSolidReplacementProperties(task),
   deleteProperties: taskToSolidDeleteProperties(task),
 });
@@ -63,8 +62,12 @@ export const taskToSolidChanges = (task: Task): ThingChanges => ({
 export const taskToSolidProperties = (task: Task): ThingRdfPropertyInput =>
   buildTaskSolidProperties(task, { includeEmptyArrays: false });
 
-const taskToSolidReplacementProperties = (task: Task): ThingRdfPropertyInput =>
-  buildTaskSolidProperties(task, { includeEmptyArrays: true });
+const taskToSolidReplacementProperties = (task: Task): ThingRdfPropertyInput => {
+  const properties = buildTaskSolidProperties(task, { includeEmptyArrays: true });
+  addLiteral(properties, SCHEMA_THING.title, task.title);
+  addLiteral(properties, SCHEMA_THING.status, task.isDone ? 'done' : 'open');
+  return properties;
+};
 
 const buildTaskSolidProperties = (
   task: Task,

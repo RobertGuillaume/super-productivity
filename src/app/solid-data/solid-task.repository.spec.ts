@@ -343,6 +343,7 @@ describe('SolidTaskRepository', () => {
 
     expect(literalValues(reloaded?.property(SP_TASK.isDone))).toEqual([true]);
     expect(literalValues(reloaded?.property(ICAL_TASK.status))).toEqual(['COMPLETED']);
+    expect(reloaded?.facets.status).toBe('done');
   });
 
   it('does not lose completion when create and update overlap', async () => {
