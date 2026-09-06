@@ -249,6 +249,7 @@ describe('SolidRuntimeService', () => {
           authCapabilities: {
             browserSessionRestore: true,
             headlessSessionRestore: false,
+            headlessInteractiveLogin: false,
             suppliedFetch: podUrl !== mockPodUrl,
             message: '',
           },
