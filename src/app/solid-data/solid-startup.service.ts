@@ -18,6 +18,7 @@ export class SolidStartupService {
       return null;
     }
 
+    const startedAt = performance.now();
     await this.solidRuntime.boot({
       restoreSession: true,
       auth: {
@@ -27,7 +28,10 @@ export class SolidStartupService {
     });
 
     const state = this.solidRuntime.client.auth.state();
-    Log.normal(`Solid data layer booted with auth state: ${state.status}`);
+    Log.normal(
+      `Solid runtime boot completed in ${Math.round(performance.now() - startedAt)}ms ` +
+        `with auth state: ${state.status}`,
+    );
     if (state.status !== 'authenticated' && isSolidDataLayerPrimaryEnabled()) {
       this.sessionRecovery.promptForLogin();
     }

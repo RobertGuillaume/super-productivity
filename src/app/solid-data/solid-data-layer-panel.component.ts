@@ -17,6 +17,8 @@ import {
   SolidInitialUploadService,
 } from './solid-initial-upload.service';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidPodRefreshCoordinatorService } from './solid-pod-refresh-coordinator.service';
+import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 
 @Component({
   selector: 'solid-data-layer-panel',
@@ -40,18 +42,35 @@ export class SolidDataLayerPanelComponent {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly translateService = inject(TranslateService);
   private readonly uploadService = inject(SolidInitialUploadService);
+  private readonly refreshCoordinator = inject(SolidPodRefreshCoordinatorService);
+  private readonly dataLayerState = inject(SolidDataLayerStateService);
 
   readonly T = T;
   readonly authState = signal<AuthState>(this.solidRuntime.client.auth.state());
   readonly isBusy = signal(false);
   readonly isEnabled = this.settings.isEnabled;
   readonly isPrimaryEnabled = this.settings.isPrimaryEnabled;
+  readonly lifecyclePhase = this.dataLayerState.phase;
+  readonly isRefreshing = computed(() => this.lifecyclePhase() === 'refreshing');
   readonly webId = computed(() => {
     const authState = this.authState();
     return authState.status === 'authenticated' ? authState.webId : null;
   });
   readonly statusLabel = computed(() => {
     const authState = this.authState();
+    const phase = this.lifecyclePhase();
+    if (phase === 'booting' || phase === 'hydrating-cache') {
+      return T.PS.SOLID.STATUS_CONNECTING;
+    }
+    if (phase === 'refreshing') {
+      return T.PS.SOLID.STATUS_REFRESHING;
+    }
+    if (phase === 'degraded' || phase === 'unavailable') {
+      return T.PS.SOLID.STATUS_DEGRADED;
+    }
+    if (phase === 'sign-in-required') {
+      return T.PS.SOLID.STATUS_SIGN_IN_REQUIRED;
+    }
     if (this.isPrimaryEnabled() && authState.status === 'authenticated') {
       return T.PS.SOLID.STATUS_ACTIVE;
     }
@@ -104,8 +123,8 @@ export class SolidDataLayerPanelComponent {
     this.reloadFromPod();
   }
 
-  reloadFromPod(): void {
-    window.location.reload();
+  async reloadFromPod(): Promise<void> {
+    await this.runBusy(() => this.refreshCoordinator.refreshNow());
   }
 
   async login(): Promise<void> {
@@ -160,7 +179,7 @@ export class SolidDataLayerPanelComponent {
           type: 'SUCCESS',
           msg: T.PS.SOLID.UPLOAD_SUCCESS,
         });
-        window.location.reload();
+        void this.reloadFromPod();
         break;
       case 'not-authenticated':
         this.snackService.open({

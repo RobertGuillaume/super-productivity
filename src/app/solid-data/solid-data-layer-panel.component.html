@@ -46,7 +46,7 @@
     @if (isPrimaryEnabled()) {
       <button
         (click)="reloadFromPod()"
-        [disabled]="isBusy()"
+        [disabled]="isBusy() || isRefreshing()"
         color="primary"
         mat-flat-button
         type="button"
@@ -125,7 +125,7 @@
     }
   }
 
-  @if (isBusy()) {
+  @if (isBusy() || isRefreshing()) {
     <mat-spinner diameter="24"></mat-spinner>
   }
 </div>

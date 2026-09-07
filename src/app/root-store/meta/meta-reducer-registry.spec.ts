@@ -3,13 +3,16 @@ import { loadAllDataFailureGuardMetaReducer } from '../../op-log/apply/load-all-
 import { operationCaptureMetaReducer } from '../../op-log/capture/operation-capture.meta-reducer';
 import { bulkOperationsMetaReducer } from '../../op-log/apply/bulk-hydration.meta-reducer';
 import { undoTaskDeleteMetaReducer } from './undo-task-delete.meta-reducer';
+import { solidCatalogReconciliationMetaReducer } from '../../solid-data/solid-catalog-reconciliation.meta-reducer';
 
 describe('META_REDUCERS registry', () => {
   // The dev-mode validateMetaReducerOrdering() covers index 0/1/last; this
   // spec guards registrations it does not.
   it('registers the loadAllData failure guard (#9140 hydration fallback depends on it)', () => {
     const guardIdx = META_REDUCERS.indexOf(loadAllDataFailureGuardMetaReducer);
-    expect(guardIdx).toBeGreaterThan(META_REDUCERS.indexOf(bulkOperationsMetaReducer));
+    expect(guardIdx).toBeGreaterThan(
+      META_REDUCERS.indexOf(solidCatalogReconciliationMetaReducer),
+    );
     // The guard must wrap every reducer that handles loadAllData — i.e. sit
     // before the Phase 3+ meta-reducers, not just anywhere in the chain.
     expect(guardIdx).toBeLessThan(META_REDUCERS.indexOf(undoTaskDeleteMetaReducer));
@@ -18,5 +21,6 @@ describe('META_REDUCERS registry', () => {
   it('keeps the hard ordering constraints intact', () => {
     expect(META_REDUCERS[0]).toBe(operationCaptureMetaReducer);
     expect(META_REDUCERS[1]).toBe(bulkOperationsMetaReducer);
+    expect(META_REDUCERS[2]).toBe(solidCatalogReconciliationMetaReducer);
   });
 });

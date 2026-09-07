@@ -12,6 +12,9 @@ import { SolidInitialUploadService } from './solid-initial-upload.service';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SnackService } from '../core/snack/snack.service';
 import { T } from '../t.const';
+import { SolidPodRefreshCoordinatorService } from './solid-pod-refresh-coordinator.service';
+import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { signal } from '@angular/core';
 
 describe('SolidDataLayerPanelComponent', () => {
   let fixture: ComponentFixture<SolidDataLayerPanelComponent>;
@@ -20,6 +23,7 @@ describe('SolidDataLayerPanelComponent', () => {
   > & { client: SolidRuntime };
   let snackService: jasmine.SpyObj<SnackService>;
   let uploadService: jasmine.SpyObj<SolidInitialUploadService>;
+  let refreshCoordinator: jasmine.SpyObj<SolidPodRefreshCoordinatorService>;
   let authState: AuthState;
 
   beforeEach(async () => {
@@ -41,6 +45,11 @@ describe('SolidDataLayerPanelComponent', () => {
       'SolidInitialUploadService',
       ['uploadCurrentDataToEmptyPod'],
     );
+    refreshCoordinator = jasmine.createSpyObj<SolidPodRefreshCoordinatorService>(
+      'SolidPodRefreshCoordinatorService',
+      ['refreshNow'],
+    );
+    refreshCoordinator.refreshNow.and.resolveTo();
 
     await TestBed.configureTestingModule({
       imports: [
@@ -52,6 +61,11 @@ describe('SolidDataLayerPanelComponent', () => {
         { provide: SolidRuntimeService, useValue: solidRuntime },
         { provide: SnackService, useValue: snackService },
         { provide: SolidInitialUploadService, useValue: uploadService },
+        { provide: SolidPodRefreshCoordinatorService, useValue: refreshCoordinator },
+        {
+          provide: SolidDataLayerStateService,
+          useValue: { phase: signal('disabled') },
+        },
       ],
     }).compileComponents();
 
@@ -121,7 +135,7 @@ describe('SolidDataLayerPanelComponent', () => {
     });
   });
 
-  it('can use an existing Pod without uploading local data first', () => {
+  it('can use an existing Pod without uploading local data first', async () => {
     const component = fixture.componentInstance;
     component.authState.set({
       status: 'authenticated',
@@ -132,6 +146,7 @@ describe('SolidDataLayerPanelComponent', () => {
     fixture.detectChanges();
 
     component.activatePod();
+    await fixture.whenStable();
 
     expect(localStorage.getItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY)).toBe('true');
     expect(localStorage.getItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY)).toBe(
@@ -139,6 +154,12 @@ describe('SolidDataLayerPanelComponent', () => {
     );
     expect(uploadService.uploadCurrentDataToEmptyPod).not.toHaveBeenCalled();
     expect(reloadFromPod).toHaveBeenCalled();
-    expect(fixture.nativeElement.textContent).toContain(T.PS.SOLID.ACTIVATE);
+    expect(fixture.nativeElement.textContent).toContain(T.PS.SOLID.RELOAD_FROM_POD);
+  });
+
+  it('refreshes Pod data in process without reloading the browser', async () => {
+    await fixture.componentInstance.reloadFromPod();
+
+    expect(refreshCoordinator.refreshNow).toHaveBeenCalledTimes(1);
   });
 });

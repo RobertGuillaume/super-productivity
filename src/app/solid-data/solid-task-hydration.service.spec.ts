@@ -40,7 +40,6 @@ import { SOLID_APP_STATE_ID, SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidBoardRepository } from './solid-board.repository';
 import { SolidGlobalConfigRepository } from './solid-global-config.repository';
-import { SolidHydrationDiscoveryService } from './solid-hydration-discovery.service';
 import {
   createSolidAppData,
   SolidTaskHydrationService,
@@ -59,6 +58,7 @@ import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
 import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
+import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 
 describe('SolidTaskHydrationService', () => {
   const TODAY = '2026-08-04';
@@ -392,7 +392,7 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.section.ids).toEqual(['section-2', 'section-1', 'section-3']);
   });
 
-  it('dispatches loadAllData with Solid task, project, tag, note, section, and issue provider data', async () => {
+  it('dispatches a complete snapshot despite malformed model and archive cache failures', async () => {
     const store = jasmine.createSpyObj<Store>('Store', ['dispatch']);
     const archiveDbAdapter = jasmine.createSpyObj<ArchiveDbAdapter>('ArchiveDbAdapter', [
       'saveArchivesAtomic',
@@ -468,11 +468,13 @@ describe('SolidTaskHydrationService', () => {
       'SolidTimeTrackingRepository',
       ['loadTimeTrackingState'],
     );
-    const hydrationDiscovery = jasmine.createSpyObj<SolidHydrationDiscoveryService>(
-      'SolidHydrationDiscoveryService',
-      ['prepare'],
+    const dataLayerState = jasmine.createSpyObj<SolidDataLayerStateService>(
+      'SolidDataLayerStateService',
+      ['addDiagnostics', 'setPhase'],
     );
-    archiveDbAdapter.saveArchivesAtomic.and.resolveTo();
+    archiveDbAdapter.saveArchivesAtomic.and.rejectWith(
+      new Error('archive cache unavailable'),
+    );
     archiveStateRepository.loadArchiveStates.and.resolveTo(
       solidRepositoryRead(archiveStates),
     );
@@ -498,7 +500,7 @@ describe('SolidTaskHydrationService', () => {
     simpleCounterRepository.loadSimpleCounters.and.resolveTo(
       solidRepositoryRead([simpleCounter]),
     );
-    metricRepository.loadMetrics.and.resolveTo(solidRepositoryRead([metric]));
+    metricRepository.loadMetrics.and.rejectWith(new TypeError('malformed metric'));
     plannerRepository.loadPlannerState.and.resolveTo(solidRepositoryRead(plannerState));
     pluginDataRepository.loadPluginUserData.and.resolveTo(
       solidRepositoryRead([pluginUserData]),
@@ -510,13 +512,12 @@ describe('SolidTaskHydrationService', () => {
     timeTrackingRepository.loadTimeTrackingState.and.resolveTo(
       solidRepositoryRead(timeTrackingState),
     );
-    hydrationDiscovery.prepare.and.resolveTo(undefined);
 
     TestBed.configureTestingModule({
       providers: [
         { provide: Store, useValue: store },
         { provide: ArchiveDbAdapter, useValue: archiveDbAdapter },
-        { provide: SolidHydrationDiscoveryService, useValue: hydrationDiscovery },
+        { provide: SolidDataLayerStateService, useValue: dataLayerState },
         { provide: SolidArchiveStateRepository, useValue: archiveStateRepository },
         { provide: SolidTaskRepository, useValue: taskRepository },
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
@@ -572,8 +573,7 @@ describe('SolidTaskHydrationService', () => {
     expect(action.appDataComplete.simpleCounter.entities['counter-1']).toEqual(
       simpleCounter,
     );
-    expect(action.appDataComplete.metric.ids).toEqual([TODAY]);
-    expect(action.appDataComplete.metric.entities[TODAY]).toEqual(metric);
+    expect(action.appDataComplete.metric.ids).toEqual([]);
     const appDataComplete = action.appDataComplete as AppDataComplete;
     expect(appDataComplete.pluginUserData).toEqual([pluginUserData]);
     expect(appDataComplete.pluginMetadata).toEqual([pluginMetadata]);
@@ -606,6 +606,8 @@ describe('SolidTaskHydrationService', () => {
     expect(metricRepository.loadMetrics).toHaveBeenCalledTimes(1);
     expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
     expect(timeTrackingRepository.loadTimeTrackingState).toHaveBeenCalledTimes(1);
-    expect(hydrationDiscovery.prepare).toHaveBeenCalledTimes(1);
+    expect(dataLayerState.addDiagnostics.calls.count()).toBe(2);
+    expect(dataLayerState.addDiagnostics).toHaveBeenCalledWith(1);
+    expect(dataLayerState.setPhase).toHaveBeenCalledWith('degraded');
   });
 });

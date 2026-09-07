@@ -36,6 +36,8 @@ import { SOLID_RUNTIME } from './solid-runtime.token';
 const PIM_STORAGE = 'http://www.w3.org/ns/pim/space#storage';
 const LDP_BASIC_CONTAINER = 'http://www.w3.org/ns/ldp#BasicContainer';
 
+export type SolidStorageRootResolution = 'unchanged' | 'changed' | 'unavailable';
+
 @Injectable({ providedIn: 'root' })
 export class SolidRuntimeService {
   private readonly runtime = inject(SOLID_RUNTIME);
@@ -129,7 +131,6 @@ export class SolidRuntimeService {
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
     this.clearLayout();
     await this.runtime.boot(options);
-    await this.bootDiscoveredStorageRoot(this.runtime.auth.state());
     this.clearLayout();
     this.ensureLayout();
   }
@@ -141,7 +142,6 @@ export class SolidRuntimeService {
       redirectUrl: window.location.href,
       ...options,
     });
-    await this.bootDiscoveredStorageRoot(state);
     this.clearLayout();
     this.ensureLayout();
     return state;
@@ -180,30 +180,53 @@ export class SolidRuntimeService {
     }
   }
 
-  private clearLayout(): void {
-    this.layout = null;
-    this.layoutPodUrl = null;
+  async ensureAppContainer(
+    containerUri: string,
+    knownExisting: ReadonlySet<string> = new Set(),
+  ): Promise<void> {
+    const podUrl = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
+    const fetchResource = this.runtime.auth.fetch();
+    const containerUris = collectContainerUris(podUrl, [containerUri]);
+
+    for (const uri of containerUris) {
+      if (!knownExisting.has(uri)) {
+        await ensureContainer(fetchResource, uri);
+      }
+    }
   }
 
-  private async bootDiscoveredStorageRoot(state: AuthState): Promise<void> {
+  /**
+   * Resolves the WebID storage root after cached catalog hydration. Profile failures are
+   * intentionally nonfatal: callers can keep displaying the currently booted catalog.
+   */
+  async resolveAuthenticatedStorageRoot(): Promise<SolidStorageRootResolution> {
+    const state = this.runtime.auth.state();
     if (state.status !== 'authenticated') {
-      return;
+      return 'unchanged';
     }
 
     const storageRoot = await this.discoverStorageRoot(state.webId);
     if (storageRoot === null) {
-      return;
+      return 'unavailable';
     }
 
     const currentPodUrl = this.runtime.diagnostics.status().podUrl;
     if (normalizeContainerUrl(currentPodUrl) === storageRoot) {
-      return;
+      return 'unchanged';
     }
 
     await this.runtime.boot({
       podUrl: storageRoot,
       fetch: this.runtime.auth.fetch(),
     });
+    this.clearLayout();
+    this.ensureLayout();
+    return 'changed';
+  }
+
+  private clearLayout(): void {
+    this.layout = null;
+    this.layoutPodUrl = null;
   }
 
   private async discoverStorageRoot(webId: string): Promise<string | null> {
@@ -221,7 +244,7 @@ export class SolidRuntimeService {
       Log.err('SolidRuntimeService: Failed to discover Solid storage root', {
         name: error instanceof Error ? error.name : 'UnknownError',
       });
-      throw error;
+      return null;
     }
   }
 }

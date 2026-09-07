@@ -82,7 +82,7 @@ describe('SolidRuntimeService', () => {
     );
   });
 
-  it('rebuilds a cached layout when session restore moves the runtime to the discovered storage root', async () => {
+  it('discovers and activates the WebID storage root after session restore', async () => {
     const service = TestBed.inject(SolidRuntimeService);
 
     await service.boot();
@@ -93,18 +93,31 @@ describe('SolidRuntimeService', () => {
     await service.restoreSession();
 
     expect(service.taskProfile.target?.containerUri).toBe(
+      'https://id.example/super-productivity/tasks/',
+    );
+    await expectAsync(service.resolveAuthenticatedStorageRoot()).toBeResolvedTo(
+      'changed',
+    );
+
+    expect(service.taskProfile.target?.containerUri).toBe(
       'https://pod.example/super-productivity/tasks/',
     );
   });
 
-  it('aborts authenticated startup when the storage profile cannot be read', async () => {
+  it('keeps the booted catalog available when the storage profile cannot be read', async () => {
     const service = TestBed.inject(SolidRuntimeService);
     profileFetchError = new Error('profile unavailable');
+    await service.restoreSession();
 
-    await expectAsync(service.restoreSession()).toBeRejectedWith(profileFetchError);
+    await expectAsync(service.resolveAuthenticatedStorageRoot()).toBeResolvedTo(
+      'unavailable',
+    );
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://id.example/super-productivity/tasks/',
+    );
   });
 
-  it('rebuilds a cached layout when boot restore moves the runtime to the discovered storage root', async () => {
+  it('does not block boot restore on WebID profile discovery', async () => {
     const service = TestBed.inject(SolidRuntimeService);
 
     await service.boot();
@@ -115,7 +128,7 @@ describe('SolidRuntimeService', () => {
     await service.boot({ restoreSession: true });
 
     expect(service.taskProfile.target?.containerUri).toBe(
-      'https://pod.example/super-productivity/tasks/',
+      'https://id.example/super-productivity/tasks/',
     );
   });
 

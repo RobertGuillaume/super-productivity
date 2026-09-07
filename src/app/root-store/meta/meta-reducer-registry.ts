@@ -18,6 +18,7 @@ import { plannerSharedMetaReducer } from './task-shared-meta-reducers/planner-sh
 import { shortSyntaxSharedMetaReducer } from './task-shared-meta-reducers/short-syntax-shared.reducer';
 import { lwwUpdateMetaReducer } from './task-shared-meta-reducers/lww-update.meta-reducer';
 import { actionLoggerReducer } from './action-logger.reducer';
+import { solidCatalogReconciliationMetaReducer } from '../../solid-data/solid-catalog-reconciliation.meta-reducer';
 
 /**
  * Meta-Reducer Registry
@@ -97,6 +98,10 @@ export const META_REDUCERS: MetaReducer[] = [
   // - Remote sync (operations from other clients)
   // Must run early so all subsequent reducers see individual actions.
   bulkOperationsMetaReducer,
+
+  // Translate post-startup Solid snapshots inside the reducer chain. Effects see only
+  // `solidCatalogReconciled`, so normal app initialization remains a one-shot lifecycle.
+  solidCatalogReconciliationMetaReducer,
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PHASE 2.5: LOAD-ALL-DATA FAILURE GUARD (#9140)
