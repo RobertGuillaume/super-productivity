@@ -110,7 +110,7 @@ describe('solidTask.mapper', () => {
         [ICAL_TASK.status]: [literal('COMPLETED')],
         [ICAL_TASK.due]: [literal(due)],
       },
-      {},
+      { title: '' },
       'https://pod.example/calendar/tasks.ttl#todo-1',
     );
 

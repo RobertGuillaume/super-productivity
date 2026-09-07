@@ -11,6 +11,7 @@ import { INBOX_PROJECT } from '../features/project/project.const';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import {
   ICAL_TASK,
+  ICAL_VTODO_CATALOG_TYPE,
   SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
   SOLID_PRODUCTIVITY_TASK_TYPE,
   SP_TASK,
@@ -96,7 +97,7 @@ describe('SolidTaskRepository', () => {
       properties: {
         [ICAL_TASK.summary]: [literal('Task from another Pod container')],
       },
-      types: ['Task'],
+      types: [ICAL_VTODO_CATALOG_TYPE],
     });
     things.query.and.resolveTo({ things: [externalThing] });
 
@@ -108,7 +109,11 @@ describe('SolidTaskRepository', () => {
     });
     expect(things.query).toHaveBeenCalledOnceWith(
       {
-        type: [SOLID_PRODUCTIVITY_TASK_TYPE, SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE],
+        type: [
+          SOLID_PRODUCTIVITY_TASK_TYPE,
+          SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
+          ICAL_VTODO_CATALOG_TYPE,
+        ],
       },
       {
         scope: { kind: 'runtime-graph' },

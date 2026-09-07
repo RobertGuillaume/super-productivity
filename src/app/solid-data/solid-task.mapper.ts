@@ -14,6 +14,7 @@ import {
 } from '../features/tasks/task.model';
 import {
   ICAL_TASK,
+  ICAL_VTODO_CATALOG_TYPE,
   SCHEMA_THING,
   SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
   SOLID_PRODUCTIVITY_TASKS_CONTAINER,
@@ -162,11 +163,12 @@ const taskToSolidDeleteProperties = (task: Task): ThingRdfPropertyInput => {
 export const solidThingToTask = (thing: Thing): Task => {
   const nativeDue = dateProp(thing, ICAL_TASK.due)?.getTime();
   const nativeStatus = stringProp(thing, ICAL_TASK.status)?.toLowerCase();
+  const nativeTitle = stringProp(thing, ICAL_TASK.summary);
   const facetStatus = thing.facets.status?.toLowerCase();
   const task: TaskCopy = {
     ...DEFAULT_TASK,
     id: stringProp(thing, SP_TASK.id) ?? thing.uri,
-    title: thing.facets.title ?? stringProp(thing, ICAL_TASK.summary) ?? '',
+    title: nonEmptyString(thing.facets.title) ?? nativeTitle ?? '',
     projectId: stringProp(thing, SP_TASK.projectId) ?? INBOX_PROJECT.id,
     isDone:
       booleanProp(thing, SP_TASK.isDone) ??
@@ -231,8 +233,15 @@ const dateProp = (thing: Thing, predicate: string): Date | undefined => {
 };
 
 export const solidTaskQuery = {
-  type: [SOLID_PRODUCTIVITY_TASK_TYPE, SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE],
+  type: [
+    SOLID_PRODUCTIVITY_TASK_TYPE,
+    SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
+    ICAL_VTODO_CATALOG_TYPE,
+  ],
 } as const;
+
+const nonEmptyString = (value: string | undefined): string | undefined =>
+  value?.trim() === '' ? undefined : value;
 
 const hideSubTasksModeProp = (
   thing: Thing,
