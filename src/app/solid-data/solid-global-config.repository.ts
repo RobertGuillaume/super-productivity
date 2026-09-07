@@ -16,14 +16,17 @@ import {
 } from './solid-global-config.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidGlobalConfigContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidGlobalConfigRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadGlobalConfig(): Promise<SolidRepositoryRead<GlobalConfigState | null>> {
     const result = await this.queryGlobalConfigThing();
@@ -37,7 +40,9 @@ export class SolidGlobalConfigRepository {
   }
 
   saveGlobalConfig(config: GlobalConfigState): Promise<GlobalConfigState> {
-    return this.writeQueue.enqueue(() => this.saveGlobalConfigNow(config));
+    return this.mutationCoordinator.run(solidMutationKey('globalConfig', 'root'), () =>
+      this.saveGlobalConfigNow(config),
+    );
   }
 
   private async saveGlobalConfigNow(

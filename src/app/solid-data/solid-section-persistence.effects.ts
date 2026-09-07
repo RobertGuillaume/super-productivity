@@ -13,7 +13,7 @@ import { selectTagById } from '../features/tag/store/tag.reducer';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
@@ -31,11 +31,12 @@ import {
   SolidSectionWorkContextAction,
 } from './solid-section-action-types';
 import { SolidSectionRepository } from './solid-section.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidTagRepository } from './solid-tag.repository';
 
 @Injectable()
 export class SolidSectionPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidAppStateRepository = inject(SolidAppStateRepository);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
@@ -78,7 +79,7 @@ export class SolidSectionPersistenceEffects {
             take(1),
             concatMap((state) =>
               from(
-                Promise.all(
+                settleSolidMutations(
                   sectionIds
                     .map((id) => {
                       const section = state.entities[id];

@@ -1,10 +1,13 @@
 import { inject, Injectable } from '@angular/core';
-import type { Thing, Unsubscribe } from '@solid-intents/runtime';
+import { RuntimeError, type Thing, type Unsubscribe } from '@solid-intents/runtime';
 import { Task } from '../features/tasks/task.model';
 import { SP_TASK } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 import {
   solidTaskQuery,
   solidThingToTask,
@@ -15,7 +18,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class SolidTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly taskThingUris = new Map<string, string>();
 
   async loadTasks(): Promise<SolidRepositoryRead<Task[]>> {
@@ -31,11 +34,25 @@ export class SolidTaskRepository {
   }
 
   saveTask(task: Task): Promise<Task> {
-    return this.writeQueue.enqueue(() => this.saveTaskNow(task));
+    return this.mutationCoordinator.run(solidMutationKey('task', task.id), () =>
+      this.saveTaskNow(task),
+    );
+  }
+
+  createTask(task: Task): Promise<Task> {
+    return this.mutationCoordinator.run(solidMutationKey('task', task.id), () =>
+      this.createTaskNow(task),
+    );
+  }
+
+  updateTask(task: Task): Promise<Task> {
+    return this.mutationCoordinator.run(solidMutationKey('task', task.id), () =>
+      this.updateTaskNow(task, this.thingUriForUpdate(task.id)),
+    );
   }
 
   deleteTask(taskId: string): Promise<void> {
-    return this.writeQueue.enqueue(async () => {
+    return this.mutationCoordinator.run(solidMutationKey('task', taskId), async () => {
       const existingThingUri = await this.findTaskThingUri(taskId);
       if (existingThingUri !== null) {
         await this.solidRuntime.client.things.delete(existingThingUri);
@@ -58,12 +75,38 @@ export class SolidTaskRepository {
     const existingThingUri = await this.findTaskThingUri(task.id);
 
     if (existingThingUri === null) {
+      return this.createTaskNow(task);
+    }
+
+    return this.updateTaskNow(task, existingThingUri);
+  }
+
+  private async createTaskNow(task: Task): Promise<Task> {
+    try {
       const created = await this.solidRuntime.client.things.create(
         taskToSolidCreateInput(task, this.solidRuntime.taskProfile),
       );
       return this.rememberTaskThing(created);
-    }
+    } catch (error) {
+      if (!isResourceAlreadyExistsError(error)) {
+        throw error;
+      }
 
+      const resourceUri = existingResourceUri(error);
+      if (resourceUri !== null) {
+        await this.solidRuntime.client.discovery.refresh({ uris: [resourceUri] });
+      }
+      const thingUri = await this.findTaskThingUri(task.id);
+      const podThing =
+        thingUri === null ? null : await this.solidRuntime.client.things.get(thingUri);
+      if (podThing === null) {
+        throw error;
+      }
+      return this.rememberTaskThing(podThing);
+    }
+  }
+
+  private async updateTaskNow(task: Task, existingThingUri: string): Promise<Task> {
     const plan = this.solidRuntime.client.writes.planUpdate(
       existingThingUri,
       taskToSolidChanges(task),
@@ -75,6 +118,22 @@ export class SolidTaskRepository {
     }
 
     return this.rememberTaskThing(commit.result);
+  }
+
+  private thingUriForUpdate(taskId: string): string {
+    const remembered = this.taskThingUris.get(taskId);
+    if (remembered !== undefined) {
+      return remembered;
+    }
+    if (isAbsoluteUri(taskId)) {
+      return taskId;
+    }
+
+    const containerUri = this.solidRuntime.taskProfile.target?.containerUri;
+    if (containerUri === undefined) {
+      throw new Error('Solid task profile has no target container');
+    }
+    return new URL(`${safeResourceName(taskId)}.ttl#it`, containerUri).toString();
   }
 
   private async findTaskThingUri(taskId: string): Promise<string | null> {
@@ -126,4 +185,23 @@ const isAbsoluteUri = (value: string): boolean => {
   } catch {
     return false;
   }
+};
+
+const safeResourceName = (value: string): string => {
+  const lastSegment = value.split(/[\\/]/u).filter(Boolean).at(-1) ?? 'thing';
+  const plainSegment = lastSegment.split(/[?#]/u)[0] ?? 'thing';
+  return (
+    plainSegment
+      .trim()
+      .replace(/[^A-Za-z0-9._-]+/gu, '-')
+      .replace(/^-+|-+$/gu, '') || 'thing'
+  ).replace(/\.ttl$/u, '');
+};
+
+const isResourceAlreadyExistsError = (error: unknown): error is RuntimeError =>
+  error instanceof RuntimeError && error.code === 'resource-already-exists';
+
+const existingResourceUri = (error: RuntimeError): string | null => {
+  const uri = error.details?.['uri'];
+  return typeof uri === 'string' ? uri : null;
 };

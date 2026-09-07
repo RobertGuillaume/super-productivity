@@ -23,14 +23,18 @@ import {
 import { SP_PLANNER_DAY, SP_PLANNER_STATE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  settleSolidMutations,
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidPlannerContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidPlannerRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadPlannerState(): Promise<SolidRepositoryRead<PlannerState>> {
     const plannerContainerScope = this.plannerContainerScope();
@@ -60,25 +64,33 @@ export class SolidPlannerRepository {
   }
 
   replacePlannerState(plannerState: PlannerState): Promise<PlannerState> {
-    return this.writeQueue.enqueue(() => this.replacePlannerStateNow(plannerState));
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+      this.replacePlannerStateNow(plannerState),
+    );
   }
 
   reconcilePlannerDays(plannerState: PlannerState): Promise<PlannerState> {
-    return this.writeQueue.enqueue(() => this.reconcilePlannerDaysNow(plannerState));
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+      this.reconcilePlannerDaysNow(plannerState),
+    );
   }
 
   savePlannerDay(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
-    return this.writeQueue.enqueue(() => this.savePlannerDayNow(plannerDay));
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+      this.savePlannerDayNow(plannerDay),
+    );
   }
 
   deletePlannerDay(day: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deletePlannerDayNow(day));
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+      this.deletePlannerDayNow(day),
+    );
   }
 
   savePlannerDialogState(
     addPlannedTasksDialogLastShown: string | undefined,
   ): Promise<void> {
-    return this.writeQueue.enqueue(() =>
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
       this.savePlannerDialogStateNow(addPlannedTasksDialogLastShown),
     );
   }
@@ -89,7 +101,7 @@ export class SolidPlannerRepository {
     const existingDays = await this.loadPlannerDays();
     const nextDays = new Set(Object.keys(plannerState.days));
 
-    await Promise.all([
+    await settleSolidMutations([
       ...existingDays
         .filter((plannerDay) => !nextDays.has(plannerDay.day))
         .map((plannerDay) => this.deletePlannerDayNow(plannerDay.day)),
@@ -138,7 +150,7 @@ export class SolidPlannerRepository {
       }
     }
 
-    await Promise.all(operations);
+    await settleSolidMutations(operations);
 
     return plannerState;
   }

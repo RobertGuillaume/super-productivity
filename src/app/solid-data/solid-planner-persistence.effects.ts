@@ -13,17 +13,18 @@ import { TODAY_TAG } from '../features/tag/tag.const';
 import { Task } from '../features/tasks/task.model';
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import { isSolidPlannerAction, SolidPlannerAction } from './solid-planner-action-types';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidTaskRepository } from './solid-task.repository';
 
 @Injectable()
 export class SolidPlannerPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidPlannerRepository = inject(SolidPlannerRepository);
@@ -73,7 +74,7 @@ export class SolidPlannerPersistenceEffects {
     const affectedTask = tasks.find((task) => task.id === plannerTaskId(action));
     const todayTag = tags.find((tag) => tag.id === TODAY_TAG.id);
 
-    await Promise.all([
+    await settleSolidMutations([
       this.solidPlannerRepository.reconcilePlannerDays(plannerState),
       ...(shouldPersistTaskAndTagSideEffects
         ? [

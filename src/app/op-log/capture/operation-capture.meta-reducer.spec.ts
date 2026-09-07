@@ -12,8 +12,12 @@ import {
 import { OperationCaptureService } from './operation-capture.service';
 import { Action } from '@ngrx/store';
 import { PersistentAction } from '../core/persistent-action.interface';
-import { EntityType, OpType } from '../core/operation.types';
+import { ActionType, EntityType, OpType } from '../core/operation.types';
 import { RootState } from '../../root-store/root-state';
+import {
+  SOLID_DATA_LAYER_ENABLED_STORAGE_KEY,
+  SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY,
+} from '../../solid-data/solid-data-layer-feature-flag';
 
 describe('operationCaptureMetaReducer', () => {
   let mockCaptureService: jasmine.SpyObj<OperationCaptureService>;
@@ -65,12 +69,16 @@ describe('operationCaptureMetaReducer', () => {
     // Reset sync state and deferred buffer to prevent test pollution
     setIsApplyingRemoteOps(false);
     clearDeferredActions();
+    localStorage.removeItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY);
+    localStorage.removeItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY);
   });
 
   afterEach(() => {
     // Ensure sync state and deferred buffer are reset after each test
     setIsApplyingRemoteOps(false);
     clearDeferredActions();
+    localStorage.removeItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY);
+    localStorage.removeItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY);
   });
 
   describe('setOperationCaptureService', () => {
@@ -141,6 +149,19 @@ describe('operationCaptureMetaReducer', () => {
       const action = createNonPersistentAction();
 
       wrappedReducer(mockState, action);
+
+      expect(mockCaptureService.incrementPending).not.toHaveBeenCalled();
+    });
+
+    it('does not capture Solid-owned actions while primary mode is offline', () => {
+      localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
+      localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
+      const wrappedReducer = operationCaptureMetaReducer(mockReducer);
+
+      wrappedReducer(
+        mockState,
+        createMockAction({ type: ActionType.TASK_SHARED_UPDATE }),
+      );
 
       expect(mockCaptureService.incrementPending).not.toHaveBeenCalled();
     });

@@ -18,7 +18,7 @@ import { updateTagOrder } from '../features/tag/store/tag.actions';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
@@ -26,7 +26,7 @@ import { SolidProjectRepository } from './solid-project.repository';
 
 @Injectable()
 export class SolidAppStatePersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidAppStateRepository = inject(SolidAppStateRepository);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);

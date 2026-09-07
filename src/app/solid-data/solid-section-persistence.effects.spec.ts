@@ -19,7 +19,7 @@ import { DEFAULT_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { selectTagById } from '../features/tag/store/tag.reducer';
 import { WorkContextType } from '../features/work-context/work-context.model';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidProjectRepository } from './solid-project.repository';
@@ -73,7 +73,7 @@ describe('SolidSectionPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidSectionPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidAppStateRepository, useValue: solidAppStateRepository },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidProjectRepository, useValue: solidProjectRepository },

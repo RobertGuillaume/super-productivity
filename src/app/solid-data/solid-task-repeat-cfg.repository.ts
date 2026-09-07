@@ -10,14 +10,17 @@ import {
 } from './solid-task-repeat-cfg.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidTaskRepeatCfgContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidTaskRepeatCfgRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadTaskRepeatCfgs(): Promise<SolidRepositoryRead<TaskRepeatCfg[]>> {
     const taskRepeatCfgContainerScope = this.taskRepeatCfgContainerScope();
@@ -34,11 +37,17 @@ export class SolidTaskRepeatCfgRepository {
   }
 
   saveTaskRepeatCfg(taskRepeatCfg: TaskRepeatCfg): Promise<TaskRepeatCfg> {
-    return this.writeQueue.enqueue(() => this.saveTaskRepeatCfgNow(taskRepeatCfg));
+    return this.mutationCoordinator.run(
+      solidMutationKey('taskRepeatCfg', taskRepeatCfg.id),
+      () => this.saveTaskRepeatCfgNow(taskRepeatCfg),
+    );
   }
 
   deleteTaskRepeatCfg(taskRepeatCfgId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteTaskRepeatCfgNow(taskRepeatCfgId));
+    return this.mutationCoordinator.run(
+      solidMutationKey('taskRepeatCfg', taskRepeatCfgId),
+      () => this.deleteTaskRepeatCfgNow(taskRepeatCfgId),
+    );
   }
 
   private async saveTaskRepeatCfgNow(

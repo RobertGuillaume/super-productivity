@@ -10,7 +10,7 @@ import {
   updateNote,
 } from '../features/note/store/note.actions';
 import { selectNoteById } from '../features/note/store/note.reducer';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidNotePersistenceEffects } from './solid-note-persistence.effects';
 import { SolidNoteRepository } from './solid-note.repository';
@@ -46,7 +46,7 @@ describe('SolidNotePersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidNotePersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidNoteRepository, useValue: solidNoteRepository },
         { provide: SnackService, useValue: snackService },

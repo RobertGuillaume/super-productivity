@@ -10,14 +10,17 @@ import {
 } from './solid-metric.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidMetricContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidMetricRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadMetrics(): Promise<SolidRepositoryRead<Metric[]>> {
     const metricContainerScope = this.metricContainerScope();
@@ -34,11 +37,15 @@ export class SolidMetricRepository {
   }
 
   saveMetric(metric: Metric): Promise<Metric> {
-    return this.writeQueue.enqueue(() => this.saveMetricNow(metric));
+    return this.mutationCoordinator.run(solidMutationKey('metric', metric.id), () =>
+      this.saveMetricNow(metric),
+    );
   }
 
   deleteMetric(metricId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteMetricNow(metricId));
+    return this.mutationCoordinator.run(solidMutationKey('metric', metricId), () =>
+      this.deleteMetricNow(metricId),
+    );
   }
 
   private async saveMetricNow(metric: Metric): Promise<Metric> {

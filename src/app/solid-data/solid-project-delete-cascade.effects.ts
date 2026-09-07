@@ -15,10 +15,11 @@ import { Tag } from '../features/tag/tag.model';
 import { selectAllTags } from '../features/tag/store/tag.reducer';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidNoteRepository } from './solid-note.repository';
 import {
   isSolidProjectDeleteAction,
@@ -31,7 +32,7 @@ import { SolidTaskRepository } from './solid-task.repository';
 
 @Injectable()
 export class SolidProjectDeleteCascadeEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidAppStateRepository = inject(SolidAppStateRepository);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
@@ -84,7 +85,7 @@ export class SolidProjectDeleteCascadeEffects {
       )
       .map((section) => section.id);
 
-    await Promise.all([
+    await settleSolidMutations([
       this.solidProjectRepository.deleteProject(action.projectId),
       ...action.allTaskIds.map((taskId) => this.solidTaskRepository.deleteTask(taskId)),
       ...action.noteIds.map((noteId) => this.solidNoteRepository.deleteNote(noteId)),

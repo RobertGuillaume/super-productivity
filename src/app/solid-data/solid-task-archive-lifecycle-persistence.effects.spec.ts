@@ -14,7 +14,7 @@ import { DEFAULT_TASK, Task, TaskWithSubTasks } from '../features/tasks/task.mod
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidProjectRepository } from './solid-project.repository';
@@ -131,7 +131,7 @@ describe('SolidTaskArchiveLifecyclePersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidTaskArchiveLifecyclePersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         {
           provide: SolidArchivedTaskRepository,
           useValue: solidArchivedTaskRepository,

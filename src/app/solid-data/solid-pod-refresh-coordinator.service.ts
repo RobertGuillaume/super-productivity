@@ -8,6 +8,8 @@ import type {
 import { Log } from '../core/log';
 import { isSolidDataLayerPrimaryEnabled } from './solid-data-layer-feature-flag';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { SolidMutationCoordinator } from './solid-mutation-coordinator.service';
+import { SolidContainerKey } from './solid-persistent-action-ownership';
 import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
@@ -23,17 +25,24 @@ export class SolidPodRefreshCoordinatorService {
   private readonly dataLayerState = inject(SolidDataLayerStateService);
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly hydration = inject(SolidTaskHydrationService);
+  private readonly mutations = inject(SolidMutationCoordinator);
 
   private startPromise: Promise<void> | null = null;
   private refreshPromise: Promise<void> | null = null;
-  private reconciliationTail: Promise<void> = Promise.resolve();
+  private reconciliationPromise: Promise<void> | null = null;
+  private reconciliationRequested = false;
   private reconciliationTimer: ReturnType<typeof setTimeout> | null = null;
   private subscriptions: Unsubscribe[] = [];
   private knownContainers = new Set<string>();
   private started = false;
   private firstRefreshedEntityLogged = false;
+  private rootVerified = false;
+  private lastRefreshHadAuthoritativeData = false;
 
   constructor() {
+    this.dataLayerState.registerMutationRecoveryHandler(() =>
+      this.recoverRejectedMutation(),
+    );
     const handleOnline = (): void => {
       if (this.started) {
         void this.refreshNow();
@@ -76,10 +85,20 @@ export class SolidPodRefreshCoordinatorService {
       return Promise.resolve();
     }
 
-    this.refreshPromise = this.refreshCatalog(false).finally(() => {
+    this.refreshPromise = this.refreshManually().finally(() => {
       this.refreshPromise = null;
     });
     return this.refreshPromise;
+  }
+
+  async recoverRejectedMutation(): Promise<void> {
+    await this.mutations.whenIdle();
+    await this.refreshNow();
+    if (!this.lastRefreshHadAuthoritativeData) {
+      await this.hydration.restoreLastPublishedSnapshot();
+      this.dataLayerState.clearWriteReadiness();
+      this.dataLayerState.setPhase('degraded');
+    }
   }
 
   private async startInternal(): Promise<void> {
@@ -92,10 +111,12 @@ export class SolidPodRefreshCoordinatorService {
       return;
     }
 
+    this.dataLayerState.clearWriteReadiness();
     let rootUnavailable = false;
     try {
       const resolution = await this.solidRuntime.resolveAuthenticatedStorageRoot();
       rootUnavailable = resolution === 'unavailable';
+      this.rootVerified = !rootUnavailable;
       if (resolution === 'changed') {
         this.stopSubscriptions();
         this.knownContainers.clear();
@@ -103,6 +124,7 @@ export class SolidPodRefreshCoordinatorService {
       }
     } catch (error) {
       rootUnavailable = true;
+      this.rootVerified = false;
       this.dataLayerState.addDiagnostics();
       Log.err('Solid storage root activation failed', safeError('root-discovery', error));
     }
@@ -115,24 +137,50 @@ export class SolidPodRefreshCoordinatorService {
     await this.refreshPromise;
   }
 
+  private async refreshManually(): Promise<void> {
+    if (!this.rootVerified) {
+      try {
+        const resolution = await this.solidRuntime.resolveAuthenticatedStorageRoot();
+        this.rootVerified = resolution !== 'unavailable';
+        if (resolution === 'changed') {
+          this.stopSubscriptions();
+          this.knownContainers.clear();
+          this.dataLayerState.clearWriteReadiness();
+          await this.hydration.reconcileStore();
+          this.installSubscriptions();
+        }
+      } catch (error) {
+        this.rootVerified = false;
+        this.dataLayerState.addDiagnostics();
+        Log.err('Solid storage root refresh failed', safeError('root-discovery', error));
+      }
+    }
+    await this.refreshCatalog(!this.rootVerified);
+  }
+
   private async refreshCatalog(initiallyDegraded: boolean): Promise<void> {
     const startedAt = performance.now();
     const containers = orderedContainers(this.solidRuntime.ensureLayout());
     let isDegraded = initiallyDegraded;
+    let successfulContainerCount = 0;
+    this.lastRefreshHadAuthoritativeData = false;
 
     this.dataLayerState.setRefreshProgress({
       completedContainers: 0,
       totalContainers: containers.length,
     });
 
-    for (const [index, containerUri] of containers.entries()) {
+    for (const [index, [containerKey, containerUri]] of containers.entries()) {
       try {
         const listing = await this.listProvisionedContainer(containerUri);
         if (listing.status === 'ok' || listing.status === 'not-modified') {
           this.knownContainers.add(containerUri);
           await this.refreshListingResources(listing);
+          successfulContainerCount++;
+          this.dataLayerState.setContainerWriteReady(containerKey, !initiallyDegraded);
         } else {
           isDegraded = true;
+          this.dataLayerState.setContainerWriteReady(containerKey, false);
           this.dataLayerState.addDiagnostics();
           Log.err('Solid container refresh unavailable', {
             operation: 'list-container',
@@ -142,6 +190,7 @@ export class SolidPodRefreshCoordinatorService {
         }
       } catch (error) {
         isDegraded = true;
+        this.dataLayerState.setContainerWriteReady(containerKey, false);
         this.dataLayerState.addDiagnostics();
         Log.err('Solid container refresh failed', safeError('list-container', error));
       }
@@ -162,6 +211,8 @@ export class SolidPodRefreshCoordinatorService {
       Log.err('Solid native task discovery failed', safeError('discover-type', error));
     }
 
+    this.lastRefreshHadAuthoritativeData =
+      this.rootVerified && successfulContainerCount > 0;
     this.dataLayerState.setPhase(isDegraded ? 'degraded' : 'ready');
     Log.normal(
       `Solid Pod refresh completed in ${Math.round(performance.now() - startedAt)}ms ` +
@@ -266,16 +317,27 @@ export class SolidPodRefreshCoordinatorService {
   }
 
   private enqueueReconciliation(): Promise<void> {
-    this.reconciliationTail = this.reconciliationTail
-      .catch(() => undefined)
-      .then(async () => {
-        await this.hydration.reconcileStore();
-      });
-    return this.reconciliationTail;
+    this.reconciliationRequested = true;
+    if (this.reconciliationPromise !== null) {
+      return this.reconciliationPromise;
+    }
+
+    this.reconciliationPromise = this.drainReconciliations().finally(() => {
+      this.reconciliationPromise = null;
+    });
+    return this.reconciliationPromise;
+  }
+
+  private async drainReconciliations(): Promise<void> {
+    while (this.reconciliationRequested) {
+      this.reconciliationRequested = false;
+      await this.mutations.whenIdle();
+      await this.hydration.reconcileStore();
+    }
   }
 }
 
-const orderedContainers = (layout: RuntimeLayout): string[] => {
+const orderedContainers = (layout: RuntimeLayout): Array<[SolidContainerKey, string]> => {
   const entries = Object.entries(layout.containers);
   const priority = new Map<string, number>(
     PRIORITY_CONTAINER_KEYS.map((key, index) => [key, index]),
@@ -286,7 +348,7 @@ const orderedContainers = (layout: RuntimeLayout): string[] => {
         (priority.get(left) ?? PRIORITY_CONTAINER_KEYS.length) -
         (priority.get(right) ?? PRIORITY_CONTAINER_KEYS.length),
     )
-    .map(([, containerUri]) => containerUri);
+    .map(([key, containerUri]) => [key as SolidContainerKey, containerUri]);
 };
 
 const isDiscoverySettled = (status: DiscoveryStatus): boolean =>

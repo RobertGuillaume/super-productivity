@@ -11,8 +11,9 @@ import {
 } from '../features/boards/store/boards.actions';
 import { selectBoardsState } from '../features/boards/store/boards.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidBoardRepository } from './solid-board.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
@@ -29,7 +30,7 @@ interface OrderedBoard {
 
 @Injectable()
 export class SolidBoardPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidBoardRepository = inject(SolidBoardRepository);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
@@ -48,7 +49,7 @@ export class SolidBoardPersistenceEffects {
           this.boardsForSaveAction(action).pipe(
             concatMap((boards) =>
               from(
-                Promise.all(
+                settleSolidMutations(
                   boards.map((board) =>
                     this.solidBoardRepository.saveBoard(board.board, board.order),
                   ),

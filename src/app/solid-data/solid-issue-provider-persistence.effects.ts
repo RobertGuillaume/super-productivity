@@ -10,7 +10,7 @@ import { selectIssueProviderState } from '../features/issue/store/issue-provider
 import { selectTasksById } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
@@ -20,11 +20,12 @@ import {
   SolidIssueProviderSaveAction,
 } from './solid-issue-provider-action-types';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidTaskRepository } from './solid-task.repository';
 
 @Injectable()
 export class SolidIssueProviderPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidIssueProviderRepository = inject(SolidIssueProviderRepository);
@@ -45,7 +46,7 @@ export class SolidIssueProviderPersistenceEffects {
             take(1),
             concatMap((state) =>
               from(
-                Promise.all(
+                settleSolidMutations(
                   this.issueProvidersForSaveAction(action, state.ids as string[])
                     .map((id) => state.entities[id])
                     .filter(
@@ -81,7 +82,7 @@ export class SolidIssueProviderPersistenceEffects {
             take(1),
             concatMap((tasks) =>
               from(
-                Promise.all([
+                settleSolidMutations([
                   ...this.issueProviderIdsForDeleteAction(action).map((id) =>
                     this.solidIssueProviderRepository.deleteIssueProvider(id),
                   ),

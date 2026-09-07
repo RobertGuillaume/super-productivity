@@ -10,7 +10,7 @@ import { TimeTrackingState } from '../features/time-tracking/time-tracking.model
 import { initialTimeTrackingState } from '../features/time-tracking/store/time-tracking.reducer';
 import { Task, TaskArchive } from '../features/tasks/task.model';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidArchiveStateRepository } from './solid-archive-state.repository';
 import {
   isSolidArchiveStatePersistenceTrigger,
@@ -22,12 +22,13 @@ import { SolidArchivedTask, SolidArchiveBucket } from './solid-archived-task.map
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 import { SnackService } from '../core/snack/snack.service';
 
 @Injectable()
 export class SolidArchiveStatePersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly archiveDbAdapter = inject(ArchiveDbAdapter);
   private readonly solidArchiveStateRepository = inject(SolidArchiveStateRepository);
   private readonly solidArchivedTaskRepository = inject(SolidArchivedTaskRepository);
@@ -78,7 +79,7 @@ export class SolidArchiveStatePersistenceEffects {
       ...archivedTasksFromArchiveModel(old, 'old'),
     ];
 
-    await Promise.all([
+    await settleSolidMutations([
       this.solidArchiveStateRepository.saveArchiveState(
         this.solidArchiveStateRepository.archiveModelToSolidArchiveState('young', young),
       ),

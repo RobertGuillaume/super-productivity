@@ -3233,7 +3233,9 @@
       "TITLE": "Your Solid Pod",
       "UPLOAD_CURRENT_DATA": "Upload current data",
       "UPLOAD_SUCCESS": "Solid upload complete",
-      "USE_LOCAL_DATA": "Use local data"
+      "USE_LOCAL_DATA": "Use local data",
+      "WRITE_NOT_READY": "This change was not applied because its Pod location is not ready for writing.",
+      "WRITE_RESTORED": "The change was not saved. The Pod-backed version has been restored."
     },
     "SYNC_EXPORT": "Sync & Export",
     "TABS": {

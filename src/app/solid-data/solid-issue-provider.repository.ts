@@ -11,14 +11,17 @@ import {
 } from './solid-issue-provider.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidIssueProviderContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidIssueProviderRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadIssueProviders(): Promise<SolidRepositoryRead<IssueProvider[]>> {
     const issueProviderContainerScope = this.issueProviderContainerScope();
@@ -38,11 +41,17 @@ export class SolidIssueProviderRepository {
   }
 
   saveIssueProvider(issueProvider: IssueProvider, order = 0): Promise<IssueProvider> {
-    return this.writeQueue.enqueue(() => this.saveIssueProviderNow(issueProvider, order));
+    return this.mutationCoordinator.run(
+      solidMutationKey('issueProvider', issueProvider.id),
+      () => this.saveIssueProviderNow(issueProvider, order),
+    );
   }
 
   deleteIssueProvider(issueProviderId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteIssueProviderNow(issueProviderId));
+    return this.mutationCoordinator.run(
+      solidMutationKey('issueProvider', issueProviderId),
+      () => this.deleteIssueProviderNow(issueProviderId),
+    );
   }
 
   private async saveIssueProviderNow(

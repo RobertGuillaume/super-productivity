@@ -13,7 +13,7 @@ import { selectAllTags } from '../features/tag/store/tag.reducer';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { selectNoteTodayOrder } from '../features/note/store/note.reducer';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidNoteRepository } from './solid-note.repository';
@@ -106,7 +106,7 @@ describe('SolidProjectDeleteCascadeEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidProjectDeleteCascadeEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidAppStateRepository, useValue: solidAppStateRepository },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidNoteRepository, useValue: solidNoteRepository },

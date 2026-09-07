@@ -14,7 +14,7 @@ import {
 import { selectNoteById } from '../features/note/store/note.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidNoteRepository } from './solid-note.repository';
@@ -25,7 +25,7 @@ type SolidNoteUpdateAction =
 
 @Injectable()
 export class SolidNotePersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidNoteRepository = inject(SolidNoteRepository);

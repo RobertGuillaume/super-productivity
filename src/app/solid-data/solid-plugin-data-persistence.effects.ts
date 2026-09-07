@@ -13,7 +13,7 @@ import {
 import { selectPluginMetadataFeatureState } from '../plugins/store/plugin-metadata.reducer';
 import { selectPluginUserDataFeatureState } from '../plugins/store/plugin-user-data.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
@@ -26,7 +26,7 @@ import { SolidPluginDataRepository } from './solid-plugin-data.repository';
 
 @Injectable()
 export class SolidPluginDataPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidPluginDataRepository = inject(SolidPluginDataRepository);

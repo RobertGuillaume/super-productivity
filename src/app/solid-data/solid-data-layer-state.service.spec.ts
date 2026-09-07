@@ -83,6 +83,8 @@ import {
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidSessionRecoveryService } from './solid-session-recovery.service';
+import { SnackService } from '../core/snack/snack.service';
+import { resetSolidMutationGuard } from './solid-mutation-guard.meta-reducer';
 
 describe('SolidDataLayerStateService', () => {
   let authState: AuthState;
@@ -108,6 +110,10 @@ describe('SolidDataLayerStateService', () => {
           },
         },
         { provide: SolidSessionRecoveryService, useValue: sessionRecovery },
+        {
+          provide: SnackService,
+          useValue: jasmine.createSpyObj('SnackService', ['open']),
+        },
       ],
     });
   });
@@ -115,6 +121,7 @@ describe('SolidDataLayerStateService', () => {
   afterEach(() => {
     localStorage.removeItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY);
     localStorage.removeItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY);
+    resetSolidMutationGuard();
     TestBed.resetTestingModule();
   });
 
@@ -143,7 +150,7 @@ describe('SolidDataLayerStateService', () => {
     expect(sessionRecovery.handleAuthenticationError).toHaveBeenCalledOnceWith(error);
   });
 
-  it('owns Solid-backed write actions only while active', () => {
+  it('keeps Solid ownership while offline and gates application on readiness', () => {
     const service = TestBed.inject(SolidDataLayerStateService);
     const task: Task = {
       ...DEFAULT_TASK,
@@ -197,9 +204,17 @@ describe('SolidDataLayerStateService', () => {
 
     localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
     localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
-    authState = { status: 'authenticated', webId: 'https://user.example/#me' };
 
     expect(service.ownsPersistentAction(action)).toBe(true);
+    expect(service.canApplyPersistentAction(action)).toBe(false);
+
+    authState = { status: 'authenticated', webId: 'https://user.example/#me' };
+    service.setContainerWriteReady('tasks', true);
+    service.setContainerWriteReady('projects', true);
+    service.setContainerWriteReady('tags', true);
+    service.setContainerWriteReady('planner', true);
+    service.setContainerWriteReady('app', true);
+    expect(service.canApplyPersistentAction(action)).toBe(true);
     expect(service.ownsPersistentAction(addBoard({ board }) as PersistentAction)).toBe(
       true,
     );

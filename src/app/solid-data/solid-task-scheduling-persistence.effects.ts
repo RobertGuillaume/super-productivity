@@ -11,7 +11,7 @@ import { Task } from '../features/tasks/task.model';
 import { selectTasksById } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -20,10 +20,11 @@ import {
   SolidTaskSchedulingAction,
 } from './solid-task-scheduling-action-types';
 import { SolidTaskRepository } from './solid-task.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 
 @Injectable()
 export class SolidTaskSchedulingPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidTagRepository = inject(SolidTagRepository);
@@ -46,7 +47,7 @@ export class SolidTaskSchedulingPersistenceEffects {
           }).pipe(
             concatMap(({ task, todayTag }) =>
               from(
-                Promise.all([
+                settleSolidMutations([
                   this.solidTaskRepository.saveTask(task),
                   this.solidTagRepository.saveTag(todayTag),
                 ]),

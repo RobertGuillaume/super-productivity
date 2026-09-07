@@ -14,14 +14,17 @@ import {
 } from './solid-archive-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidArchiveStateContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidArchiveStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadArchiveStates(): Promise<
     SolidRepositoryRead<{
@@ -53,7 +56,10 @@ export class SolidArchiveStateRepository {
   }
 
   saveArchiveState(archiveState: SolidArchiveState): Promise<SolidArchiveState> {
-    return this.writeQueue.enqueue(() => this.saveArchiveStateNow(archiveState));
+    return this.mutationCoordinator.run(
+      solidMutationKey('archiveState', archiveState.bucket),
+      () => this.saveArchiveStateNow(archiveState),
+    );
   }
 
   private async saveArchiveStateNow(

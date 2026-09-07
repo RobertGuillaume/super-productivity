@@ -11,14 +11,18 @@ import {
 } from './solid-simple-counter.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  settleSolidMutations,
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidSimpleCounterContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidSimpleCounterRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadSimpleCounters(): Promise<SolidRepositoryRead<SimpleCounter[]>> {
     const simpleCounterContainerScope = this.simpleCounterContainerScope();
@@ -38,17 +42,23 @@ export class SolidSimpleCounterRepository {
   }
 
   saveSimpleCounter(simpleCounter: SimpleCounter, order = 0): Promise<SimpleCounter> {
-    return this.writeQueue.enqueue(() => this.saveSimpleCounterNow(simpleCounter, order));
+    return this.mutationCoordinator.run(solidMutationKey('simpleCounter', '*'), () =>
+      this.saveSimpleCounterNow(simpleCounter, order),
+    );
   }
 
   replaceSimpleCounters(
     simpleCounters: readonly SimpleCounter[],
   ): Promise<SimpleCounter[]> {
-    return this.writeQueue.enqueue(() => this.replaceSimpleCountersNow(simpleCounters));
+    return this.mutationCoordinator.run(solidMutationKey('simpleCounter', '*'), () =>
+      this.replaceSimpleCountersNow(simpleCounters),
+    );
   }
 
   deleteSimpleCounter(simpleCounterId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteSimpleCounterNow(simpleCounterId));
+    return this.mutationCoordinator.run(solidMutationKey('simpleCounter', '*'), () =>
+      this.deleteSimpleCounterNow(simpleCounterId),
+    );
   }
 
   private async saveSimpleCounterNow(
@@ -89,14 +99,14 @@ export class SolidSimpleCounterRepository {
     const existingThings = await this.querySimpleCounterThings();
     const nextIds = new Set(simpleCounters.map((simpleCounter) => simpleCounter.id));
 
-    await Promise.all(
+    await settleSolidMutations(
       existingThings
         .map(solidThingToSimpleCounter)
         .filter((simpleCounter) => !nextIds.has(simpleCounter.id))
         .map((simpleCounter) => this.deleteSimpleCounterNow(simpleCounter.id)),
     );
 
-    return Promise.all(
+    return settleSolidMutations(
       simpleCounters.map((simpleCounter, order) =>
         this.saveSimpleCounterNow(simpleCounter, order),
       ),

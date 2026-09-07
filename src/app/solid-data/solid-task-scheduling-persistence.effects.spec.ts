@@ -8,7 +8,7 @@ import { selectTagById } from '../features/tag/store/tag.reducer';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { selectTasksById } from '../features/tasks/store/task.selectors';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskSchedulingPersistenceEffects } from './solid-task-scheduling-persistence.effects';
@@ -54,7 +54,7 @@ describe('SolidTaskSchedulingPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidTaskSchedulingPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidTagRepository, useValue: solidTagRepository },
         { provide: SolidTaskRepository, useValue: solidTaskRepository },

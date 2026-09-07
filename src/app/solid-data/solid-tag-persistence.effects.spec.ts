@@ -12,7 +12,7 @@ import {
   updateTag,
 } from '../features/tag/store/tag.actions';
 import { selectTagById } from '../features/tag/store/tag.reducer';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidTagPersistenceEffects } from './solid-tag-persistence.effects';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -47,7 +47,7 @@ describe('SolidTagPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidTagPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidTagRepository, useValue: solidTagRepository },
         { provide: SnackService, useValue: snackService },

@@ -4,7 +4,10 @@ import { Tag } from '../features/tag/tag.model';
 import { SP_TAG } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 import {
   solidTagQuery,
   solidThingToTag,
@@ -17,7 +20,7 @@ type SolidTagContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 @Injectable({ providedIn: 'root' })
 export class SolidTagRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadTags(): Promise<SolidRepositoryRead<Tag[]>> {
     const tagContainerScope = this.tagContainerScope();
@@ -31,11 +34,15 @@ export class SolidTagRepository {
   }
 
   saveTag(tag: Tag): Promise<Tag> {
-    return this.writeQueue.enqueue(() => this.saveTagNow(tag));
+    return this.mutationCoordinator.run(solidMutationKey('tag', tag.id), () =>
+      this.saveTagNow(tag),
+    );
   }
 
   deleteTag(tagId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteTagNow(tagId));
+    return this.mutationCoordinator.run(solidMutationKey('tag', tagId), () =>
+      this.deleteTagNow(tagId),
+    );
   }
 
   private async saveTagNow(tag: Tag): Promise<Tag> {

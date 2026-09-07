@@ -12,7 +12,7 @@ import {
   updateProject,
 } from '../features/project/store/project.actions';
 import { selectProjectById } from '../features/project/store/project.selectors';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidProjectPersistenceEffects } from './solid-project-persistence.effects';
 import { SolidProjectRepository } from './solid-project.repository';
@@ -46,7 +46,7 @@ describe('SolidProjectPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidProjectPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidProjectRepository, useValue: solidProjectRepository },
         { provide: SnackService, useValue: snackService },

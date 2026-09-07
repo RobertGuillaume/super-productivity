@@ -6,6 +6,11 @@ import {
 import { OperationCaptureService } from './operation-capture.service';
 import { OpLog } from '../../core/log';
 import { devError } from '../../util/dev-error';
+import {
+  isSolidDataLayerEnabled,
+  isSolidDataLayerPrimaryEnabled,
+} from '../../solid-data/solid-data-layer-feature-flag';
+import { SOLID_OWNED_PERSISTENT_ACTION_TYPES } from '../../solid-data/solid-persistent-action-ownership';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ARCHITECTURAL DEBT: Module-Level State for Meta-Reducer Service Injection
@@ -243,7 +248,11 @@ export const operationCaptureMetaReducer = <S, A extends Action = Action>(
     const afterState = reducer(state, action);
 
     // Only process persistent, non-remote actions
-    if (isPersistentAction(action) && !(action as PersistentAction).meta.isRemote) {
+    if (
+      isPersistentAction(action) &&
+      !(action as PersistentAction).meta.isRemote &&
+      !isSolidOwnedPersistentAction(action)
+    ) {
       // Buffer actions during sync replay - they'll be processed after sync completes
       // with fresh vector clocks that include the newly-applied remote operations.
       // This prevents superseded operations that would immediately conflict.
@@ -306,3 +315,8 @@ export const operationCaptureMetaReducer = <S, A extends Action = Action>(
     return afterState;
   };
 };
+
+const isSolidOwnedPersistentAction = (action: PersistentAction): boolean =>
+  isSolidDataLayerEnabled() &&
+  isSolidDataLayerPrimaryEnabled() &&
+  SOLID_OWNED_PERSISTENT_ACTION_TYPES.has(action.type);

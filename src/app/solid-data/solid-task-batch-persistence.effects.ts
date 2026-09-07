@@ -15,10 +15,11 @@ import { Task } from '../features/tasks/task.model';
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidProjectRepository } from './solid-project.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
 import {
@@ -29,7 +30,7 @@ import { SolidTaskRepository } from './solid-task.repository';
 
 @Injectable()
 export class SolidTaskBatchPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidProjectRepository = inject(SolidProjectRepository);
@@ -71,7 +72,7 @@ export class SolidTaskBatchPersistenceEffects {
     tags: readonly Tag[],
     sections: readonly Section[],
   ): Promise<void> {
-    await Promise.all([
+    await settleSolidMutations([
       ...this.deletedTaskIdsForAction(action).map((taskId) =>
         this.solidTaskRepository.deleteTask(taskId),
       ),

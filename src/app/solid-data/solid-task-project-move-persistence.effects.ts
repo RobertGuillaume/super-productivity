@@ -11,7 +11,7 @@ import { selectAllSections } from '../features/section/store/section.selectors';
 import { Task } from '../features/tasks/task.model';
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidProjectRepository } from './solid-project.repository';
@@ -20,11 +20,12 @@ import {
   SolidTaskProjectMoveAction,
 } from './solid-task-project-move-action-types';
 import { SolidSectionRepository } from './solid-section.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidTaskRepository } from './solid-task.repository';
 
 @Injectable()
 export class SolidTaskProjectMovePersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidProjectRepository = inject(SolidProjectRepository);
@@ -71,7 +72,7 @@ export class SolidTaskProjectMovePersistenceEffects {
         payloadSubTaskIds.includes(task.id),
     );
 
-    await Promise.all([
+    await settleSolidMutations([
       ...movedTasks.map((task) => this.solidTaskRepository.saveTask(task)),
       ...projects.map((project) => this.solidProjectRepository.saveProject(project)),
       ...sections.map((section) => this.solidSectionRepository.saveSection(section)),

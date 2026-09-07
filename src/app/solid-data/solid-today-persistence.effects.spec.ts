@@ -9,7 +9,7 @@ import { DEFAULT_TAG, TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { selectTagById } from '../features/tag/store/tag.reducer';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
@@ -54,7 +54,7 @@ describe('SolidTodayPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidTodayPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidTagRepository, useValue: solidTagRepository },
         { provide: SolidTaskRepository, useValue: solidTaskRepository },

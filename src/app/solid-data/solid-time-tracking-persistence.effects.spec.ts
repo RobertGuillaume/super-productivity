@@ -9,7 +9,7 @@ import {
 import { selectTimeTrackingState } from '../features/time-tracking/store/time-tracking.selectors';
 import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
 import { WorkContextType } from '../features/work-context/work-context.model';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { timeTrackingEntryId } from './solid-time-tracking.mapper';
 import { SolidTimeTrackingPersistenceEffects } from './solid-time-tracking-persistence.effects';
@@ -58,7 +58,7 @@ describe('SolidTimeTrackingPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidTimeTrackingPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidTimeTrackingRepository, useValue: solidTimeTrackingRepository },
         { provide: SnackService, useValue: snackService },

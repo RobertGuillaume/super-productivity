@@ -5,7 +5,7 @@ import type {
   Thing,
   ThingView,
 } from '@solid-intents/runtime';
-import { SolidGraphRuntime } from '@solid-intents/runtime';
+import { RuntimeError, SolidGraphRuntime } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
@@ -237,6 +237,63 @@ describe('SolidTaskRepository', () => {
       createdThing.uri,
       jasmine.any(Object),
     );
+  });
+
+  it('updates the deterministic app Thing URI without treating an incomplete query as absence', async () => {
+    const updatedThing = createThing('Updated without a lookup');
+    const plan = {
+      version: 1,
+      id: 'write-plan-direct-update',
+      kind: 'thing.update',
+      request: {
+        kind: 'thing.update',
+        uri: updatedThing.uri,
+        changes: {},
+      },
+      operations: [],
+      affectedResources: [],
+      preconditions: [],
+      diagnostics: [],
+    } as RuntimeWritePlan;
+    writes.planUpdate.and.returnValue(plan);
+    writes.commit.and.resolveTo({
+      planId: plan.id,
+      kind: 'thing.update',
+      result: updatedThing,
+    });
+
+    await TestBed.inject(SolidTaskRepository).updateTask(task);
+
+    expect(things.query).not.toHaveBeenCalled();
+    expect(things.create).not.toHaveBeenCalled();
+    expect(writes.planUpdate).toHaveBeenCalledOnceWith(
+      'https://pod.example/super-productivity/tasks/task-1.ttl#it',
+      jasmine.any(Object),
+    );
+  });
+
+  it('refreshes a same-ID create conflict and keeps the existing Pod Thing', async () => {
+    const existingThing = createThing('Existing Pod task');
+    things.create.and.rejectWith(
+      new RuntimeError('already exists', {
+        code: 'resource-already-exists',
+        details: {
+          uri: existingThing.source.uri,
+          status: 'available',
+          httpStatus: 200,
+        },
+      }),
+    );
+    things.query.and.resolveTo({ things: [existingThing] });
+    things.get.and.resolveTo(existingThing);
+
+    const result = await TestBed.inject(SolidTaskRepository).createTask(task);
+
+    expect(discovery.refresh).toHaveBeenCalledOnceWith({
+      uris: [existingThing.source.uri],
+    });
+    expect(things.create).toHaveBeenCalledTimes(1);
+    expect(result.title).toBe('Existing Pod task');
   });
 
   it('serializes an update that arrives while task creation is still pending', async () => {

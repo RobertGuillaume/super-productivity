@@ -15,7 +15,7 @@ import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
@@ -85,7 +85,7 @@ describe('SolidTaskBatchPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidTaskBatchPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidProjectRepository, useValue: solidProjectRepository },
         { provide: SolidSectionRepository, useValue: solidSectionRepository },

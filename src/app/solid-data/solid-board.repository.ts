@@ -11,14 +11,17 @@ import {
 } from './solid-board.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidBoardContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidBoardRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadBoards(): Promise<SolidRepositoryRead<BoardCfg[]>> {
     const boardContainerScope = this.boardContainerScope();
@@ -38,11 +41,15 @@ export class SolidBoardRepository {
   }
 
   saveBoard(board: BoardCfg, order = 0): Promise<BoardCfg> {
-    return this.writeQueue.enqueue(() => this.saveBoardNow(board, order));
+    return this.mutationCoordinator.run(solidMutationKey('board', board.id), () =>
+      this.saveBoardNow(board, order),
+    );
   }
 
   deleteBoard(boardId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteBoardNow(boardId));
+    return this.mutationCoordinator.run(solidMutationKey('board', boardId), () =>
+      this.deleteBoardNow(boardId),
+    );
   }
 
   private async saveBoardNow(board: BoardCfg, order: number): Promise<BoardCfg> {

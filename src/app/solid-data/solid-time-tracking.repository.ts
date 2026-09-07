@@ -15,14 +15,18 @@ import {
 } from './solid-time-tracking.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  settleSolidMutations,
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidTimeTrackingContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidTimeTrackingRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadTimeTrackingState(): Promise<SolidRepositoryRead<TimeTrackingState>> {
     const timeTrackingContainerScope = this.timeTrackingContainerScope();
@@ -39,11 +43,15 @@ export class SolidTimeTrackingRepository {
   }
 
   saveTimeTrackingEntry(entry: SolidTimeTrackingEntry): Promise<SolidTimeTrackingEntry> {
-    return this.writeQueue.enqueue(() => this.saveTimeTrackingEntryNow(entry));
+    return this.mutationCoordinator.run(solidMutationKey('timeTracking', '*'), () =>
+      this.saveTimeTrackingEntryNow(entry),
+    );
   }
 
   replaceTimeTrackingState(state: TimeTrackingState): Promise<void> {
-    return this.writeQueue.enqueue(() => this.replaceTimeTrackingStateNow(state));
+    return this.mutationCoordinator.run(solidMutationKey('timeTracking', '*'), () =>
+      this.replaceTimeTrackingStateNow(state),
+    );
   }
 
   private async saveTimeTrackingEntryNow(
@@ -90,9 +98,11 @@ export class SolidTimeTrackingRepository {
     const entries = timeTrackingStateToEntries(state);
     const desiredIds = new Set(entries.map((entry) => entry.id));
 
-    await Promise.all(entries.map((entry) => this.saveTimeTrackingEntryNow(entry)));
+    await settleSolidMutations(
+      entries.map((entry) => this.saveTimeTrackingEntryNow(entry)),
+    );
 
-    await Promise.all(
+    await settleSolidMutations(
       existingThings
         .map((thing) => ({
           thing,

@@ -3,6 +3,7 @@ import { Actions } from '@ngrx/effects';
 import { Action } from '@ngrx/store';
 import { Observable } from 'rxjs';
 import { filter, share } from 'rxjs/operators';
+import { isSolidMutationBlocked } from '../solid-data/solid-mutation-guard.meta-reducer';
 
 /**
  * DEFAULT: Injection token for Actions stream filtered to local user actions only.
@@ -48,7 +49,11 @@ export const LOCAL_ACTIONS = new InjectionToken<Observable<Action>>('LOCAL_ACTIO
   factory: () => {
     const actions$ = inject(Actions);
     return actions$.pipe(
-      filter((action: Action) => !(action as any).meta?.isRemote),
+      filter(
+        (action: Action) =>
+          !(action as { meta?: { isRemote?: boolean } }).meta?.isRemote &&
+          !isSolidMutationBlocked(action),
+      ),
       share(),
     );
   },

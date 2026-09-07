@@ -7,7 +7,7 @@ import { SnackService } from '../core/snack/snack.service';
 import { selectAllTasks, selectTasksById } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
@@ -17,6 +17,7 @@ import {
   SOLID_TASK_TAG_MEMBERSHIP_ACTION_TYPES,
 } from './solid-task-tag-action-types';
 import { SolidTaskRepository } from './solid-task.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 
 type SolidTaskUpdateAction =
   | ReturnType<typeof TaskSharedActions.updateTask>
@@ -25,7 +26,7 @@ type SolidTaskUpdateAction =
 
 @Injectable()
 export class SolidTaskPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidTaskRepository = inject(SolidTaskRepository);
@@ -43,7 +44,7 @@ export class SolidTaskPersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidTaskRepository.saveTask(action.task)).pipe(
+          from(this.solidTaskRepository.createTask(action.task)).pipe(
             catchError((error) => this.handlePersistenceError(error)),
           ),
         ),
@@ -67,8 +68,8 @@ export class SolidTaskPersistenceEffects {
               take(1),
               concatMap((tasks) =>
                 from(
-                  Promise.all(
-                    tasks.map((task) => this.solidTaskRepository.saveTask(task)),
+                  settleSolidMutations(
+                    tasks.map((task) => this.solidTaskRepository.updateTask(task)),
                   ),
                 ),
               ),
@@ -93,7 +94,9 @@ export class SolidTaskPersistenceEffects {
             take(1),
             concatMap((tasks) =>
               from(
-                Promise.all(tasks.map((task) => this.solidTaskRepository.saveTask(task))),
+                settleSolidMutations(
+                  tasks.map((task) => this.solidTaskRepository.updateTask(task)),
+                ),
               ),
             ),
             catchError((error) => this.handlePersistenceError(error)),
@@ -136,7 +139,7 @@ export class SolidTaskPersistenceEffects {
         ? [action.task.id, ...action.task.subTasks.map((task) => task.id)]
         : action.taskIds;
 
-    await Promise.all(
+    await settleSolidMutations(
       taskIds.map((taskId) => this.solidTaskRepository.deleteTask(taskId)),
     );
   }

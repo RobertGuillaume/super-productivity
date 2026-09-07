@@ -13,7 +13,7 @@ import {
 } from '../features/simple-counter/store/simple-counter.actions';
 import { selectSimpleCounterFeatureState } from '../features/simple-counter/store/simple-counter.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
@@ -23,6 +23,7 @@ import {
   SolidSimpleCounterSaveAction,
 } from './solid-simple-counter-action-types';
 import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 
 interface OrderedSimpleCounter {
   simpleCounter: SimpleCounter;
@@ -36,7 +37,7 @@ interface SimpleCounterSaveSelection {
 
 @Injectable()
 export class SolidSimpleCounterPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidSimpleCounterRepository = inject(SolidSimpleCounterRepository);
@@ -61,7 +62,7 @@ export class SolidSimpleCounterPersistenceEffects {
                         (orderedSimpleCounter) => orderedSimpleCounter.simpleCounter,
                       ),
                     )
-                  : Promise.all(
+                  : settleSolidMutations(
                       simpleCounters.map((orderedSimpleCounter) =>
                         this.solidSimpleCounterRepository.saveSimpleCounter(
                           orderedSimpleCounter.simpleCounter,
@@ -89,7 +90,7 @@ export class SolidSimpleCounterPersistenceEffects {
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
           from(
-            Promise.all(
+            settleSolidMutations(
               this.simpleCounterIdsForDeleteAction(action).map((id) =>
                 this.solidSimpleCounterRepository.deleteSimpleCounter(id),
               ),

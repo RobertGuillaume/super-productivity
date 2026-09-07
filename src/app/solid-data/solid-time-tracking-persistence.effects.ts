@@ -8,7 +8,7 @@ import { syncTimeTracking } from '../features/time-tracking/store/time-tracking.
 import { selectTimeTrackingState } from '../features/time-tracking/store/time-tracking.selectors';
 import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
@@ -24,7 +24,7 @@ import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 
 @Injectable()
 export class SolidTimeTrackingPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidTimeTrackingRepository = inject(SolidTimeTrackingRepository);

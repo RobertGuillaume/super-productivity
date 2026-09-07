@@ -6,7 +6,7 @@ import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
 import { selectMenuTreeState } from '../features/menu-tree/store/menu-tree.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
@@ -17,7 +17,7 @@ import { SolidMenuTreeRepository } from './solid-menu-tree.repository';
 
 @Injectable()
 export class SolidMenuTreePersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidMenuTreeRepository = inject(SolidMenuTreeRepository);

@@ -5,7 +5,7 @@ import { SnackService } from '../core/snack/snack.service';
 import { DEFAULT_GLOBAL_CONFIG } from '../features/config/default-global-config.const';
 import { updateGlobalConfigSection } from '../features/config/store/global-config.actions';
 import { selectConfigFeatureState } from '../features/config/store/global-config.reducer';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidGlobalConfigPersistenceEffects } from './solid-global-config-persistence.effects';
 import { SolidGlobalConfigRepository } from './solid-global-config.repository';
@@ -41,7 +41,7 @@ describe('SolidGlobalConfigPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidGlobalConfigPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidGlobalConfigRepository, useValue: solidGlobalConfigRepository },
         { provide: SnackService, useValue: snackService },

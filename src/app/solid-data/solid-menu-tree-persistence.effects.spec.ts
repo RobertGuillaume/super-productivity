@@ -9,7 +9,7 @@ import { DEFAULT_TAG } from '../features/tag/tag.const';
 import { addTag, deleteTag } from '../features/tag/store/tag.actions';
 import { DEFAULT_TASK } from '../features/tasks/task.model';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidMenuTreePersistenceEffects } from './solid-menu-tree-persistence.effects';
 import { SolidMenuTreeRepository } from './solid-menu-tree.repository';
@@ -52,7 +52,7 @@ describe('SolidMenuTreePersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidMenuTreePersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidMenuTreeRepository, useValue: solidMenuTreeRepository },
         { provide: SnackService, useValue: snackService },

@@ -13,7 +13,7 @@ import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { selectTimeTrackingState } from '../features/time-tracking/store/time-tracking.selectors';
 import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidArchiveState } from './solid-archive-state.mapper';
 import { SolidArchiveStatePersistenceEffects } from './solid-archive-state-persistence.effects';
 import { SolidArchiveStateRepository } from './solid-archive-state.repository';
@@ -146,7 +146,7 @@ describe('SolidArchiveStatePersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidArchiveStatePersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: ArchiveDbAdapter, useValue: archiveDbAdapter },
         { provide: SolidArchiveStateRepository, useValue: archiveStateRepository },
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },

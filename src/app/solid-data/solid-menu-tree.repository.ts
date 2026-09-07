@@ -16,14 +16,17 @@ import {
 } from './solid-menu-tree.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidMenuTreeContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidMenuTreeRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadMenuTree(): Promise<SolidRepositoryRead<MenuTreeState | null>> {
     const result = await this.queryMenuTreeThing();
@@ -37,7 +40,9 @@ export class SolidMenuTreeRepository {
   }
 
   saveMenuTree(menuTree: MenuTreeState): Promise<MenuTreeState> {
-    return this.writeQueue.enqueue(() => this.saveMenuTreeNow(menuTree));
+    return this.mutationCoordinator.run(solidMutationKey('menuTree', 'root'), () =>
+      this.saveMenuTreeNow(menuTree),
+    );
   }
 
   private async saveMenuTreeNow(menuTree: MenuTreeState): Promise<MenuTreeState> {

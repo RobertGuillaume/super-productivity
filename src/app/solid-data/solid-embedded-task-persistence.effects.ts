@@ -24,9 +24,10 @@ import {
   updateTaskAttachment,
 } from '../features/tasks/task-attachment/task-attachment.actions';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import {
   isSolidEmbeddedTaskAction,
   SolidEmbeddedTaskAction,
@@ -35,7 +36,7 @@ import { SolidTaskRepository } from './solid-task.repository';
 
 @Injectable()
 export class SolidEmbeddedTaskPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidTaskRepository = inject(SolidTaskRepository);
@@ -56,7 +57,7 @@ export class SolidEmbeddedTaskPersistenceEffects {
               take(1),
               concatMap((tasks) =>
                 from(
-                  Promise.all(
+                  settleSolidMutations(
                     tasks.map((task) => this.solidTaskRepository.saveTask(task)),
                   ),
                 ),
@@ -71,7 +72,7 @@ export class SolidEmbeddedTaskPersistenceEffects {
               take(1),
               concatMap((tasks) =>
                 from(
-                  Promise.all(
+                  settleSolidMutations(
                     tasks.map((task) => this.solidTaskRepository.saveTask(task)),
                   ),
                 ),

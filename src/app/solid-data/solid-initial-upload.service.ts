@@ -25,6 +25,7 @@ import { SolidGlobalConfigRepository } from './solid-global-config.repository';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
 import { SolidMenuTreeRepository } from './solid-menu-tree.repository';
 import { SolidMetricRepository } from './solid-metric.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidPluginDataRepository } from './solid-plugin-data.repository';
@@ -229,7 +230,7 @@ export class SolidInitialUploadService {
     const pluginUserData = [...(snapshot.pluginUserData as PluginUserData[])];
     const pluginMetadata = [...(snapshot.pluginMetadata as PluginMetadata[])];
 
-    await Promise.all([
+    await settleSolidMutations([
       ...tasks.map((task) => this.taskRepository.saveTask(task)),
       ...projects.map((project) => this.projectRepository.saveProject(project)),
       ...tags.map((tag) => this.tagRepository.saveTag(tag)),

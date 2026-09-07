@@ -118,6 +118,7 @@ export class SolidTaskHydrationService {
   private readonly simpleCounterRepository = inject(SolidSimpleCounterRepository);
   private readonly appStateRepository = inject(SolidAppStateRepository);
   private readonly timeTrackingRepository = inject(SolidTimeTrackingRepository);
+  private lastPublishedSnapshot: SolidCatalogSnapshot | null = null;
 
   async hydrateStore(): Promise<SolidCatalogSnapshot> {
     return this.publishSnapshot('initial');
@@ -125,6 +126,18 @@ export class SolidTaskHydrationService {
 
   async reconcileStore(): Promise<SolidCatalogSnapshot> {
     return this.publishSnapshot('reconcile');
+  }
+
+  async restoreLastPublishedSnapshot(): Promise<boolean> {
+    const snapshot = this.lastPublishedSnapshot;
+    if (snapshot === null) {
+      return false;
+    }
+
+    this.store.dispatch(
+      solidCatalogReconciled({ appDataComplete: snapshot.appDataComplete }),
+    );
+    return true;
   }
 
   async readCatalogSnapshot(): Promise<SolidCatalogSnapshot> {
@@ -255,6 +268,8 @@ export class SolidTaskHydrationService {
         operation: mode,
         failureCount: reducerFailures.length,
       });
+    } else {
+      this.lastPublishedSnapshot = snapshot;
     }
     if (snapshot.diagnostics.length > 0) {
       this.dataLayerState.addDiagnostics(snapshot.diagnostics.length);

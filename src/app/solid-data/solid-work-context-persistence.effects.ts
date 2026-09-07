@@ -10,7 +10,7 @@ import { Tag } from '../features/tag/tag.model';
 import { selectTagById } from '../features/tag/store/tag.reducer';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidProjectRepository } from './solid-project.repository';
@@ -22,7 +22,7 @@ import {
 
 @Injectable()
 export class SolidWorkContextPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidProjectRepository = inject(SolidProjectRepository);

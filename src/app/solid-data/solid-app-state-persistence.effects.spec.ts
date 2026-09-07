@@ -15,7 +15,7 @@ import { DEFAULT_TAG, TODAY_TAG } from '../features/tag/tag.const';
 import { updateTagOrder } from '../features/tag/store/tag.actions';
 import { selectTagFeatureState } from '../features/tag/store/tag.reducer';
 import { WorkContextType } from '../features/work-context/work-context.model';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidAppStatePersistenceEffects } from './solid-app-state-persistence.effects';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
@@ -49,7 +49,7 @@ describe('SolidAppStatePersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidAppStatePersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidAppStateRepository, useValue: solidAppStateRepository },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidProjectRepository, useValue: solidProjectRepository },

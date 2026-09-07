@@ -17,9 +17,10 @@ import { Task } from '../features/tasks/task.model';
 import { selectAllTasks, selectTasksById } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import {
   isSolidTaskRepeatCfgDeleteAction,
   isSolidTaskRepeatCfgSaveAction,
@@ -31,7 +32,7 @@ import { SolidTaskRepository } from './solid-task.repository';
 
 @Injectable()
 export class SolidTaskRepeatCfgPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidTaskRepeatCfgRepository = inject(SolidTaskRepeatCfgRepository);
@@ -54,7 +55,7 @@ export class SolidTaskRepeatCfgPersistenceEffects {
           }).pipe(
             concatMap(({ taskRepeatCfgs, tasks }) =>
               from(
-                Promise.all([
+                settleSolidMutations([
                   ...taskRepeatCfgs.map((taskRepeatCfg) =>
                     this.solidTaskRepeatCfgRepository.saveTaskRepeatCfg(taskRepeatCfg),
                   ),
@@ -82,7 +83,7 @@ export class SolidTaskRepeatCfgPersistenceEffects {
           this.tasksForDeleteAction(action).pipe(
             concatMap((tasks) =>
               from(
-                Promise.all([
+                settleSolidMutations([
                   ...this.taskRepeatCfgIdsForDeleteAction(action).map((id) =>
                     this.solidTaskRepeatCfgRepository.deleteTaskRepeatCfg(id),
                   ),

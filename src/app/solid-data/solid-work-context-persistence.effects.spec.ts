@@ -13,7 +13,7 @@ import {
   moveTaskInTodayList,
   moveTaskToTopInTodayList,
 } from '../features/work-context/store/work-context-meta.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -46,7 +46,7 @@ describe('SolidWorkContextPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidWorkContextPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidProjectRepository, useValue: solidProjectRepository },
         { provide: SolidTagRepository, useValue: solidTagRepository },

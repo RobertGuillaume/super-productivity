@@ -16,7 +16,7 @@ import { selectTaskRepeatCfgFeatureState } from '../features/task-repeat-cfg/sto
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { selectAllTasks, selectTasksById } from '../features/tasks/store/task.selectors';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidTaskRepeatCfgPersistenceEffects } from './solid-task-repeat-cfg-persistence.effects';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
@@ -80,7 +80,7 @@ describe('SolidTaskRepeatCfgPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidTaskRepeatCfgPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         {
           provide: SolidTaskRepeatCfgRepository,

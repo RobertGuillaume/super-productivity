@@ -12,14 +12,17 @@ import {
 } from './solid-app-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidAppContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidAppStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadAppState(): Promise<SolidRepositoryRead<SolidAppState | null>> {
     const result = await this.queryAppStateThing();
@@ -35,7 +38,9 @@ export class SolidAppStateRepository {
       Pick<SolidAppState, 'noteTodayOrder' | 'projectOrder' | 'sectionOrder' | 'tagOrder'>
     >,
   ): Promise<SolidAppState> {
-    return this.writeQueue.enqueue(() => this.saveAppStateOrderNow(changes));
+    return this.mutationCoordinator.run(solidMutationKey('appState', 'order'), () =>
+      this.saveAppStateOrderNow(changes),
+    );
   }
 
   private async saveAppStateOrderNow(

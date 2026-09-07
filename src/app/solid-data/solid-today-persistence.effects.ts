@@ -9,7 +9,7 @@ import { TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { selectTagById } from '../features/tag/store/tag.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
@@ -19,10 +19,11 @@ import {
 } from './solid-today-action-types';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 
 @Injectable()
 export class SolidTodayPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidTagRepository = inject(SolidTagRepository);
@@ -47,7 +48,7 @@ export class SolidTodayPersistenceEffects {
           }).pipe(
             concatMap(({ tasks, todayTag }) =>
               from(
-                Promise.all([
+                settleSolidMutations([
                   ...tasks.map((task) => this.solidTaskRepository.saveTask(task)),
                   this.solidTagRepository.saveTag(todayTag),
                 ]),

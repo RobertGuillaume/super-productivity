@@ -9,7 +9,7 @@ import {
   updateMetric,
 } from '../features/metric/store/metric.actions';
 import { selectMetricFeatureState } from '../features/metric/store/metric.selectors';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidMetricPersistenceEffects } from './solid-metric-persistence.effects';
 import { SolidMetricRepository } from './solid-metric.repository';
@@ -50,7 +50,7 @@ describe('SolidMetricPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidMetricPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidMetricRepository, useValue: solidMetricRepository },
         { provide: SnackService, useValue: snackService },

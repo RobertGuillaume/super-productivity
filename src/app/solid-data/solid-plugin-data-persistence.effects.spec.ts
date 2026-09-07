@@ -11,7 +11,7 @@ import {
 } from '../plugins/store/plugin.actions';
 import { selectPluginMetadataFeatureState } from '../plugins/store/plugin-metadata.reducer';
 import { selectPluginUserDataFeatureState } from '../plugins/store/plugin-user-data.reducer';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidPluginDataPersistenceEffects } from './solid-plugin-data-persistence.effects';
 import { SolidPluginDataRepository } from './solid-plugin-data.repository';
@@ -53,7 +53,7 @@ describe('SolidPluginDataPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidPluginDataPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidPluginDataRepository, useValue: solidPluginDataRepository },
         { provide: SnackService, useValue: snackService },

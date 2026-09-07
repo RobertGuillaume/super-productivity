@@ -7,7 +7,7 @@ import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { selectAllTasks, selectTasksById } from '../features/tasks/store/task.selectors';
 import { WorkContextType } from '../features/work-context/work-context.model';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidTaskPersistenceEffects } from './solid-task-persistence.effects';
 import { SolidTaskRepository } from './solid-task.repository';
@@ -34,7 +34,7 @@ describe('SolidTaskPersistenceEffects', () => {
     );
     solidTaskRepository = jasmine.createSpyObj<SolidTaskRepository>(
       'SolidTaskRepository',
-      ['deleteTask', 'saveTask'],
+      ['createTask', 'deleteTask', 'updateTask'],
     );
     snackService = jasmine.createSpyObj<SnackService>('SnackService', ['open']);
     store = jasmine.createSpyObj<Store>('Store', ['select']);
@@ -42,7 +42,7 @@ describe('SolidTaskPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidTaskPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidTaskRepository, useValue: solidTaskRepository },
         { provide: SnackService, useValue: snackService },
@@ -58,14 +58,14 @@ describe('SolidTaskPersistenceEffects', () => {
 
   it('persists task creates to Solid when the Solid data layer owns the action', async () => {
     solidDataLayerState.ownsPersistentAction.and.returnValue(true);
-    solidTaskRepository.saveTask.and.resolveTo(task);
+    solidTaskRepository.createTask.and.resolveTo(task);
     const effects = TestBed.inject(SolidTaskPersistenceEffects);
     const subscription = effects.persistTaskCreate$.subscribe();
 
     actions$.next(createAddTaskAction());
     await Promise.resolve();
 
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(task);
+    expect(solidTaskRepository.createTask).toHaveBeenCalledOnceWith(task);
     expect(snackService.open).not.toHaveBeenCalled();
     subscription.unsubscribe();
   });
@@ -78,7 +78,7 @@ describe('SolidTaskPersistenceEffects', () => {
     actions$.next(createAddTaskAction());
     await Promise.resolve();
 
-    expect(solidTaskRepository.saveTask).not.toHaveBeenCalled();
+    expect(solidTaskRepository.createTask).not.toHaveBeenCalled();
     subscription.unsubscribe();
   });
 
@@ -88,7 +88,7 @@ describe('SolidTaskPersistenceEffects', () => {
       title: 'Updated in store',
     };
     solidDataLayerState.ownsPersistentAction.and.returnValue(true);
-    solidTaskRepository.saveTask.and.resolveTo(updatedTask);
+    solidTaskRepository.updateTask.and.resolveTo(updatedTask);
     store.select.and.returnValue(of([updatedTask]));
     const effects = TestBed.inject(SolidTaskPersistenceEffects);
     const subscription = effects.persistTaskUpdate$.subscribe();
@@ -112,7 +112,7 @@ describe('SolidTaskPersistenceEffects', () => {
         ids: ['task-1'],
       },
     ]);
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(updatedTask);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledOnceWith(updatedTask);
     subscription.unsubscribe();
   });
 
@@ -124,7 +124,7 @@ describe('SolidTaskPersistenceEffects', () => {
       modified: 1710000005000,
     };
     solidDataLayerState.ownsPersistentAction.and.returnValue(true);
-    solidTaskRepository.saveTask.and.resolveTo(completedTask);
+    solidTaskRepository.updateTask.and.resolveTo(completedTask);
     store.select.and.returnValue(of([completedTask]));
     const effects = TestBed.inject(SolidTaskPersistenceEffects);
     const subscription = effects.persistTaskUpdate$.subscribe();
@@ -141,7 +141,7 @@ describe('SolidTaskPersistenceEffects', () => {
     );
     await Promise.resolve();
 
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(completedTask);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledOnceWith(completedTask);
     subscription.unsubscribe();
   });
 
@@ -152,7 +152,7 @@ describe('SolidTaskPersistenceEffects', () => {
       title: 'Second task',
     };
     solidDataLayerState.ownsPersistentAction.and.returnValue(true);
-    solidTaskRepository.saveTask.and.resolveTo(task);
+    solidTaskRepository.updateTask.and.resolveTo(task);
     store.select.and.returnValue(of([task, secondTask]));
     const effects = TestBed.inject(SolidTaskPersistenceEffects);
     const subscription = effects.persistTaskUpdate$.subscribe();
@@ -184,9 +184,9 @@ describe('SolidTaskPersistenceEffects', () => {
         ids: ['task-1', 'task-2'],
       },
     ]);
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledWith(task);
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledWith(secondTask);
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledTimes(2);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledWith(task);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledWith(secondTask);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledTimes(2);
     subscription.unsubscribe();
   });
 
@@ -196,7 +196,7 @@ describe('SolidTaskPersistenceEffects', () => {
       tagIds: ['tag-1'],
     };
     solidDataLayerState.ownsPersistentAction.and.returnValue(true);
-    solidTaskRepository.saveTask.and.resolveTo(taggedTask);
+    solidTaskRepository.updateTask.and.resolveTo(taggedTask);
     store.select.and.returnValue(of([taggedTask]));
     const effects = TestBed.inject(SolidTaskPersistenceEffects);
     const subscription = effects.persistTaskUpdate$.subscribe();
@@ -215,7 +215,7 @@ describe('SolidTaskPersistenceEffects', () => {
         ids: ['task-1'],
       },
     ]);
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(taggedTask);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledOnceWith(taggedTask);
     subscription.unsubscribe();
   });
 
@@ -231,7 +231,7 @@ describe('SolidTaskPersistenceEffects', () => {
       tagIds: ['tag-2'],
     };
     solidDataLayerState.ownsPersistentAction.and.returnValue(true);
-    solidTaskRepository.saveTask.and.resolveTo(firstTask);
+    solidTaskRepository.updateTask.and.resolveTo(firstTask);
     store.select.and.returnValue(of([firstTask, secondTask]));
     const effects = TestBed.inject(SolidTaskPersistenceEffects);
     const subscription = effects.persistBulkTagRemoval$.subscribe();
@@ -244,9 +244,9 @@ describe('SolidTaskPersistenceEffects', () => {
     await Promise.resolve();
 
     expect(store.select.calls.mostRecent().args as unknown[]).toEqual([selectAllTasks]);
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledWith(firstTask);
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledWith(secondTask);
-    expect(solidTaskRepository.saveTask).toHaveBeenCalledTimes(2);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledWith(firstTask);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledWith(secondTask);
+    expect(solidTaskRepository.updateTask).toHaveBeenCalledTimes(2);
     subscription.unsubscribe();
   });
 
@@ -266,13 +266,13 @@ describe('SolidTaskPersistenceEffects', () => {
     await Promise.resolve();
 
     expect(store.select).not.toHaveBeenCalled();
-    expect(solidTaskRepository.saveTask).not.toHaveBeenCalled();
+    expect(solidTaskRepository.updateTask).not.toHaveBeenCalled();
     subscription.unsubscribe();
   });
 
   it('surfaces Solid persistence failures', async () => {
     solidDataLayerState.ownsPersistentAction.and.returnValue(true);
-    solidTaskRepository.saveTask.and.rejectWith(new Error('write failed'));
+    solidTaskRepository.createTask.and.rejectWith(new Error('write failed'));
     const effects = TestBed.inject(SolidTaskPersistenceEffects);
     const subscription = effects.persistTaskCreate$.subscribe();
 

@@ -4,7 +4,10 @@ import { Section } from '../features/section/section.model';
 import { SP_SECTION } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 import {
   sectionToSolidChanges,
   sectionToSolidCreateInput,
@@ -17,7 +20,7 @@ type SolidSectionContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 @Injectable({ providedIn: 'root' })
 export class SolidSectionRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadSections(): Promise<SolidRepositoryRead<Section[]>> {
     const sectionContainerScope = this.sectionContainerScope();
@@ -31,11 +34,15 @@ export class SolidSectionRepository {
   }
 
   saveSection(section: Section): Promise<Section> {
-    return this.writeQueue.enqueue(() => this.saveSectionNow(section));
+    return this.mutationCoordinator.run(solidMutationKey('section', section.id), () =>
+      this.saveSectionNow(section),
+    );
   }
 
   deleteSection(sectionId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteSectionNow(sectionId));
+    return this.mutationCoordinator.run(solidMutationKey('section', sectionId), () =>
+      this.deleteSectionNow(sectionId),
+    );
   }
 
   private async saveSectionNow(section: Section): Promise<Section> {

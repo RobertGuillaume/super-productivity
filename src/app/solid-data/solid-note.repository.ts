@@ -4,7 +4,10 @@ import { Note } from '../features/note/note.model';
 import { SP_NOTE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 import {
   noteToSolidChanges,
   noteToSolidCreateInput,
@@ -17,7 +20,7 @@ type SolidNoteContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 @Injectable({ providedIn: 'root' })
 export class SolidNoteRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadNotes(): Promise<SolidRepositoryRead<Note[]>> {
     const noteContainerScope = this.noteContainerScope();
@@ -31,11 +34,15 @@ export class SolidNoteRepository {
   }
 
   saveNote(note: Note): Promise<Note> {
-    return this.writeQueue.enqueue(() => this.saveNoteNow(note));
+    return this.mutationCoordinator.run(solidMutationKey('note', note.id), () =>
+      this.saveNoteNow(note),
+    );
   }
 
   deleteNote(noteId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteNoteNow(noteId));
+    return this.mutationCoordinator.run(solidMutationKey('note', noteId), () =>
+      this.deleteNoteNow(noteId),
+    );
   }
 
   private async saveNoteNow(note: Note): Promise<Note> {

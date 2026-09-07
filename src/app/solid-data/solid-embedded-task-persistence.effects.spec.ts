@@ -10,7 +10,7 @@ import {
   updateTaskUi,
 } from '../features/tasks/store/task.actions';
 import { selectAllTasks, selectTasksById } from '../features/tasks/store/task.selectors';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidEmbeddedTaskPersistenceEffects } from './solid-embedded-task-persistence.effects';
 import { SolidTaskRepository } from './solid-task.repository';
@@ -55,7 +55,7 @@ describe('SolidEmbeddedTaskPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidEmbeddedTaskPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidTaskRepository, useValue: solidTaskRepository },
         { provide: SnackService, useValue: snackService },

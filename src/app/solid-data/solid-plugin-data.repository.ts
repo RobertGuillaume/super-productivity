@@ -14,14 +14,17 @@ import {
 } from './solid-plugin-data.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 
 type SolidPluginContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidPluginDataRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadPluginUserData(): Promise<SolidRepositoryRead<PluginUserData[]>> {
     const scope = this.pluginUserDataContainerScope();
@@ -58,19 +61,31 @@ export class SolidPluginDataRepository {
   }
 
   savePluginUserData(pluginUserData: PluginUserData): Promise<PluginUserData> {
-    return this.writeQueue.enqueue(() => this.savePluginUserDataNow(pluginUserData));
+    return this.mutationCoordinator.run(
+      solidMutationKey('pluginUserData', pluginUserData.id),
+      () => this.savePluginUserDataNow(pluginUserData),
+    );
   }
 
   savePluginMetadata(pluginMetadata: PluginMetadata): Promise<PluginMetadata> {
-    return this.writeQueue.enqueue(() => this.savePluginMetadataNow(pluginMetadata));
+    return this.mutationCoordinator.run(
+      solidMutationKey('pluginMetadata', pluginMetadata.id),
+      () => this.savePluginMetadataNow(pluginMetadata),
+    );
   }
 
   deletePluginUserData(pluginId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deletePluginUserDataNow(pluginId));
+    return this.mutationCoordinator.run(
+      solidMutationKey('pluginUserData', pluginId),
+      () => this.deletePluginUserDataNow(pluginId),
+    );
   }
 
   deletePluginMetadata(pluginId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deletePluginMetadataNow(pluginId));
+    return this.mutationCoordinator.run(
+      solidMutationKey('pluginMetadata', pluginId),
+      () => this.deletePluginMetadataNow(pluginId),
+    );
   }
 
   private async savePluginUserDataNow(

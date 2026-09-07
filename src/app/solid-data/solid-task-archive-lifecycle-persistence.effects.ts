@@ -15,10 +15,11 @@ import { Task, TaskWithSubTasks } from '../features/tasks/task.model';
 import { flattenTasks, selectAllTasks } from '../features/tasks/store/task.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -30,7 +31,7 @@ import { SolidTaskRepository } from './solid-task.repository';
 
 @Injectable()
 export class SolidTaskArchiveLifecyclePersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidArchivedTaskRepository = inject(SolidArchivedTaskRepository);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
@@ -75,7 +76,7 @@ export class SolidTaskArchiveLifecyclePersistenceEffects {
   ): Promise<void> {
     if (action.type === TaskSharedActions.moveToArchive.type) {
       const archivedTasks = this.tasksForArchive(action.tasks);
-      await Promise.all([
+      await settleSolidMutations([
         ...archivedTasks.map((task) =>
           this.solidArchivedTaskRepository.saveArchivedTask(task, 'young'),
         ),
@@ -88,7 +89,7 @@ export class SolidTaskArchiveLifecyclePersistenceEffects {
     }
 
     const restoredArchiveTaskIds = this.restoredArchiveTaskIdsForAction(action);
-    await Promise.all([
+    await settleSolidMutations([
       ...restoredArchiveTaskIds.map((taskId) =>
         this.solidArchivedTaskRepository.deleteArchivedTask(taskId),
       ),

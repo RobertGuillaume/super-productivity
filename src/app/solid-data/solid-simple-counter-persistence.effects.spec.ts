@@ -15,7 +15,7 @@ import {
   updateSimpleCounterOrder,
 } from '../features/simple-counter/store/simple-counter.actions';
 import { selectSimpleCounterFeatureState } from '../features/simple-counter/store/simple-counter.reducer';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidSimpleCounterPersistenceEffects } from './solid-simple-counter-persistence.effects';
 import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
@@ -68,7 +68,7 @@ describe('SolidSimpleCounterPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidSimpleCounterPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         {
           provide: SolidSimpleCounterRepository,

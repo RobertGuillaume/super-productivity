@@ -15,10 +15,11 @@ import {
 import { selectTagById } from '../features/tag/store/tag.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { ActionType } from '../op-log/core/operation.types';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidTagRepository } from './solid-tag.repository';
+import { settleSolidMutations } from './solid-mutation-coordinator.service';
 
 type SolidTagUpdateAction =
   | ReturnType<typeof updateTag>
@@ -26,7 +27,7 @@ type SolidTagUpdateAction =
 
 @Injectable()
 export class SolidTagPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidTagRepository = inject(SolidTagRepository);
@@ -108,7 +109,9 @@ export class SolidTagPersistenceEffects {
     action: ReturnType<typeof deleteTag> | ReturnType<typeof deleteTags>,
   ): Promise<void> {
     const tagIds = action.type === ActionType.TAG_DELETE ? [action.id] : action.ids;
-    await Promise.all(tagIds.map((tagId) => this.solidTagRepository.deleteTag(tagId)));
+    await settleSolidMutations(
+      tagIds.map((tagId) => this.solidTagRepository.deleteTag(tagId)),
+    );
   }
 
   private handlePersistenceError(error: unknown): typeof EMPTY {

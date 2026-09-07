@@ -4,6 +4,7 @@ import { operationCaptureMetaReducer } from '../../op-log/capture/operation-capt
 import { bulkOperationsMetaReducer } from '../../op-log/apply/bulk-hydration.meta-reducer';
 import { undoTaskDeleteMetaReducer } from './undo-task-delete.meta-reducer';
 import { solidCatalogReconciliationMetaReducer } from '../../solid-data/solid-catalog-reconciliation.meta-reducer';
+import { solidMutationGuardMetaReducer } from '../../solid-data/solid-mutation-guard.meta-reducer';
 
 describe('META_REDUCERS registry', () => {
   // The dev-mode validateMetaReducerOrdering() covers index 0/1/last; this
@@ -21,6 +22,7 @@ describe('META_REDUCERS registry', () => {
   it('keeps the hard ordering constraints intact', () => {
     expect(META_REDUCERS[0]).toBe(operationCaptureMetaReducer);
     expect(META_REDUCERS[1]).toBe(bulkOperationsMetaReducer);
-    expect(META_REDUCERS[2]).toBe(solidCatalogReconciliationMetaReducer);
+    expect(META_REDUCERS[2]).toBe(solidMutationGuardMetaReducer);
+    expect(META_REDUCERS[3]).toBe(solidCatalogReconciliationMetaReducer);
   });
 });

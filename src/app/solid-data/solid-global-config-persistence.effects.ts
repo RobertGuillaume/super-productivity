@@ -6,7 +6,7 @@ import { catchError, concatMap, filter, take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
 import { selectConfigFeatureState } from '../features/config/store/global-config.reducer';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import {
   isSolidGlobalConfigSaveAction,
   SolidGlobalConfigSaveAction,
@@ -17,7 +17,7 @@ import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 
 @Injectable()
 export class SolidGlobalConfigPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidGlobalConfigRepository = inject(SolidGlobalConfigRepository);

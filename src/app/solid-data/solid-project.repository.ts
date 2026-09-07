@@ -4,7 +4,10 @@ import { Project } from '../features/project/project.model';
 import { SP_PROJECT } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidWriteQueueService } from './solid-write-queue.service';
+import {
+  SolidMutationCoordinator,
+  solidMutationKey,
+} from './solid-mutation-coordinator.service';
 import {
   projectToSolidChanges,
   projectToSolidCreateInput,
@@ -17,7 +20,7 @@ type SolidProjectContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 @Injectable({ providedIn: 'root' })
 export class SolidProjectRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
-  private readonly writeQueue = inject(SolidWriteQueueService);
+  private readonly mutationCoordinator = inject(SolidMutationCoordinator);
 
   async loadProjects(): Promise<SolidRepositoryRead<Project[]>> {
     const projectContainerScope = this.projectContainerScope();
@@ -31,11 +34,15 @@ export class SolidProjectRepository {
   }
 
   saveProject(project: Project): Promise<Project> {
-    return this.writeQueue.enqueue(() => this.saveProjectNow(project));
+    return this.mutationCoordinator.run(solidMutationKey('project', project.id), () =>
+      this.saveProjectNow(project),
+    );
   }
 
   deleteProject(projectId: string): Promise<void> {
-    return this.writeQueue.enqueue(() => this.deleteProjectNow(projectId));
+    return this.mutationCoordinator.run(solidMutationKey('project', projectId), () =>
+      this.deleteProjectNow(projectId),
+    );
   }
 
   private async saveProjectNow(project: Project): Promise<Project> {

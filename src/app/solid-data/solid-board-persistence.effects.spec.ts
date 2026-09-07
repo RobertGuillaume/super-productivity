@@ -16,7 +16,7 @@ import {
 } from '../features/boards/store/boards.actions';
 import { BoardsState } from '../features/boards/store/boards.reducer';
 import { selectBoardsState } from '../features/boards/store/boards.selectors';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidBoardPersistenceEffects } from './solid-board-persistence.effects';
 import { SolidBoardRepository } from './solid-board.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
@@ -77,7 +77,7 @@ describe('SolidBoardPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidBoardPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidBoardRepository, useValue: solidBoardRepository },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SnackService, useValue: snackService },

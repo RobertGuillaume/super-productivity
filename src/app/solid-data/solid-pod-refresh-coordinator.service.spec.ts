@@ -14,6 +14,7 @@ import { SolidPodRefreshCoordinatorService } from './solid-pod-refresh-coordinat
 import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
+import { SolidMutationCoordinator } from './solid-mutation-coordinator.service';
 
 describe('SolidPodRefreshCoordinatorService', () => {
   const podRoot = 'https://pod.example/';
@@ -30,6 +31,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
   let hydration: jasmine.SpyObj<SolidTaskHydrationService>;
   let runtimeService: jasmine.SpyObj<SolidRuntimeService>;
   let dataLayerState: jasmine.SpyObj<SolidDataLayerStateService>;
+  let mutations: jasmine.SpyObj<SolidMutationCoordinator>;
   let authState: AuthState;
   let status: DiscoveryStatus;
 
@@ -55,7 +57,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
     storage.listContainer.and.callFake(async (uri: string) => containerListing(uri));
     hydration = jasmine.createSpyObj<SolidTaskHydrationService>(
       'SolidTaskHydrationService',
-      ['reconcileStore'],
+      ['reconcileStore', 'restoreLastPublishedSnapshot'],
     );
     hydration.reconcileStore.and.resolveTo({
       appDataComplete: {} as never,
@@ -64,8 +66,20 @@ describe('SolidPodRefreshCoordinatorService', () => {
     });
     dataLayerState = jasmine.createSpyObj<SolidDataLayerStateService>(
       'SolidDataLayerStateService',
-      ['setPhase', 'setRefreshProgress', 'addDiagnostics'],
+      [
+        'setPhase',
+        'setRefreshProgress',
+        'addDiagnostics',
+        'clearWriteReadiness',
+        'setContainerWriteReady',
+        'registerMutationRecoveryHandler',
+      ],
     );
+    mutations = jasmine.createSpyObj<SolidMutationCoordinator>(
+      'SolidMutationCoordinator',
+      ['whenIdle'],
+    );
+    mutations.whenIdle.and.resolveTo();
     const runtime = {
       auth: { state: () => authState },
       discovery,
@@ -88,6 +102,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
         { provide: SolidRuntimeService, useValue: runtimeService },
         { provide: SolidTaskHydrationService, useValue: hydration },
         { provide: SolidDataLayerStateService, useValue: dataLayerState },
+        { provide: SolidMutationCoordinator, useValue: mutations },
       ],
     });
   });

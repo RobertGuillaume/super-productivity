@@ -8,7 +8,7 @@ import { selectIssueProviderState } from '../features/issue/store/issue-provider
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { selectTasksById } from '../features/tasks/store/task.selectors';
 import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidIssueProviderPersistenceEffects } from './solid-issue-provider-persistence.effects';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
@@ -72,7 +72,7 @@ describe('SolidIssueProviderPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidIssueProviderPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         {
           provide: SolidIssueProviderRepository,

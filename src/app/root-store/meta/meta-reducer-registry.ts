@@ -19,6 +19,7 @@ import { shortSyntaxSharedMetaReducer } from './task-shared-meta-reducers/short-
 import { lwwUpdateMetaReducer } from './task-shared-meta-reducers/lww-update.meta-reducer';
 import { actionLoggerReducer } from './action-logger.reducer';
 import { solidCatalogReconciliationMetaReducer } from '../../solid-data/solid-catalog-reconciliation.meta-reducer';
+import { solidMutationGuardMetaReducer } from '../../solid-data/solid-mutation-guard.meta-reducer';
 
 /**
  * Meta-Reducer Registry
@@ -98,6 +99,10 @@ export const META_REDUCERS: MetaReducer[] = [
   // - Remote sync (operations from other clients)
   // Must run early so all subsequent reducers see individual actions.
   bulkOperationsMetaReducer,
+
+  // Reject Solid-owned user intents before any state-changing reducer runs when
+  // their complete persistence target set is not currently write-ready.
+  solidMutationGuardMetaReducer,
 
   // Translate post-startup Solid snapshots inside the reducer chain. Effects see only
   // `solidCatalogReconciled`, so normal app initialization remains a one-shot lifecycle.

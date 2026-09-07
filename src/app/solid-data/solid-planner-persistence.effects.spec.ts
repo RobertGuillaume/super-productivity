@@ -10,7 +10,7 @@ import { Tag } from '../features/tag/tag.model';
 import { selectAllTags } from '../features/tag/store/tag.reducer';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { selectAllTasks } from '../features/tasks/store/task.selectors';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidPlannerPersistenceEffects } from './solid-planner-persistence.effects';
 import { SolidPlannerRepository } from './solid-planner.repository';
@@ -94,7 +94,7 @@ describe('SolidPlannerPersistenceEffects', () => {
     TestBed.configureTestingModule({
       providers: [
         SolidPlannerPersistenceEffects,
-        { provide: ALL_ACTIONS, useValue: actions$ },
+        { provide: LOCAL_ACTIONS, useValue: actions$ },
         { provide: SolidDataLayerStateService, useValue: solidDataLayerState },
         { provide: SolidPlannerRepository, useValue: solidPlannerRepository },
         { provide: SolidTagRepository, useValue: solidTagRepository },

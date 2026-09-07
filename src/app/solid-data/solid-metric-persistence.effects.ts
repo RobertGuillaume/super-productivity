@@ -8,7 +8,7 @@ import { Metric } from '../features/metric/metric.model';
 import { logFocusSession } from '../features/metric/store/metric.actions';
 import { selectMetricFeatureState } from '../features/metric/store/metric.selectors';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
-import { ALL_ACTIONS } from '../util/local-actions.token';
+import { LOCAL_ACTIONS } from '../util/local-actions.token';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import {
@@ -21,7 +21,7 @@ import { SolidMetricRepository } from './solid-metric.repository';
 
 @Injectable()
 export class SolidMetricPersistenceEffects {
-  private readonly actions$ = inject(ALL_ACTIONS);
+  private readonly actions$ = inject(LOCAL_ACTIONS);
   private readonly store = inject(Store);
   private readonly solidDataLayerState = inject(SolidDataLayerStateService);
   private readonly solidMetricRepository = inject(SolidMetricRepository);
