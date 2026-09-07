@@ -13,12 +13,14 @@ import {
   solidThingToArchiveState,
 } from './solid-archive-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidArchiveStateContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidArchiveStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadArchiveStates(): Promise<{
     young: SolidArchiveState;
@@ -49,7 +51,13 @@ export class SolidArchiveStateRepository {
     };
   }
 
-  async saveArchiveState(archiveState: SolidArchiveState): Promise<SolidArchiveState> {
+  saveArchiveState(archiveState: SolidArchiveState): Promise<SolidArchiveState> {
+    return this.writeQueue.enqueue(() => this.saveArchiveStateNow(archiveState));
+  }
+
+  private async saveArchiveStateNow(
+    archiveState: SolidArchiveState,
+  ): Promise<SolidArchiveState> {
     const existingThing = await this.findArchiveStateThing(archiveState.bucket);
 
     if (existingThing === null) {

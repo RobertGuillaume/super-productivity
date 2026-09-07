@@ -14,12 +14,14 @@ import {
   timeTrackingStateToEntries,
 } from './solid-time-tracking.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidTimeTrackingContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidTimeTrackingRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadTimeTrackingState(): Promise<TimeTrackingState> {
     const timeTrackingContainerScope = this.timeTrackingContainerScope();
@@ -40,7 +42,15 @@ export class SolidTimeTrackingRepository {
     return timeTrackingEntriesToState(entries);
   }
 
-  async saveTimeTrackingEntry(
+  saveTimeTrackingEntry(entry: SolidTimeTrackingEntry): Promise<SolidTimeTrackingEntry> {
+    return this.writeQueue.enqueue(() => this.saveTimeTrackingEntryNow(entry));
+  }
+
+  replaceTimeTrackingState(state: TimeTrackingState): Promise<void> {
+    return this.writeQueue.enqueue(() => this.replaceTimeTrackingStateNow(state));
+  }
+
+  private async saveTimeTrackingEntryNow(
     entry: SolidTimeTrackingEntry,
   ): Promise<SolidTimeTrackingEntry> {
     const existingThing = await this.findTimeTrackingThing(
@@ -79,12 +89,12 @@ export class SolidTimeTrackingRepository {
     return updatedEntry;
   }
 
-  async replaceTimeTrackingState(state: TimeTrackingState): Promise<void> {
+  private async replaceTimeTrackingStateNow(state: TimeTrackingState): Promise<void> {
     const existingThings = await this.findAllTimeTrackingThings();
     const entries = timeTrackingStateToEntries(state);
     const desiredIds = new Set(entries.map((entry) => entry.id));
 
-    await Promise.all(entries.map((entry) => this.saveTimeTrackingEntry(entry)));
+    await Promise.all(entries.map((entry) => this.saveTimeTrackingEntryNow(entry)));
 
     await Promise.all(
       existingThings

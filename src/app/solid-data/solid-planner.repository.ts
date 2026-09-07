@@ -17,12 +17,14 @@ import {
 } from './solid-planner.mapper';
 import { SP_PLANNER_DAY, SP_PLANNER_STATE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidPlannerContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidPlannerRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadPlannerState(): Promise<PlannerState> {
     const plannerContainerScope = this.plannerContainerScope();
@@ -51,24 +53,52 @@ export class SolidPlannerRepository {
     return plannerState;
   }
 
-  async replacePlannerState(plannerState: PlannerState): Promise<PlannerState> {
+  replacePlannerState(plannerState: PlannerState): Promise<PlannerState> {
+    return this.writeQueue.enqueue(() => this.replacePlannerStateNow(plannerState));
+  }
+
+  reconcilePlannerDays(plannerState: PlannerState): Promise<PlannerState> {
+    return this.writeQueue.enqueue(() => this.reconcilePlannerDaysNow(plannerState));
+  }
+
+  savePlannerDay(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
+    return this.writeQueue.enqueue(() => this.savePlannerDayNow(plannerDay));
+  }
+
+  deletePlannerDay(day: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deletePlannerDayNow(day));
+  }
+
+  savePlannerDialogState(
+    addPlannedTasksDialogLastShown: string | undefined,
+  ): Promise<void> {
+    return this.writeQueue.enqueue(() =>
+      this.savePlannerDialogStateNow(addPlannedTasksDialogLastShown),
+    );
+  }
+
+  private async replacePlannerStateNow(
+    plannerState: PlannerState,
+  ): Promise<PlannerState> {
     const existingDays = await this.loadPlannerDays();
     const nextDays = new Set(Object.keys(plannerState.days));
 
     await Promise.all([
       ...existingDays
         .filter((plannerDay) => !nextDays.has(plannerDay.day))
-        .map((plannerDay) => this.deletePlannerDay(plannerDay.day)),
+        .map((plannerDay) => this.deletePlannerDayNow(plannerDay.day)),
       ...Object.entries(plannerState.days).map(([day, taskIds]) =>
-        this.savePlannerDay({ day, taskIds, updated: Date.now() }),
+        this.savePlannerDayNow({ day, taskIds, updated: Date.now() }),
       ),
-      this.savePlannerDialogState(plannerState.addPlannedTasksDialogLastShown),
+      this.savePlannerDialogStateNow(plannerState.addPlannedTasksDialogLastShown),
     ]);
 
     return plannerState;
   }
 
-  async reconcilePlannerDays(plannerState: PlannerState): Promise<PlannerState> {
+  private async reconcilePlannerDaysNow(
+    plannerState: PlannerState,
+  ): Promise<PlannerState> {
     const result = await this.solidRuntime.client.things.query(solidPlannerDayQuery, {
       scope: this.plannerContainerScope(),
       autoDiscover: true,
@@ -116,7 +146,7 @@ export class SolidPlannerRepository {
     return result.things.map(solidThingToPlannerDay);
   }
 
-  async savePlannerDay(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
+  private async savePlannerDayNow(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
     const existingThing = await this.findPlannerDayThing(plannerDay.day);
 
     if (existingThing === null) {
@@ -152,14 +182,14 @@ export class SolidPlannerRepository {
     return solidThingToPlannerDay(commit.result);
   }
 
-  async deletePlannerDay(day: string): Promise<void> {
+  private async deletePlannerDayNow(day: string): Promise<void> {
     const existingThing = await this.findPlannerDayThing(day);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);
     }
   }
 
-  async savePlannerDialogState(
+  private async savePlannerDialogStateNow(
     addPlannedTasksDialogLastShown: string | undefined,
   ): Promise<void> {
     const existingThing = await this.findPlannerStateThing();

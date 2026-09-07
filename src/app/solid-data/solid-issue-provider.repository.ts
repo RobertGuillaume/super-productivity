@@ -10,12 +10,14 @@ import {
   solidThingToIssueProviderRecord,
 } from './solid-issue-provider.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidIssueProviderContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidIssueProviderRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadIssueProviders(): Promise<IssueProvider[]> {
     const issueProviderContainerScope = this.issueProviderContainerScope();
@@ -36,9 +38,17 @@ export class SolidIssueProviderRepository {
       .map((record) => record.issueProvider);
   }
 
-  async saveIssueProvider(
+  saveIssueProvider(issueProvider: IssueProvider, order = 0): Promise<IssueProvider> {
+    return this.writeQueue.enqueue(() => this.saveIssueProviderNow(issueProvider, order));
+  }
+
+  deleteIssueProvider(issueProviderId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteIssueProviderNow(issueProviderId));
+  }
+
+  private async saveIssueProviderNow(
     issueProvider: IssueProvider,
-    order = 0,
+    order: number,
   ): Promise<IssueProvider> {
     const existingThing = await this.findIssueProviderThing(issueProvider.id);
 
@@ -68,7 +78,7 @@ export class SolidIssueProviderRepository {
     return solidThingToIssueProvider(commit.result);
   }
 
-  async deleteIssueProvider(issueProviderId: string): Promise<void> {
+  private async deleteIssueProviderNow(issueProviderId: string): Promise<void> {
     const existingThing = await this.findIssueProviderThing(issueProviderId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

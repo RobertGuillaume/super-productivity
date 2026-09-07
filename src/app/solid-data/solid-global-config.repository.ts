@@ -10,12 +10,14 @@ import {
   solidThingToGlobalConfig,
 } from './solid-global-config.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidGlobalConfigContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidGlobalConfigRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadGlobalConfig(): Promise<GlobalConfigState | null> {
     const configContainerScope = this.globalConfigContainerScope();
@@ -33,7 +35,13 @@ export class SolidGlobalConfigRepository {
     return solidThingToGlobalConfig(existingThing)?.config ?? null;
   }
 
-  async saveGlobalConfig(config: GlobalConfigState): Promise<GlobalConfigState> {
+  saveGlobalConfig(config: GlobalConfigState): Promise<GlobalConfigState> {
+    return this.writeQueue.enqueue(() => this.saveGlobalConfigNow(config));
+  }
+
+  private async saveGlobalConfigNow(
+    config: GlobalConfigState,
+  ): Promise<GlobalConfigState> {
     const existingThing = await this.findGlobalConfigThing();
 
     if (existingThing === null) {

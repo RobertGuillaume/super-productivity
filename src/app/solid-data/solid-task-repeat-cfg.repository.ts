@@ -9,12 +9,14 @@ import {
   taskRepeatCfgToSolidCreateInput,
 } from './solid-task-repeat-cfg.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidTaskRepeatCfgContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidTaskRepeatCfgRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadTaskRepeatCfgs(): Promise<TaskRepeatCfg[]> {
     const taskRepeatCfgContainerScope = this.taskRepeatCfgContainerScope();
@@ -32,7 +34,17 @@ export class SolidTaskRepeatCfgRepository {
     return result.things.map(solidThingToTaskRepeatCfg);
   }
 
-  async saveTaskRepeatCfg(taskRepeatCfg: TaskRepeatCfg): Promise<TaskRepeatCfg> {
+  saveTaskRepeatCfg(taskRepeatCfg: TaskRepeatCfg): Promise<TaskRepeatCfg> {
+    return this.writeQueue.enqueue(() => this.saveTaskRepeatCfgNow(taskRepeatCfg));
+  }
+
+  deleteTaskRepeatCfg(taskRepeatCfgId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteTaskRepeatCfgNow(taskRepeatCfgId));
+  }
+
+  private async saveTaskRepeatCfgNow(
+    taskRepeatCfg: TaskRepeatCfg,
+  ): Promise<TaskRepeatCfg> {
     const existingThing = await this.findTaskRepeatCfgThing(taskRepeatCfg.id);
 
     if (existingThing === null) {
@@ -60,7 +72,7 @@ export class SolidTaskRepeatCfgRepository {
     return solidThingToTaskRepeatCfg(commit.result);
   }
 
-  async deleteTaskRepeatCfg(taskRepeatCfgId: string): Promise<void> {
+  private async deleteTaskRepeatCfgNow(taskRepeatCfgId: string): Promise<void> {
     const existingThing = await this.findTaskRepeatCfgThing(taskRepeatCfgId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

@@ -10,12 +10,14 @@ import {
   solidThingToBoardRecord,
 } from './solid-board.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidBoardContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidBoardRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadBoards(): Promise<BoardCfg[]> {
     const boardContainerScope = this.boardContainerScope();
@@ -36,7 +38,15 @@ export class SolidBoardRepository {
       .map((record) => record.board);
   }
 
-  async saveBoard(board: BoardCfg, order = 0): Promise<BoardCfg> {
+  saveBoard(board: BoardCfg, order = 0): Promise<BoardCfg> {
+    return this.writeQueue.enqueue(() => this.saveBoardNow(board, order));
+  }
+
+  deleteBoard(boardId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteBoardNow(boardId));
+  }
+
+  private async saveBoardNow(board: BoardCfg, order: number): Promise<BoardCfg> {
     const existingThing = await this.findBoardThing(board.id);
 
     if (existingThing === null) {
@@ -59,7 +69,7 @@ export class SolidBoardRepository {
     return solidThingToBoard(commit.result);
   }
 
-  async deleteBoard(boardId: string): Promise<void> {
+  private async deleteBoardNow(boardId: string): Promise<void> {
     const existingThing = await this.findBoardThing(boardId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

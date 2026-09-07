@@ -11,12 +11,14 @@ import {
   solidThingToAppState,
 } from './solid-app-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidAppContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidAppStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadAppState(): Promise<SolidAppState | null> {
     const appContainerScope = this.appContainerScope();
@@ -30,7 +32,15 @@ export class SolidAppStateRepository {
     return existingThing === null ? null : solidThingToAppState(existingThing);
   }
 
-  async saveAppStateOrder(
+  saveAppStateOrder(
+    changes: Partial<
+      Pick<SolidAppState, 'noteTodayOrder' | 'projectOrder' | 'sectionOrder' | 'tagOrder'>
+    >,
+  ): Promise<SolidAppState> {
+    return this.writeQueue.enqueue(() => this.saveAppStateOrderNow(changes));
+  }
+
+  private async saveAppStateOrderNow(
     changes: Partial<
       Pick<SolidAppState, 'noteTodayOrder' | 'projectOrder' | 'sectionOrder' | 'tagOrder'>
     >,

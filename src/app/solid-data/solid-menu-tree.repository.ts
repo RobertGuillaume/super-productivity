@@ -10,12 +10,14 @@ import {
   solidThingToMenuTree,
 } from './solid-menu-tree.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidMenuTreeContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidMenuTreeRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadMenuTree(): Promise<MenuTreeState | null> {
     const menuTreeContainerScope = this.menuTreeContainerScope();
@@ -33,7 +35,11 @@ export class SolidMenuTreeRepository {
     return solidThingToMenuTree(existingThing)?.menuTree ?? null;
   }
 
-  async saveMenuTree(menuTree: MenuTreeState): Promise<MenuTreeState> {
+  saveMenuTree(menuTree: MenuTreeState): Promise<MenuTreeState> {
+    return this.writeQueue.enqueue(() => this.saveMenuTreeNow(menuTree));
+  }
+
+  private async saveMenuTreeNow(menuTree: MenuTreeState): Promise<MenuTreeState> {
     const existingThing = await this.findMenuTreeThing();
 
     if (existingThing === null) {

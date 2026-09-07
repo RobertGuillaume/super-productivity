@@ -10,12 +10,14 @@ import {
   solidThingToSimpleCounterRecord,
 } from './solid-simple-counter.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidSimpleCounterContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidSimpleCounterRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadSimpleCounters(): Promise<SimpleCounter[]> {
     const simpleCounterContainerScope = this.simpleCounterContainerScope();
@@ -36,9 +38,23 @@ export class SolidSimpleCounterRepository {
       .map((record) => record.simpleCounter);
   }
 
-  async saveSimpleCounter(
+  saveSimpleCounter(simpleCounter: SimpleCounter, order = 0): Promise<SimpleCounter> {
+    return this.writeQueue.enqueue(() => this.saveSimpleCounterNow(simpleCounter, order));
+  }
+
+  replaceSimpleCounters(
+    simpleCounters: readonly SimpleCounter[],
+  ): Promise<SimpleCounter[]> {
+    return this.writeQueue.enqueue(() => this.replaceSimpleCountersNow(simpleCounters));
+  }
+
+  deleteSimpleCounter(simpleCounterId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteSimpleCounterNow(simpleCounterId));
+  }
+
+  private async saveSimpleCounterNow(
     simpleCounter: SimpleCounter,
-    order = 0,
+    order: number,
   ): Promise<SimpleCounter> {
     const existingThing = await this.findSimpleCounterThing(simpleCounter.id);
 
@@ -68,7 +84,7 @@ export class SolidSimpleCounterRepository {
     return solidThingToSimpleCounter(commit.result);
   }
 
-  async replaceSimpleCounters(
+  private async replaceSimpleCountersNow(
     simpleCounters: readonly SimpleCounter[],
   ): Promise<SimpleCounter[]> {
     const existingThings = await this.querySimpleCounterThings();
@@ -78,17 +94,17 @@ export class SolidSimpleCounterRepository {
       existingThings
         .map(solidThingToSimpleCounter)
         .filter((simpleCounter) => !nextIds.has(simpleCounter.id))
-        .map((simpleCounter) => this.deleteSimpleCounter(simpleCounter.id)),
+        .map((simpleCounter) => this.deleteSimpleCounterNow(simpleCounter.id)),
     );
 
     return Promise.all(
       simpleCounters.map((simpleCounter, order) =>
-        this.saveSimpleCounter(simpleCounter, order),
+        this.saveSimpleCounterNow(simpleCounter, order),
       ),
     );
   }
 
-  async deleteSimpleCounter(simpleCounterId: string): Promise<void> {
+  private async deleteSimpleCounterNow(simpleCounterId: string): Promise<void> {
     const existingThing = await this.findSimpleCounterThing(simpleCounterId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

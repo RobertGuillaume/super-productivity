@@ -3,6 +3,7 @@ import type { Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Task } from '../features/tasks/task.model';
 import { SOLID_PRODUCTIVITY_TASK_TYPE, SP_TASK } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   solidTaskQuery,
   solidThingToTask,
@@ -13,8 +14,8 @@ import {
 @Injectable({ providedIn: 'root' })
 export class SolidTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
   private readonly taskThingUris = new Map<string, string>();
-  private readonly taskOperations = new Map<string, Promise<void>>();
 
   async loadTasks(): Promise<Task[]> {
     await this.solidRuntime.client.discovery.refresh({
@@ -31,11 +32,11 @@ export class SolidTaskRepository {
   }
 
   saveTask(task: Task): Promise<Task> {
-    return this.enqueueTaskOperation(task.id, () => this.saveTaskNow(task));
+    return this.writeQueue.enqueue(() => this.saveTaskNow(task));
   }
 
   deleteTask(taskId: string): Promise<void> {
-    return this.enqueueTaskOperation(taskId, async () => {
+    return this.writeQueue.enqueue(async () => {
       const existingThingUri = await this.findTaskThingUri(taskId);
       if (existingThingUri !== null) {
         await this.solidRuntime.client.things.delete(existingThingUri);
@@ -117,27 +118,6 @@ export class SolidTaskRepository {
     const task = solidThingToTask(thing);
     this.taskThingUris.set(task.id, thing.uri);
     return task;
-  }
-
-  private async enqueueTaskOperation<Result>(
-    taskId: string,
-    operation: () => Promise<Result>,
-  ): Promise<Result> {
-    const previous = this.taskOperations.get(taskId) ?? Promise.resolve();
-    const current = previous.catch(() => undefined).then(operation);
-    const settled = current.then(
-      () => undefined,
-      () => undefined,
-    );
-    this.taskOperations.set(taskId, settled);
-
-    try {
-      return await current;
-    } finally {
-      if (this.taskOperations.get(taskId) === settled) {
-        this.taskOperations.delete(taskId);
-      }
-    }
   }
 }
 

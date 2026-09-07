@@ -111,6 +111,60 @@ describe('SolidProjectRepository', () => {
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);
     expect(saved.title).toBe('Updated project title');
   });
+
+  it('serializes an edit that arrives while project creation is pending', async () => {
+    const createdThing = createThing(project.title);
+    const updatedThing = createThing('Edited immediately');
+    const plan = {
+      version: 1,
+      id: 'write-plan-overlap',
+      kind: 'thing.update',
+      request: {
+        kind: 'thing.update',
+        uri: createdThing.uri,
+        changes: {},
+      },
+      operations: [],
+      affectedResources: [],
+      preconditions: [],
+      diagnostics: [],
+    } as RuntimeWritePlan;
+    let created = false;
+    let releaseCreate: (() => void) | undefined;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = resolve;
+    });
+    things.query.and.callFake(async () => ({
+      things: created ? [createdThing] : [],
+    }));
+    things.create.and.callFake(async () => {
+      await createGate;
+      created = true;
+      return createdThing;
+    });
+    writes.planUpdate.and.returnValue(plan);
+    writes.commit.and.resolveTo({
+      planId: plan.id,
+      kind: 'thing.update',
+      result: updatedThing,
+    });
+    const repository = TestBed.inject(SolidProjectRepository);
+
+    const create = repository.saveProject(project);
+    await Promise.resolve();
+    await Promise.resolve();
+    const edit = repository.saveProject({
+      ...project,
+      title: 'Edited immediately',
+    });
+    await Promise.resolve();
+
+    expect(things.query).toHaveBeenCalledTimes(1);
+    releaseCreate?.();
+    await Promise.all([create, edit]);
+    expect(things.create).toHaveBeenCalledTimes(1);
+    expect(writes.commit).toHaveBeenCalledTimes(1);
+  });
 });
 
 const createThing = (title: string): Thing => {

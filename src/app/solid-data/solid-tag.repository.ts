@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Tag } from '../features/tag/tag.model';
 import { SP_TAG } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   solidTagQuery,
   solidThingToTag,
@@ -15,6 +16,7 @@ type SolidTagContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 @Injectable({ providedIn: 'root' })
 export class SolidTagRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadTags(): Promise<Tag[]> {
     const tagContainerScope = this.tagContainerScope();
@@ -32,7 +34,15 @@ export class SolidTagRepository {
     return result.things.map(solidThingToTag);
   }
 
-  async saveTag(tag: Tag): Promise<Tag> {
+  saveTag(tag: Tag): Promise<Tag> {
+    return this.writeQueue.enqueue(() => this.saveTagNow(tag));
+  }
+
+  deleteTag(tagId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteTagNow(tagId));
+  }
+
+  private async saveTagNow(tag: Tag): Promise<Tag> {
     const existingThing = await this.findTagThing(tag.id);
 
     if (existingThing === null) {
@@ -55,7 +65,7 @@ export class SolidTagRepository {
     return solidThingToTag(commit.result);
   }
 
-  async deleteTag(tagId: string): Promise<void> {
+  private async deleteTagNow(tagId: string): Promise<void> {
     const existingThing = await this.findTagThing(tagId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

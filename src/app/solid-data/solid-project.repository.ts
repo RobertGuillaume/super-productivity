@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Project } from '../features/project/project.model';
 import { SP_PROJECT } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   projectToSolidChanges,
   projectToSolidCreateInput,
@@ -15,6 +16,7 @@ type SolidProjectContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 @Injectable({ providedIn: 'root' })
 export class SolidProjectRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadProjects(): Promise<Project[]> {
     const projectContainerScope = this.projectContainerScope();
@@ -32,7 +34,15 @@ export class SolidProjectRepository {
     return result.things.map(solidThingToProject);
   }
 
-  async saveProject(project: Project): Promise<Project> {
+  saveProject(project: Project): Promise<Project> {
+    return this.writeQueue.enqueue(() => this.saveProjectNow(project));
+  }
+
+  deleteProject(projectId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteProjectNow(projectId));
+  }
+
+  private async saveProjectNow(project: Project): Promise<Project> {
     const existingThing = await this.findProjectThing(project.id);
 
     if (existingThing === null) {
@@ -55,7 +65,7 @@ export class SolidProjectRepository {
     return solidThingToProject(commit.result);
   }
 
-  async deleteProject(projectId: string): Promise<void> {
+  private async deleteProjectNow(projectId: string): Promise<void> {
     const existingThing = await this.findProjectThing(projectId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

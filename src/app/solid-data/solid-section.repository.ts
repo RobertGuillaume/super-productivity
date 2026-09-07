@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Section } from '../features/section/section.model';
 import { SP_SECTION } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   sectionToSolidChanges,
   sectionToSolidCreateInput,
@@ -15,6 +16,7 @@ type SolidSectionContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 @Injectable({ providedIn: 'root' })
 export class SolidSectionRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadSections(): Promise<Section[]> {
     const sectionContainerScope = this.sectionContainerScope();
@@ -32,7 +34,15 @@ export class SolidSectionRepository {
     return result.things.map(solidThingToSection);
   }
 
-  async saveSection(section: Section): Promise<Section> {
+  saveSection(section: Section): Promise<Section> {
+    return this.writeQueue.enqueue(() => this.saveSectionNow(section));
+  }
+
+  deleteSection(sectionId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteSectionNow(sectionId));
+  }
+
+  private async saveSectionNow(section: Section): Promise<Section> {
     const existingThing = await this.findSectionThing(section.id);
 
     if (existingThing === null) {
@@ -55,7 +65,7 @@ export class SolidSectionRepository {
     return solidThingToSection(commit.result);
   }
 
-  async deleteSection(sectionId: string): Promise<void> {
+  private async deleteSectionNow(sectionId: string): Promise<void> {
     const existingThing = await this.findSectionThing(sectionId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

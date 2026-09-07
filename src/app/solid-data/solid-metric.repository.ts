@@ -9,12 +9,14 @@ import {
   solidThingToMetric,
 } from './solid-metric.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidMetricContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidMetricRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadMetrics(): Promise<Metric[]> {
     const metricContainerScope = this.metricContainerScope();
@@ -32,7 +34,15 @@ export class SolidMetricRepository {
     return result.things.map(solidThingToMetric).sort((a, b) => a.id.localeCompare(b.id));
   }
 
-  async saveMetric(metric: Metric): Promise<Metric> {
+  saveMetric(metric: Metric): Promise<Metric> {
+    return this.writeQueue.enqueue(() => this.saveMetricNow(metric));
+  }
+
+  deleteMetric(metricId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteMetricNow(metricId));
+  }
+
+  private async saveMetricNow(metric: Metric): Promise<Metric> {
     const existingThing = await this.findMetricThing(metric.id);
 
     if (existingThing === null) {
@@ -55,7 +65,7 @@ export class SolidMetricRepository {
     return solidThingToMetric(commit.result);
   }
 
-  async deleteMetric(metricId: string): Promise<void> {
+  private async deleteMetricNow(metricId: string): Promise<void> {
     const existingThing = await this.findMetricThing(metricId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

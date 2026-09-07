@@ -11,12 +11,14 @@ import {
   solidThingToArchivedTask,
 } from './solid-archived-task.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidArchivedTaskContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidArchivedTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadArchivedTasks(): Promise<SolidArchivedTask[]> {
     const archivedTaskContainerScope = this.archivedTaskContainerScope();
@@ -34,9 +36,25 @@ export class SolidArchivedTaskRepository {
     return result.things.map(solidThingToArchivedTask);
   }
 
-  async saveArchivedTask(
+  saveArchivedTask(task: Task, bucket: SolidArchiveBucket = 'young'): Promise<Task> {
+    return this.writeQueue.enqueue(() => this.saveArchivedTaskNow(task, bucket));
+  }
+
+  deleteArchivedTask(taskId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteArchivedTaskNow(taskId));
+  }
+
+  deleteArchivedTasks(taskIds: readonly string[]): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteArchivedTasksNow(taskIds));
+  }
+
+  replaceArchivedTasks(archivedTasks: readonly SolidArchivedTask[]): Promise<void> {
+    return this.writeQueue.enqueue(() => this.replaceArchivedTasksNow(archivedTasks));
+  }
+
+  private async saveArchivedTaskNow(
     task: Task,
-    bucket: SolidArchiveBucket = 'young',
+    bucket: SolidArchiveBucket,
   ): Promise<Task> {
     const archivedTask: SolidArchivedTask = { task, bucket };
     const existingThing = await this.findArchivedTaskThing(task.id, bucket);
@@ -66,18 +84,20 @@ export class SolidArchivedTaskRepository {
     return solidThingToArchivedTask(commit.result).task;
   }
 
-  async deleteArchivedTask(taskId: string): Promise<void> {
+  private async deleteArchivedTaskNow(taskId: string): Promise<void> {
     const existingThings = await this.findArchivedTaskThings(taskId);
     await Promise.all(
       existingThings.map((thing) => this.solidRuntime.client.things.delete(thing.uri)),
     );
   }
 
-  async deleteArchivedTasks(taskIds: readonly string[]): Promise<void> {
-    await Promise.all(taskIds.map((taskId) => this.deleteArchivedTask(taskId)));
+  private async deleteArchivedTasksNow(taskIds: readonly string[]): Promise<void> {
+    await Promise.all(taskIds.map((taskId) => this.deleteArchivedTaskNow(taskId)));
   }
 
-  async replaceArchivedTasks(archivedTasks: readonly SolidArchivedTask[]): Promise<void> {
+  private async replaceArchivedTasksNow(
+    archivedTasks: readonly SolidArchivedTask[],
+  ): Promise<void> {
     const existingThings = await this.findAllArchivedTaskThings();
     const desiredKeys = new Set(
       archivedTasks.map((archivedTask) => archivedTaskKey(archivedTask)),
@@ -85,7 +105,7 @@ export class SolidArchivedTaskRepository {
 
     await Promise.all(
       archivedTasks.map((archivedTask) =>
-        this.saveArchivedTask(archivedTask.task, archivedTask.bucket),
+        this.saveArchivedTaskNow(archivedTask.task, archivedTask.bucket),
       ),
     );
 

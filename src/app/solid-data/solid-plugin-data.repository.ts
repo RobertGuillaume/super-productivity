@@ -13,12 +13,14 @@ import {
   solidThingToPluginUserData,
 } from './solid-plugin-data.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidPluginContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
 @Injectable({ providedIn: 'root' })
 export class SolidPluginDataRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadPluginUserData(): Promise<PluginUserData[]> {
     const scope = this.pluginUserDataContainerScope();
@@ -58,7 +60,25 @@ export class SolidPluginDataRepository {
       .filter((metadata): metadata is PluginMetadata => metadata !== null);
   }
 
-  async savePluginUserData(pluginUserData: PluginUserData): Promise<PluginUserData> {
+  savePluginUserData(pluginUserData: PluginUserData): Promise<PluginUserData> {
+    return this.writeQueue.enqueue(() => this.savePluginUserDataNow(pluginUserData));
+  }
+
+  savePluginMetadata(pluginMetadata: PluginMetadata): Promise<PluginMetadata> {
+    return this.writeQueue.enqueue(() => this.savePluginMetadataNow(pluginMetadata));
+  }
+
+  deletePluginUserData(pluginId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deletePluginUserDataNow(pluginId));
+  }
+
+  deletePluginMetadata(pluginId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deletePluginMetadataNow(pluginId));
+  }
+
+  private async savePluginUserDataNow(
+    pluginUserData: PluginUserData,
+  ): Promise<PluginUserData> {
     const existingThing = await this.findPluginUserDataThing(pluginUserData.id);
 
     if (existingThing === null) {
@@ -94,7 +114,9 @@ export class SolidPluginDataRepository {
     return updatedPluginUserData;
   }
 
-  async savePluginMetadata(pluginMetadata: PluginMetadata): Promise<PluginMetadata> {
+  private async savePluginMetadataNow(
+    pluginMetadata: PluginMetadata,
+  ): Promise<PluginMetadata> {
     const existingThing = await this.findPluginMetadataThing(pluginMetadata.id);
 
     if (existingThing === null) {
@@ -130,14 +152,14 @@ export class SolidPluginDataRepository {
     return updatedPluginMetadata;
   }
 
-  async deletePluginUserData(pluginId: string): Promise<void> {
+  private async deletePluginUserDataNow(pluginId: string): Promise<void> {
     const existingThing = await this.findPluginUserDataThing(pluginId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);
     }
   }
 
-  async deletePluginMetadata(pluginId: string): Promise<void> {
+  private async deletePluginMetadataNow(pluginId: string): Promise<void> {
     const existingThing = await this.findPluginMetadataThing(pluginId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);

@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Note } from '../features/note/note.model';
 import { SP_NOTE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   noteToSolidChanges,
   noteToSolidCreateInput,
@@ -15,6 +16,7 @@ type SolidNoteContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 @Injectable({ providedIn: 'root' })
 export class SolidNoteRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly writeQueue = inject(SolidWriteQueueService);
 
   async loadNotes(): Promise<Note[]> {
     const noteContainerScope = this.noteContainerScope();
@@ -32,7 +34,15 @@ export class SolidNoteRepository {
     return result.things.map(solidThingToNote);
   }
 
-  async saveNote(note: Note): Promise<Note> {
+  saveNote(note: Note): Promise<Note> {
+    return this.writeQueue.enqueue(() => this.saveNoteNow(note));
+  }
+
+  deleteNote(noteId: string): Promise<void> {
+    return this.writeQueue.enqueue(() => this.deleteNoteNow(noteId));
+  }
+
+  private async saveNoteNow(note: Note): Promise<Note> {
     const existingThing = await this.findNoteThing(note.id);
 
     if (existingThing === null) {
@@ -55,7 +65,7 @@ export class SolidNoteRepository {
     return solidThingToNote(commit.result);
   }
 
-  async deleteNote(noteId: string): Promise<void> {
+  private async deleteNoteNow(noteId: string): Promise<void> {
     const existingThing = await this.findNoteThing(noteId);
     if (existingThing !== null) {
       await this.solidRuntime.client.things.delete(existingThing.uri);
