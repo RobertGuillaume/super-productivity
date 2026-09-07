@@ -10,6 +10,7 @@ import {
   solidThingToIssueProviderRecord,
 } from './solid-issue-provider.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidIssueProviderContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -19,23 +20,21 @@ export class SolidIssueProviderRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadIssueProviders(): Promise<IssueProvider[]> {
+  async loadIssueProviders(): Promise<SolidRepositoryRead<IssueProvider[]>> {
     const issueProviderContainerScope = this.issueProviderContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [issueProviderContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidIssueProviderQuery, {
       scope: issueProviderContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things
-      .map(solidThingToIssueProviderRecord)
-      .sort((a, b) => a.order - b.order)
-      .map((record) => record.issueProvider);
+    return solidRepositoryRead(
+      result.things
+        .map(solidThingToIssueProviderRecord)
+        .sort((a, b) => a.order - b.order)
+        .map((record) => record.issueProvider),
+      result.metadata,
+    );
   }
 
   saveIssueProvider(issueProvider: IssueProvider, order = 0): Promise<IssueProvider> {
@@ -118,7 +117,7 @@ export class SolidIssueProviderRepository {
       {
         limit: 1,
         scope: this.issueProviderContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

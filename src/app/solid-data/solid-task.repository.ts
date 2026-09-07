@@ -1,8 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import type { Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Task } from '../features/tasks/task.model';
-import { SOLID_PRODUCTIVITY_TASK_TYPE, SP_TASK } from './solid-productivity-vocab';
+import { SP_TASK } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   solidTaskQuery,
@@ -17,18 +18,16 @@ export class SolidTaskRepository {
   private readonly writeQueue = inject(SolidWriteQueueService);
   private readonly taskThingUris = new Map<string, string>();
 
-  async loadTasks(): Promise<Task[]> {
-    await this.solidRuntime.client.discovery.refresh({
-      uris: [this.solidRuntime.ensureLayout().containers.tasks],
-    });
-    await this.solidRuntime.client.discovery.discoverType(SOLID_PRODUCTIVITY_TASK_TYPE);
-
+  async loadTasks(): Promise<SolidRepositoryRead<Task[]>> {
     const result = await this.solidRuntime.client.things.query(solidTaskQuery, {
       scope: { kind: 'runtime-graph' },
       autoDiscover: false,
     });
 
-    return result.things.map((thing) => this.rememberTaskThing(thing));
+    return solidRepositoryRead(
+      result.things.map((thing) => this.rememberTaskThing(thing)),
+      result.metadata,
+    );
   }
 
   saveTask(task: Task): Promise<Task> {

@@ -88,10 +88,7 @@ describe('SolidTaskRepeatCfgRepository', () => {
       SolidTaskRepeatCfgRepository,
     ).loadTaskRepeatCfgs();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/repeat-configs/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivityTaskRepeatCfg',
@@ -103,7 +100,7 @@ describe('SolidTaskRepeatCfgRepository', () => {
         },
       }),
     );
-    expect(taskRepeatCfgs[0]).toEqual(taskRepeatCfg);
+    expect(taskRepeatCfgs.value[0]).toEqual(taskRepeatCfg);
   });
 
   it('creates deterministic task repeat config resources when none exists', async () => {

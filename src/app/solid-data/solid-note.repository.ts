@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Note } from '../features/note/note.model';
 import { SP_NOTE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   noteToSolidChanges,
@@ -18,20 +19,15 @@ export class SolidNoteRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadNotes(): Promise<Note[]> {
+  async loadNotes(): Promise<SolidRepositoryRead<Note[]>> {
     const noteContainerScope = this.noteContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [noteContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidNoteQuery, {
       scope: noteContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things.map(solidThingToNote);
+    return solidRepositoryRead(result.things.map(solidThingToNote), result.metadata);
   }
 
   saveNote(note: Note): Promise<Note> {
@@ -97,7 +93,7 @@ export class SolidNoteRepository {
       {
         limit: 1,
         scope: this.noteContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

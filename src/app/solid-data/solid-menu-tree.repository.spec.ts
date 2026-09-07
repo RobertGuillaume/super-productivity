@@ -98,10 +98,7 @@ describe('SolidMenuTreeRepository', () => {
 
     const loaded = await TestBed.inject(SolidMenuTreeRepository).loadMenuTree();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/menu-tree/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivityMenuTree',
@@ -113,7 +110,7 @@ describe('SolidMenuTreeRepository', () => {
         },
       }),
     );
-    expect(loaded).toEqual(menuTree);
+    expect(loaded.value).toEqual(menuTree);
   });
 
   it('creates deterministic menu tree resources when none exists', async () => {

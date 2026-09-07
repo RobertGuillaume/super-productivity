@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Project } from '../features/project/project.model';
 import { SP_PROJECT } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   projectToSolidChanges,
@@ -18,20 +19,15 @@ export class SolidProjectRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadProjects(): Promise<Project[]> {
+  async loadProjects(): Promise<SolidRepositoryRead<Project[]>> {
     const projectContainerScope = this.projectContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [projectContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidProjectQuery, {
       scope: projectContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things.map(solidThingToProject);
+    return solidRepositoryRead(result.things.map(solidThingToProject), result.metadata);
   }
 
   saveProject(project: Project): Promise<Project> {
@@ -97,7 +93,7 @@ export class SolidProjectRepository {
       {
         limit: 1,
         scope: this.projectContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

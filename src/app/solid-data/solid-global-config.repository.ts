@@ -1,5 +1,10 @@
 import { inject, Injectable } from '@angular/core';
-import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
+import type {
+  RuntimeScope,
+  Thing,
+  ThingQueryResult,
+  Unsubscribe,
+} from '@solid-intents/runtime';
 import { GlobalConfigState } from '../features/config/global-config.model';
 import { SP_GLOBAL_CONFIG } from './solid-productivity-vocab';
 import {
@@ -10,6 +15,7 @@ import {
   solidThingToGlobalConfig,
 } from './solid-global-config.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidGlobalConfigContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -19,20 +25,15 @@ export class SolidGlobalConfigRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadGlobalConfig(): Promise<GlobalConfigState | null> {
-    const configContainerScope = this.globalConfigContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [configContainerScope.uri],
-      mode: 'balanced',
-    });
-
-    const existingThing = await this.findGlobalConfigThing();
-    if (existingThing === null) {
-      return null;
-    }
-
-    return solidThingToGlobalConfig(existingThing)?.config ?? null;
+  async loadGlobalConfig(): Promise<SolidRepositoryRead<GlobalConfigState | null>> {
+    const result = await this.queryGlobalConfigThing();
+    const existingThing = result.things[0] ?? null;
+    return solidRepositoryRead(
+      existingThing === null
+        ? null
+        : (solidThingToGlobalConfig(existingThing)?.config ?? null),
+      result.metadata,
+    );
   }
 
   saveGlobalConfig(config: GlobalConfigState): Promise<GlobalConfigState> {
@@ -87,7 +88,12 @@ export class SolidGlobalConfigRepository {
   }
 
   private async findGlobalConfigThing(): Promise<Thing | null> {
-    const result = await this.solidRuntime.client.things.query(
+    const result = await this.queryGlobalConfigThing();
+    return result.things[0] ?? null;
+  }
+
+  private queryGlobalConfigThing(): Promise<ThingQueryResult> {
+    return this.solidRuntime.client.things.query(
       {
         ...solidGlobalConfigQuery,
         where: [
@@ -101,11 +107,9 @@ export class SolidGlobalConfigRepository {
       {
         limit: 1,
         scope: this.globalConfigContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
-
-    return result.things[0] ?? null;
   }
 
   private globalConfigContainerScope(): SolidGlobalConfigContainerScope {

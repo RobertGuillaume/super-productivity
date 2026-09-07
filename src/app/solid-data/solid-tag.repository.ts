@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Tag } from '../features/tag/tag.model';
 import { SP_TAG } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   solidTagQuery,
@@ -18,20 +19,15 @@ export class SolidTagRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadTags(): Promise<Tag[]> {
+  async loadTags(): Promise<SolidRepositoryRead<Tag[]>> {
     const tagContainerScope = this.tagContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [tagContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidTagQuery, {
       scope: tagContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things.map(solidThingToTag);
+    return solidRepositoryRead(result.things.map(solidThingToTag), result.metadata);
   }
 
   saveTag(tag: Tag): Promise<Tag> {
@@ -97,7 +93,7 @@ export class SolidTagRepository {
       {
         limit: 1,
         scope: this.tagContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

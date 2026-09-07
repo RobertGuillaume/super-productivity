@@ -87,10 +87,7 @@ describe('SolidMetricRepository', () => {
 
     const metrics = await TestBed.inject(SolidMetricRepository).loadMetrics();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/metrics/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivityMetric',
@@ -102,7 +99,7 @@ describe('SolidMetricRepository', () => {
         },
       }),
     );
-    expect(metrics).toEqual([metric]);
+    expect(metrics.value).toEqual([metric]);
   });
 
   it('creates deterministic metric resources when none exists', async () => {

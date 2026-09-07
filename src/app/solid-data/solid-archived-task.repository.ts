@@ -11,6 +11,7 @@ import {
   solidThingToArchivedTask,
 } from './solid-archived-task.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidArchivedTaskContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -20,20 +21,18 @@ export class SolidArchivedTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadArchivedTasks(): Promise<SolidArchivedTask[]> {
+  async loadArchivedTasks(): Promise<SolidRepositoryRead<SolidArchivedTask[]>> {
     const archivedTaskContainerScope = this.archivedTaskContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [archivedTaskContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidArchivedTaskQuery, {
       scope: archivedTaskContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things.map(solidThingToArchivedTask);
+    return solidRepositoryRead(
+      result.things.map(solidThingToArchivedTask),
+      result.metadata,
+    );
   }
 
   saveArchivedTask(task: Task, bucket: SolidArchiveBucket = 'young'): Promise<Task> {
@@ -151,7 +150,7 @@ export class SolidArchivedTaskRepository {
       {
         limit: 1,
         scope: this.archivedTaskContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 
@@ -172,7 +171,7 @@ export class SolidArchivedTaskRepository {
       },
       {
         scope: this.archivedTaskContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 
@@ -182,7 +181,7 @@ export class SolidArchivedTaskRepository {
   private async findAllArchivedTaskThings(): Promise<Thing[]> {
     const result = await this.solidRuntime.client.things.query(solidArchivedTaskQuery, {
       scope: this.archivedTaskContainerScope(),
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
     return result.things;

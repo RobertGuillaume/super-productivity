@@ -52,6 +52,7 @@ import { SolidMenuTreeRepository } from './solid-menu-tree.repository';
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidPluginDataRepository } from './solid-plugin-data.repository';
 import { SolidProjectRepository } from './solid-project.repository';
+import { solidRepositoryRead } from './solid-repository-read';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -472,25 +473,43 @@ describe('SolidTaskHydrationService', () => {
       ['prepare'],
     );
     archiveDbAdapter.saveArchivesAtomic.and.resolveTo();
-    archiveStateRepository.loadArchiveStates.and.resolveTo(archiveStates);
-    taskRepository.loadTasks.and.resolveTo([task]);
-    archivedTaskRepository.loadArchivedTasks.and.resolveTo(archivedTasks);
-    boardRepository.loadBoards.and.resolveTo([board]);
-    globalConfigRepository.loadGlobalConfig.and.resolveTo(globalConfig);
-    menuTreeRepository.loadMenuTree.and.resolveTo(menuTree);
-    projectRepository.loadProjects.and.resolveTo([project]);
-    tagRepository.loadTags.and.resolveTo([tag]);
-    noteRepository.loadNotes.and.resolveTo([note]);
-    sectionRepository.loadSections.and.resolveTo([section]);
-    issueProviderRepository.loadIssueProviders.and.resolveTo([issueProvider]);
-    taskRepeatCfgRepository.loadTaskRepeatCfgs.and.resolveTo([taskRepeatCfg]);
-    simpleCounterRepository.loadSimpleCounters.and.resolveTo([simpleCounter]);
-    metricRepository.loadMetrics.and.resolveTo([metric]);
-    plannerRepository.loadPlannerState.and.resolveTo(plannerState);
-    pluginDataRepository.loadPluginUserData.and.resolveTo([pluginUserData]);
-    pluginDataRepository.loadPluginMetadata.and.resolveTo([pluginMetadata]);
-    appStateRepository.loadAppState.and.resolveTo(appState);
-    timeTrackingRepository.loadTimeTrackingState.and.resolveTo(timeTrackingState);
+    archiveStateRepository.loadArchiveStates.and.resolveTo(
+      solidRepositoryRead(archiveStates),
+    );
+    taskRepository.loadTasks.and.resolveTo(solidRepositoryRead([task]));
+    archivedTaskRepository.loadArchivedTasks.and.resolveTo(
+      solidRepositoryRead(archivedTasks),
+    );
+    boardRepository.loadBoards.and.resolveTo(solidRepositoryRead([board]));
+    globalConfigRepository.loadGlobalConfig.and.resolveTo(
+      solidRepositoryRead(globalConfig),
+    );
+    menuTreeRepository.loadMenuTree.and.resolveTo(solidRepositoryRead(menuTree));
+    projectRepository.loadProjects.and.resolveTo(solidRepositoryRead([project]));
+    tagRepository.loadTags.and.resolveTo(solidRepositoryRead([tag]));
+    noteRepository.loadNotes.and.resolveTo(solidRepositoryRead([note]));
+    sectionRepository.loadSections.and.resolveTo(solidRepositoryRead([section]));
+    issueProviderRepository.loadIssueProviders.and.resolveTo(
+      solidRepositoryRead([issueProvider]),
+    );
+    taskRepeatCfgRepository.loadTaskRepeatCfgs.and.resolveTo(
+      solidRepositoryRead([taskRepeatCfg]),
+    );
+    simpleCounterRepository.loadSimpleCounters.and.resolveTo(
+      solidRepositoryRead([simpleCounter]),
+    );
+    metricRepository.loadMetrics.and.resolveTo(solidRepositoryRead([metric]));
+    plannerRepository.loadPlannerState.and.resolveTo(solidRepositoryRead(plannerState));
+    pluginDataRepository.loadPluginUserData.and.resolveTo(
+      solidRepositoryRead([pluginUserData]),
+    );
+    pluginDataRepository.loadPluginMetadata.and.resolveTo(
+      solidRepositoryRead([pluginMetadata]),
+    );
+    appStateRepository.loadAppState.and.resolveTo(solidRepositoryRead(appState));
+    timeTrackingRepository.loadTimeTrackingState.and.resolveTo(
+      solidRepositoryRead(timeTrackingState),
+    );
     hydrationDiscovery.prepare.and.resolveTo(undefined);
 
     TestBed.configureTestingModule({

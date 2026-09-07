@@ -86,10 +86,7 @@ describe('SolidArchivedTaskRepository', () => {
       SolidArchivedTaskRepository,
     ).loadArchivedTasks();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/archive/tasks/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       { type: 'SuperProductivityArchivedTask' },
       {
@@ -97,13 +94,13 @@ describe('SolidArchivedTaskRepository', () => {
           kind: 'container',
           uri: 'https://pod.example/super-productivity/archive/tasks/',
         },
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
-    expect(archivedTasks[0].bucket).toBe('old');
-    expect(archivedTasks[0].task.id).toBe(task.id);
-    expect(archivedTasks[0].task.title).toBe(task.title);
-    expect(archivedTasks[0].task.projectId).toBe(task.projectId);
+    expect(archivedTasks.value[0].bucket).toBe('old');
+    expect(archivedTasks.value[0].task.id).toBe(task.id);
+    expect(archivedTasks.value[0].task.title).toBe(task.title);
+    expect(archivedTasks.value[0].task.projectId).toBe(task.projectId);
   });
 
   it('creates missing archived task resources with deterministic names', async () => {

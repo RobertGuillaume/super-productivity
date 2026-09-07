@@ -92,10 +92,7 @@ describe('SolidIssueProviderRepository', () => {
       SolidIssueProviderRepository,
     ).loadIssueProviders();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/issue-providers/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivityIssueProvider',
@@ -107,7 +104,7 @@ describe('SolidIssueProviderRepository', () => {
         },
       }),
     );
-    expect(issueProviders.map((provider) => provider.id)).toEqual([
+    expect(issueProviders.value.map((provider) => provider.id)).toEqual([
       'issue-provider-1',
       'b',
     ]);

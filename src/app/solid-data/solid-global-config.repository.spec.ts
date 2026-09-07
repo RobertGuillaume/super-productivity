@@ -84,10 +84,7 @@ describe('SolidGlobalConfigRepository', () => {
 
     const loaded = await TestBed.inject(SolidGlobalConfigRepository).loadGlobalConfig();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/config/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivityGlobalConfig',
@@ -99,7 +96,7 @@ describe('SolidGlobalConfigRepository', () => {
         },
       }),
     );
-    expect(loaded?.misc.isDisableAnimations).toBe(true);
+    expect(loaded.value?.misc.isDisableAnimations).toBe(true);
   });
 
   it('creates deterministic global config resources when none exists', async () => {

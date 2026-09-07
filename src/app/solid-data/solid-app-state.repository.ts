@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import type { RuntimeScope, Thing } from '@solid-intents/runtime';
+import type { RuntimeScope, Thing, ThingQueryResult } from '@solid-intents/runtime';
 import { SP_APP_STATE } from './solid-productivity-vocab';
 import {
   appStateToSolidChanges,
@@ -11,6 +11,7 @@ import {
   solidThingToAppState,
 } from './solid-app-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidAppContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -20,16 +21,13 @@ export class SolidAppStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadAppState(): Promise<SolidAppState | null> {
-    const appContainerScope = this.appContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [appContainerScope.uri],
-      mode: 'balanced',
-    });
-
-    const existingThing = await this.findAppStateThing();
-    return existingThing === null ? null : solidThingToAppState(existingThing);
+  async loadAppState(): Promise<SolidRepositoryRead<SolidAppState | null>> {
+    const result = await this.queryAppStateThing();
+    const existingThing = result.things[0] ?? null;
+    return solidRepositoryRead(
+      existingThing === null ? null : solidThingToAppState(existingThing),
+      result.metadata,
+    );
   }
 
   saveAppStateOrder(
@@ -45,13 +43,6 @@ export class SolidAppStateRepository {
       Pick<SolidAppState, 'noteTodayOrder' | 'projectOrder' | 'sectionOrder' | 'tagOrder'>
     >,
   ): Promise<SolidAppState> {
-    const appContainerScope = this.appContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [appContainerScope.uri],
-      mode: 'balanced',
-    });
-
     const existingThing = await this.findAppStateThing();
     const existing = existingThing === null ? null : solidThingToAppState(existingThing);
     const nextAppState: SolidAppState = {
@@ -82,7 +73,12 @@ export class SolidAppStateRepository {
   }
 
   private async findAppStateThing(): Promise<Thing | null> {
-    const result = await this.solidRuntime.client.things.query(
+    const result = await this.queryAppStateThing();
+    return result.things[0] ?? null;
+  }
+
+  private queryAppStateThing(): Promise<ThingQueryResult> {
+    return this.solidRuntime.client.things.query(
       {
         ...solidAppStateQuery,
         where: [
@@ -96,11 +92,9 @@ export class SolidAppStateRepository {
       {
         limit: 1,
         scope: this.appContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
-
-    return result.things[0] ?? null;
   }
 
   private appContainerScope(): SolidAppContainerScope {

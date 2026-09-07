@@ -75,7 +75,7 @@ export class SolidProjectDeleteCascadeEffects {
     sections: readonly Section[],
     noteTodayOrder: readonly Note['id'][],
   ): Promise<void> {
-    const solidSections = await this.solidSectionRepository.loadSections();
+    const solidSections = (await this.solidSectionRepository.loadSections()).value;
     const deletedProjectSectionIds = solidSections
       .filter(
         (section) =>

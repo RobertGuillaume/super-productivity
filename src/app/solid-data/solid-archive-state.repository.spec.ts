@@ -95,10 +95,7 @@ describe('SolidArchiveStateRepository', () => {
 
     const loaded = await TestBed.inject(SolidArchiveStateRepository).loadArchiveStates();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/archive/state/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivityArchiveState',
@@ -110,8 +107,8 @@ describe('SolidArchiveStateRepository', () => {
         },
       }),
     );
-    expect(loaded.young.timeTracking).toEqual(timeTracking);
-    expect(loaded.old.timeTracking).toEqual({ project: {}, tag: {} });
+    expect(loaded.value.young.timeTracking).toEqual(timeTracking);
+    expect(loaded.value.old.timeTracking).toEqual({ project: {}, tag: {} });
   });
 
   it('creates deterministic archive state resources when none exists', async () => {

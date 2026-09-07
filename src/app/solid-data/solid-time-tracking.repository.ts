@@ -14,6 +14,7 @@ import {
   timeTrackingStateToEntries,
 } from './solid-time-tracking.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidTimeTrackingContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -23,23 +24,18 @@ export class SolidTimeTrackingRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadTimeTrackingState(): Promise<TimeTrackingState> {
+  async loadTimeTrackingState(): Promise<SolidRepositoryRead<TimeTrackingState>> {
     const timeTrackingContainerScope = this.timeTrackingContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [timeTrackingContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidTimeTrackingQuery, {
       scope: timeTrackingContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
     const entries = result.things
       .map((thing) => solidThingToTimeTrackingEntry(thing))
       .filter((entry): entry is SolidTimeTrackingEntry => entry !== null);
 
-    return timeTrackingEntriesToState(entries);
+    return solidRepositoryRead(timeTrackingEntriesToState(entries), result.metadata);
   }
 
   saveTimeTrackingEntry(entry: SolidTimeTrackingEntry): Promise<SolidTimeTrackingEntry> {
@@ -126,7 +122,7 @@ export class SolidTimeTrackingRepository {
       {
         limit: 1,
         scope: this.timeTrackingContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 
@@ -136,7 +132,7 @@ export class SolidTimeTrackingRepository {
   private async findAllTimeTrackingThings(): Promise<Thing[]> {
     const result = await this.solidRuntime.client.things.query(solidTimeTrackingQuery, {
       scope: this.timeTrackingContainerScope(),
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
     return result.things;

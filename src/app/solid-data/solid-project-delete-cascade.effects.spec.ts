@@ -20,6 +20,7 @@ import { SolidNoteRepository } from './solid-note.repository';
 import { SolidProjectDeleteCascadeEffects } from './solid-project-delete-cascade.effects';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidSectionRepository } from './solid-section.repository';
+import { solidRepositoryRead } from './solid-repository-read';
 import { SolidTagRepository } from './solid-tag.repository';
 import { SolidTaskRepository } from './solid-task.repository';
 
@@ -132,10 +133,9 @@ describe('SolidProjectDeleteCascadeEffects', () => {
     solidTagRepository.saveTag.and.resolveTo(cleanedTodayTag);
     solidSectionRepository.saveSection.and.resolveTo(remainingSection);
     solidSectionRepository.deleteSection.and.resolveTo();
-    solidSectionRepository.loadSections.and.resolveTo([
-      deletedProjectSection,
-      unrelatedProjectSection,
-    ]);
+    solidSectionRepository.loadSections.and.resolveTo(
+      solidRepositoryRead([deletedProjectSection, unrelatedProjectSection]),
+    );
     solidAppStateRepository.saveAppStateOrder.and.resolveTo({
       id: 'super-productivity-app-state',
       projectOrder: ['remaining-project'],

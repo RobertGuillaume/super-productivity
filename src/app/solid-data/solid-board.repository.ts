@@ -10,6 +10,7 @@ import {
   solidThingToBoardRecord,
 } from './solid-board.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidBoardContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -19,23 +20,21 @@ export class SolidBoardRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadBoards(): Promise<BoardCfg[]> {
+  async loadBoards(): Promise<SolidRepositoryRead<BoardCfg[]>> {
     const boardContainerScope = this.boardContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [boardContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidBoardQuery, {
       scope: boardContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things
-      .map(solidThingToBoardRecord)
-      .sort((a, b) => a.order - b.order)
-      .map((record) => record.board);
+    return solidRepositoryRead(
+      result.things
+        .map(solidThingToBoardRecord)
+        .sort((a, b) => a.order - b.order)
+        .map((record) => record.board),
+      result.metadata,
+    );
   }
 
   saveBoard(board: BoardCfg, order = 0): Promise<BoardCfg> {
@@ -107,7 +106,7 @@ export class SolidBoardRepository {
       {
         limit: 1,
         scope: this.boardContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

@@ -97,11 +97,8 @@ describe('SolidPlannerRepository', () => {
 
     const plannerState = await TestBed.inject(SolidPlannerRepository).loadPlannerState();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/planner/'],
-      mode: 'balanced',
-    });
-    expect(plannerState).toEqual({
+    expect(discovery.start).not.toHaveBeenCalled();
+    expect(plannerState.value).toEqual({
       days: {
         ['2026-08-04']: ['task-1'],
       },

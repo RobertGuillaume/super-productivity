@@ -93,12 +93,9 @@ describe('SolidTimeTrackingRepository', () => {
       SolidTimeTrackingRepository,
     ).loadTimeTrackingState();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/time-tracking/'],
-      mode: 'balanced',
-    });
-    expect(loaded.project['project-1']['2026-08-04']).toEqual(entry.data);
-    expect(loaded.tag).toEqual({});
+    expect(discovery.start).not.toHaveBeenCalled();
+    expect(loaded.value.project['project-1']['2026-08-04']).toEqual(entry.data);
+    expect(loaded.value.tag).toEqual({});
   });
 
   it('creates deterministic time tracking resources when none exists', async () => {

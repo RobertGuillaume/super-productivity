@@ -91,7 +91,7 @@ describe('SolidTaskRepository', () => {
     });
   });
 
-  it('discovers tasks across the Pod through the runtime type index and graph', async () => {
+  it('reads Pod-wide tasks from the catalog without starting discovery', async () => {
     const externalThing = createThing('Task from another Pod container', {
       uri: 'https://pod.example/calendar/work.ttl#todo-1',
       properties: {
@@ -103,10 +103,8 @@ describe('SolidTaskRepository', () => {
 
     const loaded = await TestBed.inject(SolidTaskRepository).loadTasks();
 
-    expect(discovery.discoverType).toHaveBeenCalledOnceWith(SOLID_PRODUCTIVITY_TASK_TYPE);
-    expect(discovery.refresh).toHaveBeenCalledOnceWith({
-      uris: ['https://pod.example/super-productivity/tasks/'],
-    });
+    expect(discovery.discoverType).not.toHaveBeenCalled();
+    expect(discovery.refresh).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       {
         type: [
@@ -120,8 +118,8 @@ describe('SolidTaskRepository', () => {
         autoDiscover: false,
       },
     );
-    expect(loaded[0].id).toBe(externalThing.uri);
-    expect(loaded[0].title).toBe('Task from another Pod container');
+    expect(loaded.value[0].id).toBe(externalThing.uri);
+    expect(loaded.value[0].title).toBe('Task from another Pod container');
   });
 
   it('keeps legacy Super Productivity task resources in Pod-wide results', async () => {
@@ -133,9 +131,9 @@ describe('SolidTaskRepository', () => {
 
     const loaded = await TestBed.inject(SolidTaskRepository).loadTasks();
 
-    expect(loaded).toHaveSize(1);
-    expect(loaded[0].id).toBe(task.id);
-    expect(loaded[0].title).toBe('Legacy task');
+    expect(loaded.value).toHaveSize(1);
+    expect(loaded.value[0].id).toBe(task.id);
+    expect(loaded.value[0].title).toBe('Legacy task');
   });
 
   afterEach(() => {

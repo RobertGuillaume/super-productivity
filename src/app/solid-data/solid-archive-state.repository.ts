@@ -13,6 +13,7 @@ import {
   solidThingToArchiveState,
 } from './solid-archive-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidArchiveStateContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -22,33 +23,33 @@ export class SolidArchiveStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadArchiveStates(): Promise<{
-    young: SolidArchiveState;
-    old: SolidArchiveState;
-  }> {
+  async loadArchiveStates(): Promise<
+    SolidRepositoryRead<{
+      young: SolidArchiveState;
+      old: SolidArchiveState;
+    }>
+  > {
     const archiveStateContainerScope = this.archiveStateContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [archiveStateContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidArchiveStateQuery, {
       scope: archiveStateContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
     const states = result.things
       .map((thing) => solidThingToArchiveState(thing))
       .filter((state): state is SolidArchiveState => state !== null);
 
-    return {
-      young:
-        states.find((archiveState) => archiveState.bucket === 'young') ??
-        createDefaultSolidArchiveState('young'),
-      old:
-        states.find((archiveState) => archiveState.bucket === 'old') ??
-        createDefaultSolidArchiveState('old'),
-    };
+    return solidRepositoryRead(
+      {
+        young:
+          states.find((archiveState) => archiveState.bucket === 'young') ??
+          createDefaultSolidArchiveState('young'),
+        old:
+          states.find((archiveState) => archiveState.bucket === 'old') ??
+          createDefaultSolidArchiveState('old'),
+      },
+      result.metadata,
+    );
   }
 
   saveArchiveState(archiveState: SolidArchiveState): Promise<SolidArchiveState> {
@@ -123,7 +124,7 @@ export class SolidArchiveStateRepository {
       {
         limit: 1,
         scope: this.archiveStateContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

@@ -9,6 +9,7 @@ import {
   taskRepeatCfgToSolidCreateInput,
 } from './solid-task-repeat-cfg.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidTaskRepeatCfgContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -18,20 +19,18 @@ export class SolidTaskRepeatCfgRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadTaskRepeatCfgs(): Promise<TaskRepeatCfg[]> {
+  async loadTaskRepeatCfgs(): Promise<SolidRepositoryRead<TaskRepeatCfg[]>> {
     const taskRepeatCfgContainerScope = this.taskRepeatCfgContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [taskRepeatCfgContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidTaskRepeatCfgQuery, {
       scope: taskRepeatCfgContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things.map(solidThingToTaskRepeatCfg);
+    return solidRepositoryRead(
+      result.things.map(solidThingToTaskRepeatCfg),
+      result.metadata,
+    );
   }
 
   saveTaskRepeatCfg(taskRepeatCfg: TaskRepeatCfg): Promise<TaskRepeatCfg> {
@@ -106,7 +105,7 @@ export class SolidTaskRepeatCfgRepository {
       {
         limit: 1,
         scope: this.taskRepeatCfgContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

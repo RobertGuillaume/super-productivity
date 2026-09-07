@@ -78,10 +78,7 @@ describe('SolidAppStateRepository', () => {
 
     const loaded = await TestBed.inject(SolidAppStateRepository).loadAppState();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/app/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         where: [
@@ -99,7 +96,7 @@ describe('SolidAppStateRepository', () => {
         },
       }),
     );
-    expect(loaded?.projectOrder).toEqual(['project-2', 'project-1']);
+    expect(loaded.value?.projectOrder).toEqual(['project-2', 'project-1']);
   });
 
   it('creates deterministic app-state resources when no state exists', async () => {

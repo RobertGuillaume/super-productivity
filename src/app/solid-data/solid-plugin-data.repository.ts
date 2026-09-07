@@ -13,6 +13,7 @@ import {
   solidThingToPluginUserData,
 } from './solid-plugin-data.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidPluginContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -22,42 +23,38 @@ export class SolidPluginDataRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadPluginUserData(): Promise<PluginUserData[]> {
+  async loadPluginUserData(): Promise<SolidRepositoryRead<PluginUserData[]>> {
     const scope = this.pluginUserDataContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [scope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidPluginUserDataQuery, {
       scope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things
-      .map((thing) => solidThingToPluginUserData(thing))
-      .filter(
-        (pluginUserData): pluginUserData is PluginUserData => pluginUserData !== null,
-      );
+    return solidRepositoryRead(
+      result.things
+        .map((thing) => solidThingToPluginUserData(thing))
+        .filter(
+          (pluginUserData): pluginUserData is PluginUserData => pluginUserData !== null,
+        ),
+      result.metadata,
+    );
   }
 
-  async loadPluginMetadata(): Promise<PluginMetadata[]> {
+  async loadPluginMetadata(): Promise<SolidRepositoryRead<PluginMetadata[]>> {
     const scope = this.pluginMetadataContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [scope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidPluginMetadataQuery, {
       scope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things
-      .map((thing) => solidThingToPluginMetadata(thing))
-      .filter((metadata): metadata is PluginMetadata => metadata !== null);
+    return solidRepositoryRead(
+      result.things
+        .map((thing) => solidThingToPluginMetadata(thing))
+        .filter((metadata): metadata is PluginMetadata => metadata !== null),
+      result.metadata,
+    );
   }
 
   savePluginUserData(pluginUserData: PluginUserData): Promise<PluginUserData> {
@@ -181,7 +178,7 @@ export class SolidPluginDataRepository {
       {
         limit: 1,
         scope: this.pluginUserDataContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 
@@ -203,7 +200,7 @@ export class SolidPluginDataRepository {
       {
         limit: 1,
         scope: this.pluginMetadataContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

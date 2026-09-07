@@ -1,5 +1,10 @@
 import { inject, Injectable } from '@angular/core';
-import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
+import type {
+  RuntimeScope,
+  Thing,
+  ThingQueryResult,
+  Unsubscribe,
+} from '@solid-intents/runtime';
 import { PlannerState } from '../features/planner/store/planner.reducer';
 import {
   createPlannerStateFromSolid,
@@ -17,6 +22,7 @@ import {
 } from './solid-planner.mapper';
 import { SP_PLANNER_DAY, SP_PLANNER_STATE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidPlannerContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -26,25 +32,25 @@ export class SolidPlannerRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadPlannerState(): Promise<PlannerState> {
+  async loadPlannerState(): Promise<SolidRepositoryRead<PlannerState>> {
     const plannerContainerScope = this.plannerContainerScope();
 
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [plannerContainerScope.uri],
-      mode: 'balanced',
-    });
-
-    const [daysResult, stateThing] = await Promise.all([
+    const [daysResult, stateResult] = await Promise.all([
       this.solidRuntime.client.things.query(solidPlannerDayQuery, {
         scope: plannerContainerScope,
-        autoDiscover: true,
+        autoDiscover: false,
       }),
-      this.findPlannerStateThing(),
+      this.queryPlannerStateThing(),
     ]);
+    const stateThing = stateResult.things[0] ?? null;
 
-    return createPlannerStateFromSolid(
-      daysResult.things.map(solidThingToPlannerDay),
-      stateThing === null ? null : solidThingToPlannerState(stateThing),
+    return solidRepositoryRead(
+      createPlannerStateFromSolid(
+        daysResult.things.map(solidThingToPlannerDay),
+        stateThing === null ? null : solidThingToPlannerState(stateThing),
+      ),
+      daysResult.metadata,
+      stateResult.metadata,
     );
   }
 
@@ -101,7 +107,7 @@ export class SolidPlannerRepository {
   ): Promise<PlannerState> {
     const result = await this.solidRuntime.client.things.query(solidPlannerDayQuery, {
       scope: this.plannerContainerScope(),
-      autoDiscover: true,
+      autoDiscover: false,
     });
     const existingByDay = new Map(
       result.things.map((thing) => [solidThingToPlannerDay(thing).day, thing]),
@@ -140,7 +146,7 @@ export class SolidPlannerRepository {
   async loadPlannerDays(): Promise<SolidPlannerDay[]> {
     const result = await this.solidRuntime.client.things.query(solidPlannerDayQuery, {
       scope: this.plannerContainerScope(),
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
     return result.things.map(solidThingToPlannerDay);
@@ -248,7 +254,7 @@ export class SolidPlannerRepository {
       {
         limit: 1,
         scope: this.plannerContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 
@@ -256,7 +262,12 @@ export class SolidPlannerRepository {
   }
 
   private async findPlannerStateThing(): Promise<Thing | null> {
-    const result = await this.solidRuntime.client.things.query(
+    const result = await this.queryPlannerStateThing();
+    return result.things[0] ?? null;
+  }
+
+  private queryPlannerStateThing(): Promise<ThingQueryResult> {
+    return this.solidRuntime.client.things.query(
       {
         ...solidPlannerStateQuery,
         where: [
@@ -270,11 +281,9 @@ export class SolidPlannerRepository {
       {
         limit: 1,
         scope: this.plannerContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
-
-    return result.things[0] ?? null;
   }
 
   private plannerContainerScope(): SolidPlannerContainerScope {

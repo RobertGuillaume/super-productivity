@@ -94,10 +94,7 @@ describe('SolidSimpleCounterRepository', () => {
       SolidSimpleCounterRepository,
     ).loadSimpleCounters();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/simple-counters/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivitySimpleCounter',
@@ -109,7 +106,7 @@ describe('SolidSimpleCounterRepository', () => {
         },
       }),
     );
-    expect(simpleCounters.map((counter) => counter.id)).toEqual([
+    expect(simpleCounters.value.map((counter) => counter.id)).toEqual([
       'counter-2',
       'counter-1',
     ]);

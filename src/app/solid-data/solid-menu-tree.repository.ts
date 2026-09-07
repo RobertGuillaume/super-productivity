@@ -1,5 +1,10 @@
 import { inject, Injectable } from '@angular/core';
-import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
+import type {
+  RuntimeScope,
+  Thing,
+  ThingQueryResult,
+  Unsubscribe,
+} from '@solid-intents/runtime';
 import { MenuTreeState } from '../features/menu-tree/store/menu-tree.model';
 import { SP_MENU_TREE } from './solid-productivity-vocab';
 import {
@@ -10,6 +15,7 @@ import {
   solidThingToMenuTree,
 } from './solid-menu-tree.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidMenuTreeContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -19,20 +25,15 @@ export class SolidMenuTreeRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadMenuTree(): Promise<MenuTreeState | null> {
-    const menuTreeContainerScope = this.menuTreeContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [menuTreeContainerScope.uri],
-      mode: 'balanced',
-    });
-
-    const existingThing = await this.findMenuTreeThing();
-    if (existingThing === null) {
-      return null;
-    }
-
-    return solidThingToMenuTree(existingThing)?.menuTree ?? null;
+  async loadMenuTree(): Promise<SolidRepositoryRead<MenuTreeState | null>> {
+    const result = await this.queryMenuTreeThing();
+    const existingThing = result.things[0] ?? null;
+    return solidRepositoryRead(
+      existingThing === null
+        ? null
+        : (solidThingToMenuTree(existingThing)?.menuTree ?? null),
+      result.metadata,
+    );
   }
 
   saveMenuTree(menuTree: MenuTreeState): Promise<MenuTreeState> {
@@ -84,7 +85,12 @@ export class SolidMenuTreeRepository {
   }
 
   private async findMenuTreeThing(): Promise<Thing | null> {
-    const result = await this.solidRuntime.client.things.query(
+    const result = await this.queryMenuTreeThing();
+    return result.things[0] ?? null;
+  }
+
+  private queryMenuTreeThing(): Promise<ThingQueryResult> {
+    return this.solidRuntime.client.things.query(
       {
         ...solidMenuTreeQuery,
         where: [
@@ -98,11 +104,9 @@ export class SolidMenuTreeRepository {
       {
         limit: 1,
         scope: this.menuTreeContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
-
-    return result.things[0] ?? null;
   }
 
   private menuTreeContainerScope(): SolidMenuTreeContainerScope {

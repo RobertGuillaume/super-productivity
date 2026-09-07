@@ -84,10 +84,7 @@ describe('SolidSectionRepository', () => {
 
     const sections = await TestBed.inject(SolidSectionRepository).loadSections();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/sections/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivitySection',
@@ -99,7 +96,7 @@ describe('SolidSectionRepository', () => {
         },
       }),
     );
-    expect(sections[0]).toEqual(section);
+    expect(sections.value[0]).toEqual(section);
   });
 
   it('creates deterministic section resources when no section exists', async () => {

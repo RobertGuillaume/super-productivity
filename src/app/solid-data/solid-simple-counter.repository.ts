@@ -10,6 +10,7 @@ import {
   solidThingToSimpleCounterRecord,
 } from './solid-simple-counter.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidSimpleCounterContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -19,23 +20,21 @@ export class SolidSimpleCounterRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadSimpleCounters(): Promise<SimpleCounter[]> {
+  async loadSimpleCounters(): Promise<SolidRepositoryRead<SimpleCounter[]>> {
     const simpleCounterContainerScope = this.simpleCounterContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [simpleCounterContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidSimpleCounterQuery, {
       scope: simpleCounterContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things
-      .map(solidThingToSimpleCounterRecord)
-      .sort((a, b) => a.order - b.order)
-      .map((record) => record.simpleCounter);
+    return solidRepositoryRead(
+      result.things
+        .map(solidThingToSimpleCounterRecord)
+        .sort((a, b) => a.order - b.order)
+        .map((record) => record.simpleCounter),
+      result.metadata,
+    );
   }
 
   saveSimpleCounter(simpleCounter: SimpleCounter, order = 0): Promise<SimpleCounter> {
@@ -144,7 +143,7 @@ export class SolidSimpleCounterRepository {
       {
         limit: 1,
         scope: this.simpleCounterContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 
@@ -154,7 +153,7 @@ export class SolidSimpleCounterRepository {
   private async querySimpleCounterThings(): Promise<Thing[]> {
     const result = await this.solidRuntime.client.things.query(solidSimpleCounterQuery, {
       scope: this.simpleCounterContainerScope(),
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
     return [...result.things];

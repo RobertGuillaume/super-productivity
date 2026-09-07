@@ -99,10 +99,7 @@ describe('SolidBoardRepository', () => {
 
     const boards = await TestBed.inject(SolidBoardRepository).loadBoards();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/boards/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivityBoard',
@@ -114,7 +111,10 @@ describe('SolidBoardRepository', () => {
         },
       }),
     );
-    expect(boards.map((loadedBoard) => loadedBoard.id)).toEqual(['board-2', 'board-1']);
+    expect(boards.value.map((loadedBoard) => loadedBoard.id)).toEqual([
+      'board-2',
+      'board-1',
+    ]);
   });
 
   it('creates deterministic board resources when none exists', async () => {

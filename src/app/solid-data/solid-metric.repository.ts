@@ -9,6 +9,7 @@ import {
   solidThingToMetric,
 } from './solid-metric.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 
 type SolidMetricContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
@@ -18,20 +19,18 @@ export class SolidMetricRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadMetrics(): Promise<Metric[]> {
+  async loadMetrics(): Promise<SolidRepositoryRead<Metric[]>> {
     const metricContainerScope = this.metricContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [metricContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidMetricQuery, {
       scope: metricContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things.map(solidThingToMetric).sort((a, b) => a.id.localeCompare(b.id));
+    return solidRepositoryRead(
+      result.things.map(solidThingToMetric).sort((a, b) => a.id.localeCompare(b.id)),
+      result.metadata,
+    );
   }
 
   saveMetric(metric: Metric): Promise<Metric> {
@@ -100,7 +99,7 @@ export class SolidMetricRepository {
       {
         limit: 1,
         scope: this.metricContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 

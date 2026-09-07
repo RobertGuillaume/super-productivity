@@ -109,10 +109,7 @@ describe('SolidPluginDataRepository', () => {
 
     const loaded = await TestBed.inject(SolidPluginDataRepository).loadPluginUserData();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/plugins/user-data/'],
-      mode: 'balanced',
-    });
+    expect(discovery.start).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       jasmine.objectContaining({
         type: 'SuperProductivityPluginUserData',
@@ -124,7 +121,7 @@ describe('SolidPluginDataRepository', () => {
         },
       }),
     );
-    expect(loaded).toEqual([pluginUserData]);
+    expect(loaded.value).toEqual([pluginUserData]);
   });
 
   it('loads plugin metadata resources from the configured Solid container', async () => {
@@ -134,11 +131,8 @@ describe('SolidPluginDataRepository', () => {
 
     const loaded = await TestBed.inject(SolidPluginDataRepository).loadPluginMetadata();
 
-    expect(discovery.start).toHaveBeenCalledOnceWith({
-      entrypoints: ['https://pod.example/super-productivity/plugins/metadata/'],
-      mode: 'balanced',
-    });
-    expect(loaded).toEqual([pluginMetadata]);
+    expect(discovery.start).not.toHaveBeenCalled();
+    expect(loaded.value).toEqual([pluginMetadata]);
   });
 
   it('creates deterministic plugin user data resources when none exists', async () => {

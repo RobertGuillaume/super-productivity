@@ -24,6 +24,7 @@ import { SolidPlannerRepository } from './solid-planner.repository';
 import { SolidPluginDataRepository } from './solid-plugin-data.repository';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { solidRepositoryRead } from './solid-repository-read';
 import { SolidSectionRepository } from './solid-section.repository';
 import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
 import { SolidTagRepository } from './solid-tag.repository';
@@ -200,7 +201,9 @@ describe('SolidInitialUploadService', () => {
   });
 
   it('refuses to overwrite an existing Solid dataset', async () => {
-    taskRepository.loadTasks.and.resolveTo([createTask('remote-task')]);
+    taskRepository.loadTasks.and.resolveTo(
+      solidRepositoryRead([createTask('remote-task')]),
+    );
 
     const result = await TestBed.inject(
       SolidInitialUploadService,
@@ -259,32 +262,36 @@ describe('SolidInitialUploadService', () => {
   const stubEmptyPod = (): void => {
     const emptySnapshot = createAppData();
 
-    taskRepository.loadTasks.and.resolveTo([]);
-    archiveStateRepository.loadArchiveStates.and.resolveTo({
-      young: createDefaultSolidArchiveState('young'),
-      old: createDefaultSolidArchiveState('old'),
-    });
+    taskRepository.loadTasks.and.resolveTo(solidRepositoryRead([]));
+    archiveStateRepository.loadArchiveStates.and.resolveTo(
+      solidRepositoryRead({
+        young: createDefaultSolidArchiveState('young'),
+        old: createDefaultSolidArchiveState('old'),
+      }),
+    );
     archiveStateRepository.archiveModelToSolidArchiveState.and.callFake((bucket) =>
       createDefaultSolidArchiveState(bucket),
     );
-    archivedTaskRepository.loadArchivedTasks.and.resolveTo([]);
-    boardRepository.loadBoards.and.resolveTo([]);
-    globalConfigRepository.loadGlobalConfig.and.resolveTo(null);
-    issueProviderRepository.loadIssueProviders.and.resolveTo([]);
-    menuTreeRepository.loadMenuTree.and.resolveTo(null);
-    metricRepository.loadMetrics.and.resolveTo([]);
-    noteRepository.loadNotes.and.resolveTo([]);
-    plannerRepository.loadPlannerState.and.resolveTo(emptySnapshot.planner);
-    pluginDataRepository.loadPluginUserData.and.resolveTo([]);
-    pluginDataRepository.loadPluginMetadata.and.resolveTo([]);
-    appStateRepository.loadAppState.and.resolveTo(null);
-    projectRepository.loadProjects.and.resolveTo([]);
-    sectionRepository.loadSections.and.resolveTo([]);
-    simpleCounterRepository.loadSimpleCounters.and.resolveTo([]);
-    tagRepository.loadTags.and.resolveTo([]);
-    taskRepeatCfgRepository.loadTaskRepeatCfgs.and.resolveTo([]);
+    archivedTaskRepository.loadArchivedTasks.and.resolveTo(solidRepositoryRead([]));
+    boardRepository.loadBoards.and.resolveTo(solidRepositoryRead([]));
+    globalConfigRepository.loadGlobalConfig.and.resolveTo(solidRepositoryRead(null));
+    issueProviderRepository.loadIssueProviders.and.resolveTo(solidRepositoryRead([]));
+    menuTreeRepository.loadMenuTree.and.resolveTo(solidRepositoryRead(null));
+    metricRepository.loadMetrics.and.resolveTo(solidRepositoryRead([]));
+    noteRepository.loadNotes.and.resolveTo(solidRepositoryRead([]));
+    plannerRepository.loadPlannerState.and.resolveTo(
+      solidRepositoryRead(emptySnapshot.planner),
+    );
+    pluginDataRepository.loadPluginUserData.and.resolveTo(solidRepositoryRead([]));
+    pluginDataRepository.loadPluginMetadata.and.resolveTo(solidRepositoryRead([]));
+    appStateRepository.loadAppState.and.resolveTo(solidRepositoryRead(null));
+    projectRepository.loadProjects.and.resolveTo(solidRepositoryRead([]));
+    sectionRepository.loadSections.and.resolveTo(solidRepositoryRead([]));
+    simpleCounterRepository.loadSimpleCounters.and.resolveTo(solidRepositoryRead([]));
+    tagRepository.loadTags.and.resolveTo(solidRepositoryRead([]));
+    taskRepeatCfgRepository.loadTaskRepeatCfgs.and.resolveTo(solidRepositoryRead([]));
     timeTrackingRepository.loadTimeTrackingState.and.resolveTo(
-      emptySnapshot.timeTracking,
+      solidRepositoryRead(emptySnapshot.timeTracking),
     );
   };
 });

@@ -101,25 +101,25 @@ export class SolidTaskHydrationService {
     await this.hydrationDiscovery.prepare();
 
     const [
-      tasks,
-      archiveStates,
-      archivedTasks,
-      boards,
-      globalConfig,
-      menuTree,
-      projects,
-      tags,
-      notes,
-      sections,
-      issueProviders,
-      taskRepeatCfgs,
-      simpleCounters,
-      metrics,
-      plannerState,
-      pluginUserData,
-      pluginMetadata,
-      appState,
-      timeTrackingState,
+      tasksRead,
+      archiveStatesRead,
+      archivedTasksRead,
+      boardsRead,
+      globalConfigRead,
+      menuTreeRead,
+      projectsRead,
+      tagsRead,
+      notesRead,
+      sectionsRead,
+      issueProvidersRead,
+      taskRepeatCfgsRead,
+      simpleCountersRead,
+      metricsRead,
+      plannerStateRead,
+      pluginUserDataRead,
+      pluginMetadataRead,
+      appStateRead,
+      timeTrackingStateRead,
     ] = await Promise.all([
       this.taskRepository.loadTasks(),
       this.archiveStateRepository.loadArchiveStates(),
@@ -141,6 +141,25 @@ export class SolidTaskHydrationService {
       this.appStateRepository.loadAppState(),
       this.timeTrackingRepository.loadTimeTrackingState(),
     ]);
+    const tasks = tasksRead.value;
+    const archiveStates = archiveStatesRead.value;
+    const archivedTasks = archivedTasksRead.value;
+    const boards = boardsRead.value;
+    const globalConfig = globalConfigRead.value;
+    const menuTree = menuTreeRead.value;
+    const projects = projectsRead.value;
+    const tags = tagsRead.value;
+    const notes = notesRead.value;
+    const sections = sectionsRead.value;
+    const issueProviders = issueProvidersRead.value;
+    const taskRepeatCfgs = taskRepeatCfgsRead.value;
+    const simpleCounters = simpleCountersRead.value;
+    const metrics = metricsRead.value;
+    const plannerState = plannerStateRead.value;
+    const pluginUserData = pluginUserDataRead.value;
+    const pluginMetadata = pluginMetadataRead.value;
+    const appState = appStateRead.value;
+    const timeTrackingState = timeTrackingStateRead.value;
     const appDataComplete = createSolidAppData({
       tasks,
       archiveStates,

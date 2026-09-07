@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Section } from '../features/section/section.model';
 import { SP_SECTION } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidWriteQueueService } from './solid-write-queue.service';
 import {
   sectionToSolidChanges,
@@ -18,20 +19,15 @@ export class SolidSectionRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly writeQueue = inject(SolidWriteQueueService);
 
-  async loadSections(): Promise<Section[]> {
+  async loadSections(): Promise<SolidRepositoryRead<Section[]>> {
     const sectionContainerScope = this.sectionContainerScope();
-
-    await this.solidRuntime.client.discovery.start({
-      entrypoints: [sectionContainerScope.uri],
-      mode: 'balanced',
-    });
 
     const result = await this.solidRuntime.client.things.query(solidSectionQuery, {
       scope: sectionContainerScope,
-      autoDiscover: true,
+      autoDiscover: false,
     });
 
-    return result.things.map(solidThingToSection);
+    return solidRepositoryRead(result.things.map(solidThingToSection), result.metadata);
   }
 
   saveSection(section: Section): Promise<Section> {
@@ -97,7 +93,7 @@ export class SolidSectionRepository {
       {
         limit: 1,
         scope: this.sectionContainerScope(),
-        autoDiscover: true,
+        autoDiscover: false,
       },
     );
 
