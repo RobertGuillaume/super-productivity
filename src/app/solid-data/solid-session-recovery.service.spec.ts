@@ -64,6 +64,22 @@ describe('SolidSessionRecoveryService', () => {
     expect(isSolidAuthenticationError({ response: { status: 403 } })).toBe(false);
   });
 
+  it('recognizes a 401 write outcome from a runtime commit error', () => {
+    expect(
+      isSolidAuthenticationError({
+        name: 'RuntimeWriteCommitError',
+        details: {
+          outcomes: [
+            {
+              status: 'failed',
+              httpStatus: 401,
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
   it('shows one sticky sign-in prompt for repeated authentication failures', async () => {
     const service = TestBed.inject(SolidSessionRecoveryService);
 

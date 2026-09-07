@@ -221,7 +221,7 @@ export class SolidRuntimeService {
       Log.err('SolidRuntimeService: Failed to discover Solid storage root', {
         name: error instanceof Error ? error.name : 'UnknownError',
       });
-      return null;
+      throw error;
     }
   }
 }

@@ -23,6 +23,7 @@ describe('SolidRuntimeService', () => {
   let podUrl: string;
   let existingContainerUris: Set<string>;
   let fetchRequests: Array<{ uri: string; method: string }>;
+  let profileFetchError: Error | null;
 
   const mockPodUrl = 'https://mock-pod.local/';
   const authenticatedWebId = 'https://id.example/profile/card#me';
@@ -34,6 +35,7 @@ describe('SolidRuntimeService', () => {
     podUrl = mockPodUrl;
     existingContainerUris = new Set([mockPodUrl, discoveredStorageRoot]);
     fetchRequests = [];
+    profileFetchError = null;
 
     TestBed.configureTestingModule({
       providers: [
@@ -93,6 +95,13 @@ describe('SolidRuntimeService', () => {
     expect(service.taskProfile.target?.containerUri).toBe(
       'https://pod.example/super-productivity/tasks/',
     );
+  });
+
+  it('aborts authenticated startup when the storage profile cannot be read', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+    profileFetchError = new Error('profile unavailable');
+
+    await expectAsync(service.restoreSession()).toBeRejectedWith(profileFetchError);
   });
 
   it('rebuilds a cached layout when boot restore moves the runtime to the discovered storage root', async () => {
@@ -320,6 +329,13 @@ describe('SolidRuntimeService', () => {
     const uri = typeof input === 'string' ? input : input.url;
     const method = init?.method ?? 'GET';
     fetchRequests.push({ uri, method });
+
+    if (
+      profileFetchError !== null &&
+      (uri === authenticatedWebId || uri === authenticatedWebId.split('#')[0])
+    ) {
+      throw profileFetchError;
+    }
 
     if (method === 'HEAD') {
       return new Response(null, {

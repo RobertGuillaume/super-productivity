@@ -96,10 +96,17 @@ export const isSolidAuthenticationError = (error: unknown): boolean => {
     }
     visited.add(current);
 
+    if (Array.isArray(current)) {
+      pending.push(...current);
+      continue;
+    }
+
     const errorLike = current as {
       cause?: unknown;
       details?: unknown;
+      httpStatus?: unknown;
       message?: unknown;
+      outcomes?: unknown;
       response?: unknown;
       responseStatus?: unknown;
       status?: unknown;
@@ -107,12 +114,18 @@ export const isSolidAuthenticationError = (error: unknown): boolean => {
     if (
       errorLike.message === SESSION_EXPIRED_MESSAGE ||
       errorLike.status === 401 ||
-      errorLike.responseStatus === 401
+      errorLike.responseStatus === 401 ||
+      errorLike.httpStatus === 401
     ) {
       return true;
     }
 
-    pending.push(errorLike.cause, errorLike.details, errorLike.response);
+    pending.push(
+      errorLike.cause,
+      errorLike.details,
+      errorLike.outcomes,
+      errorLike.response,
+    );
   }
 
   return false;
