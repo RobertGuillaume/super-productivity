@@ -58,6 +58,7 @@ import { SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidBoardRepository } from './solid-board.repository';
 import { SolidGlobalConfigRepository } from './solid-global-config.repository';
+import { SolidHydrationDiscoveryService } from './solid-hydration-discovery.service';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
 import { SolidMetricRepository } from './solid-metric.repository';
@@ -76,6 +77,7 @@ import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 export class SolidTaskHydrationService {
   private readonly store = inject(Store);
   private readonly archiveDbAdapter = inject(ArchiveDbAdapter);
+  private readonly hydrationDiscovery = inject(SolidHydrationDiscoveryService);
   private readonly archiveStateRepository = inject(SolidArchiveStateRepository);
   private readonly taskRepository = inject(SolidTaskRepository);
   private readonly archivedTaskRepository = inject(SolidArchivedTaskRepository);
@@ -96,6 +98,8 @@ export class SolidTaskHydrationService {
   private readonly timeTrackingRepository = inject(SolidTimeTrackingRepository);
 
   async hydrateStore(): Promise<void> {
+    await this.hydrationDiscovery.prepare();
+
     const [
       tasks,
       archiveStates,

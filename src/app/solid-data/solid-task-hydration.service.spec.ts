@@ -40,6 +40,7 @@ import { SOLID_APP_STATE_ID, SolidAppState } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidBoardRepository } from './solid-board.repository';
 import { SolidGlobalConfigRepository } from './solid-global-config.repository';
+import { SolidHydrationDiscoveryService } from './solid-hydration-discovery.service';
 import {
   createSolidAppData,
   SolidTaskHydrationService,
@@ -466,6 +467,10 @@ describe('SolidTaskHydrationService', () => {
       'SolidTimeTrackingRepository',
       ['loadTimeTrackingState'],
     );
+    const hydrationDiscovery = jasmine.createSpyObj<SolidHydrationDiscoveryService>(
+      'SolidHydrationDiscoveryService',
+      ['prepare'],
+    );
     archiveDbAdapter.saveArchivesAtomic.and.resolveTo();
     archiveStateRepository.loadArchiveStates.and.resolveTo(archiveStates);
     taskRepository.loadTasks.and.resolveTo([task]);
@@ -486,11 +491,13 @@ describe('SolidTaskHydrationService', () => {
     pluginDataRepository.loadPluginMetadata.and.resolveTo([pluginMetadata]);
     appStateRepository.loadAppState.and.resolveTo(appState);
     timeTrackingRepository.loadTimeTrackingState.and.resolveTo(timeTrackingState);
+    hydrationDiscovery.prepare.and.resolveTo(undefined);
 
     TestBed.configureTestingModule({
       providers: [
         { provide: Store, useValue: store },
         { provide: ArchiveDbAdapter, useValue: archiveDbAdapter },
+        { provide: SolidHydrationDiscoveryService, useValue: hydrationDiscovery },
         { provide: SolidArchiveStateRepository, useValue: archiveStateRepository },
         { provide: SolidTaskRepository, useValue: taskRepository },
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
@@ -580,5 +587,6 @@ describe('SolidTaskHydrationService', () => {
     expect(metricRepository.loadMetrics).toHaveBeenCalledTimes(1);
     expect(appStateRepository.loadAppState).toHaveBeenCalledTimes(1);
     expect(timeTrackingRepository.loadTimeTrackingState).toHaveBeenCalledTimes(1);
+    expect(hydrationDiscovery.prepare).toHaveBeenCalledTimes(1);
   });
 });
