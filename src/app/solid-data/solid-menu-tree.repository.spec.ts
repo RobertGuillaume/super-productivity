@@ -151,6 +151,7 @@ describe('SolidMenuTreeRepository', () => {
     };
     const updatedThing = createThing({ menuTree: updatedMenuTree });
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -160,6 +161,7 @@ describe('SolidMenuTreeRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

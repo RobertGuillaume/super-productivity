@@ -148,6 +148,7 @@ describe('SolidBoardRepository', () => {
       0,
     );
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -157,6 +158,7 @@ describe('SolidBoardRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

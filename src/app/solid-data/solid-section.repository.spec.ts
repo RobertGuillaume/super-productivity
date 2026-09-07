@@ -126,6 +126,7 @@ describe('SolidSectionRepository', () => {
     const existingThing = createThing(section.title);
     const updatedThing = createThing('Updated section title');
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -135,6 +136,7 @@ describe('SolidSectionRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

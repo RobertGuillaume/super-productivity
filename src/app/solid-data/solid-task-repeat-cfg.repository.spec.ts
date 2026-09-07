@@ -133,6 +133,7 @@ describe('SolidTaskRepeatCfgRepository', () => {
       title: 'Updated repeat title',
     });
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -142,6 +143,7 @@ describe('SolidTaskRepeatCfgRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

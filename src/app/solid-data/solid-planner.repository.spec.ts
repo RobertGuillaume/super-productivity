@@ -132,6 +132,7 @@ describe('SolidPlannerRepository', () => {
   it('commits existing planner day updates through the runtime write plan API', async () => {
     const existingThing = createPlannerDayThing('2026-08-04', ['task-1']);
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -141,6 +142,7 @@ describe('SolidPlannerRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 
@@ -172,6 +174,7 @@ describe('SolidPlannerRepository', () => {
     const unchangedThing = createPlannerDayThing('2026-08-04', ['task-1']);
     const changedThing = createPlannerDayThing('2026-08-05', ['task-1', 'task-2']);
     const plan = {
+      version: 1,
       id: 'write-plan-2',
       kind: 'thing.update',
       request: {
@@ -181,6 +184,7 @@ describe('SolidPlannerRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
     things.query.and.resolveTo({ things: [unchangedThing, changedThing] });

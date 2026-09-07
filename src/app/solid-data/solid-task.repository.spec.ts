@@ -141,6 +141,7 @@ describe('SolidTaskRepository', () => {
     const existingThing = createThing(task.title);
     const updatedThing = createThing('Updated title');
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -150,6 +151,7 @@ describe('SolidTaskRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 
@@ -201,6 +203,7 @@ describe('SolidTaskRepository', () => {
       },
     });
     const plan = {
+      version: 1,
       id: 'write-plan-complete',
       kind: 'thing.update',
       request: {
@@ -210,6 +213,7 @@ describe('SolidTaskRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
     things.query.and.resolveTo({ things: [] });
@@ -241,6 +245,7 @@ describe('SolidTaskRepository', () => {
       },
     });
     const plan = {
+      version: 1,
       id: 'write-plan-overlap',
       kind: 'thing.update',
       request: {
@@ -250,6 +255,7 @@ describe('SolidTaskRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
     let releaseCreate: (() => void) | undefined;
@@ -293,6 +299,7 @@ describe('SolidTaskRepository', () => {
       types: ['Task'],
     });
     const plan = {
+      version: 1,
       id: 'write-plan-external',
       kind: 'thing.update',
       request: {
@@ -302,6 +309,7 @@ describe('SolidTaskRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
     things.get.and.resolveTo(externalThing);

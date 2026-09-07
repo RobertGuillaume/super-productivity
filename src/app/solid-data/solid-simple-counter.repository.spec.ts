@@ -149,6 +149,7 @@ describe('SolidSimpleCounterRepository', () => {
       0,
     );
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -158,6 +159,7 @@ describe('SolidSimpleCounterRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 
@@ -203,6 +205,7 @@ describe('SolidSimpleCounterRepository', () => {
       title: 'Fresh counter',
     };
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -212,6 +215,7 @@ describe('SolidSimpleCounterRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

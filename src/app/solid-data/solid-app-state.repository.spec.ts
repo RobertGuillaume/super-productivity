@@ -142,6 +142,7 @@ describe('SolidAppStateRepository', () => {
       tagOrder: ['TODAY', 'tag-1'],
     });
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -151,6 +152,7 @@ describe('SolidAppStateRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

@@ -77,6 +77,7 @@ describe('SolidNoteRepository', () => {
     const existingThing = createThing(note.content);
     const updatedThing = createThing('Updated note content');
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -86,6 +87,7 @@ describe('SolidNoteRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

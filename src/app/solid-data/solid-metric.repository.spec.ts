@@ -132,6 +132,7 @@ describe('SolidMetricRepository', () => {
       notes: 'Updated notes',
     });
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -141,6 +142,7 @@ describe('SolidMetricRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

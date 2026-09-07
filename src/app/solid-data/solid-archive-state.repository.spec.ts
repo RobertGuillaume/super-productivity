@@ -143,6 +143,7 @@ describe('SolidArchiveStateRepository', () => {
     };
     const updatedThing = createThing(updatedArchiveState);
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -152,6 +153,7 @@ describe('SolidArchiveStateRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

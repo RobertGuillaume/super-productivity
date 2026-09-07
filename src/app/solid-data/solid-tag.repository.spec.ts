@@ -77,6 +77,7 @@ describe('SolidTagRepository', () => {
     const existingThing = createThing(tag.title);
     const updatedThing = createThing('Updated tag title');
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -86,6 +87,7 @@ describe('SolidTagRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

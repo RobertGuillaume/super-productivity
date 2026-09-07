@@ -268,6 +268,7 @@ describe('SolidPluginDataRepository', () => {
 
 const createPlan = (thing: Thing): RuntimeWritePlan =>
   ({
+    version: 1,
     id: 'write-plan-1',
     kind: 'thing.update',
     request: {
@@ -277,6 +278,7 @@ const createPlan = (thing: Thing): RuntimeWritePlan =>
     },
     operations: [],
     affectedResources: [],
+    preconditions: [],
     diagnostics: [],
   }) as RuntimeWritePlan;
 

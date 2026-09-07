@@ -127,6 +127,7 @@ describe('SolidArchivedTaskRepository', () => {
     const existingThing = createThing(task.title, 'young');
     const updatedThing = createThing('Updated archive title', 'young');
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -136,6 +137,7 @@ describe('SolidArchivedTaskRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

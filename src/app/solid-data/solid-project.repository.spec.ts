@@ -76,6 +76,7 @@ describe('SolidProjectRepository', () => {
     const existingThing = createThing(project.title);
     const updatedThing = createThing('Updated project title');
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -85,6 +86,7 @@ describe('SolidProjectRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 

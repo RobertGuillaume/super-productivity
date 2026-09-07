@@ -140,6 +140,7 @@ describe('SolidIssueProviderRepository', () => {
     const existingThing = createThing(issueProvider, 0);
     const updatedThing = createThing({ ...issueProvider, isEnabled: false }, 0);
     const plan = {
+      version: 1,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -149,6 +150,7 @@ describe('SolidIssueProviderRepository', () => {
       },
       operations: [],
       affectedResources: [],
+      preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
 
