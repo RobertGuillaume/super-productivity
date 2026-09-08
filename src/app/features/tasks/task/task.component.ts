@@ -124,7 +124,6 @@ import {
 import { AddSubtaskInputService } from '../add-subtask-input/add-subtask-input.service';
 import { getSubTaskTimeLeftForDisplay } from '../util/get-sub-task-time-left-for-display';
 import { SolidTaskAccessService } from '../../../solid-data/solid-task-access.service';
-import { solidTaskAccessUi } from '../../../solid-data/solid-task-access-ui';
 
 @Component({
   selector: 'task',
@@ -143,8 +142,6 @@ import { solidTaskAccessUi } from '../../../solid-data/solid-task-access-ui';
     '[class.hasNoSubTasks]': 'task().subTaskIds.length === 0',
     '[class.isDragReady]': 'isDragReady()',
     '[class.isOverdue]': 'isOverdue()',
-    '[class.isSolidMutationBlocked]': 'isSolidMutationBlocked()',
-    '[attr.aria-disabled]': 'isSolidMutationBlocked()',
     '(contextmenu)': 'onHostContextMenu($event)',
   },
   imports: [
@@ -210,10 +207,9 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   // Use shared signals from services to avoid creating 600+ subscriptions on initial render
   isCurrent = computed(() => this._taskService.currentTaskId() === this.task().id);
   isSelected = computed(() => this._taskService.selectedTaskId() === this.task().id);
-  readonly solidAccessUi = computed(() =>
-    solidTaskAccessUi(this._solidTaskAccess.accessDecision(this.task().id)),
+  readonly isSolidMutationBlocked = computed(() =>
+    this._solidTaskAccess.isMutationBlocked(this.task().id),
   );
-  readonly isSolidMutationBlocked = computed(() => this.solidAccessUi().blocked);
   isShowCloseButton = computed(() => {
     // Only show close button when task is selected AND not on mobile (bottom panel)
     return this.isSelected() && !this.layoutService.isXs();

@@ -272,8 +272,17 @@ export class SolidDataLayerStateService {
   }
 
   private reportBlockedMutation(action: PersistentAction): void {
+    const readiness = this.writeReadiness();
+    const blockedContainers = solidContainerKeysForActionType(action.type)
+      .filter((container) => readiness.get(container) !== 'writable')
+      .map((container) => ({
+        container,
+        state: readiness.get(container) ?? 'unknown',
+      }));
     Log.warn('Blocked Solid mutation before reducer application', {
       operation: action.type,
+      blockedContainers,
+      blockedExternalTask: !this.taskAccess.canMutateTasks(solidTaskIdsForAction(action)),
     });
     if (this.blockedMutationWasReported) {
       return;

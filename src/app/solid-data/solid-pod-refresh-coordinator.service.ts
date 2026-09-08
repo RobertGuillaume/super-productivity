@@ -332,6 +332,12 @@ export class SolidPodRefreshCoordinatorService {
       return;
     }
 
+    // Enable the background queue before native resources are reconciled so each
+    // newly mapped source can enqueue its access check immediately.
+    void this.taskAccess.scheduleExternalPermissionChecks({
+      force: forceExternalAccess,
+    });
+
     try {
       const nativeTargets = await this.nativeTaskIndex.readTargets();
       if (nativeTargets.diagnosticCount > 0) {
@@ -373,10 +379,6 @@ export class SolidPodRefreshCoordinatorService {
         safeError('refresh-indexed-native-tasks', error),
       );
     }
-
-    void this.taskAccess.scheduleExternalPermissionChecks({
-      force: forceExternalAccess,
-    });
 
     this.lastRefreshDataDegraded = this.hydration.hasDegradedState() || isDegraded;
     isDegraded =

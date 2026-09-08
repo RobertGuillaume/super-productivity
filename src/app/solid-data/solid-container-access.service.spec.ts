@@ -76,6 +76,20 @@ describe('SolidContainerAccessService', () => {
     expect(resolvePermissions).toHaveBeenCalledOnceWith(containerUri);
   });
 
+  it('falls back to effective ACL resolution when HEAD is unavailable', async () => {
+    authenticatedFetch.and.rejectWith(new TypeError('Failed to fetch'));
+    resolvePermissions.and.resolveTo({
+      status: 'known',
+      provenance: 'fallback-acl',
+      permissions: [{ agent: webId, read: true, write: true }],
+    });
+
+    expect(await TestBed.inject(SolidContainerAccessService).check(containerUri)).toEqual(
+      { state: 'writable' },
+    );
+    expect(resolvePermissions).toHaveBeenCalledOnceWith(containerUri);
+  });
+
   it('distinguishes explicit denial from unknown access', async () => {
     authenticatedFetch.and.resolveTo(response(200));
     resolvePermissions.and.resolveTo({

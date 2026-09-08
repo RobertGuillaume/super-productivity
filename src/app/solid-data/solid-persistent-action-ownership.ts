@@ -173,10 +173,6 @@ registerTargets(
     ActionType.TASK_SHARED_DELETE_MULTIPLE,
   ],
   'tasks',
-  'projects',
-  'tags',
-  'planner',
-  'app',
 );
 registerTargets(SOLID_EMBEDDED_TASK_ACTION_TYPES, 'tasks');
 registerTargets(SOLID_GLOBAL_CONFIG_ACTION_TYPES, 'config');

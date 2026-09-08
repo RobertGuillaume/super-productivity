@@ -46,14 +46,6 @@
             class="task-title"
           ></task-title>
 
-          @if (solidAccessUi().tooltip; as accessTooltip) {
-            <mat-icon
-              [matTooltip]="accessTooltip | translate"
-              [attr.aria-label]="accessTooltip | translate"
-              >{{ solidAccessUi().icon }}</mat-icon
-            >
-          }
-
           @if (t.tagIds?.length || t.projectId || t.repeatCfgId || t.issueId) {
             <tag-list
               [task]="t"

@@ -20,7 +20,7 @@ export class SolidContainerAccessService {
       });
     } catch (error) {
       Log.err('Solid container access check unavailable', safeAccessError(error));
-      return { state: 'unavailable' };
+      return this.checkResolvedPermissions(containerUri, auth.webId, 'unavailable');
     }
 
     if (!response.ok) {
@@ -42,24 +42,37 @@ export class SolidContainerAccessService {
     if (headerAccess !== null) {
       return { state: headerAccess };
     }
+    return this.checkResolvedPermissions(containerUri, auth.webId, 'unknown');
+  }
 
+  private async checkResolvedPermissions(
+    containerUri: string,
+    webId: string,
+    fallbackState: Extract<SolidAccessState, 'unknown' | 'unavailable'>,
+  ): Promise<SolidAccessDecision> {
     try {
       const resolution =
         await this.solidRuntime.client.share.resolvePermissions(containerUri);
       if (resolution.status === 'unknown') {
-        return resolution.reason === 'rate-limited'
-          ? { state: 'rate-limited', retryAt: resolution.retryAt }
-          : { state: 'unknown' };
+        if (resolution.reason === 'rate-limited') {
+          return { state: 'rate-limited', retryAt: resolution.retryAt };
+        }
+        return {
+          state:
+            fallbackState === 'unavailable' && resolution.reason === 'acl-unavailable'
+              ? 'unavailable'
+              : 'unknown',
+        };
       }
       const ownPermission = resolution.permissions.find(
-        (permission) => permission.agent === auth.webId,
+        (permission) => permission.agent === webId,
       );
       return ownPermission === undefined
         ? { state: 'unknown' }
         : { state: ownPermission.write ? 'writable' : 'read-only' };
     } catch (error) {
       Log.err('Solid container permission check failed', safeAccessError(error));
-      return { state: 'unknown' };
+      return { state: fallbackState };
     }
   }
 

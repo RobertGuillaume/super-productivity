@@ -215,6 +215,24 @@ describe('SolidDataLayerStateService', () => {
     expect(service.canApplyPersistentAction(action)).toBe(true);
   });
 
+  it('does not block a task-only update on unrelated container readiness', () => {
+    localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
+    localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
+    authState = { status: 'authenticated', webId: 'https://user.example/#me' };
+    const service = TestBed.inject(SolidDataLayerStateService);
+    service.setContainerReadiness('tasks', 'writable');
+    service.setContainerReadiness('projects', 'unavailable');
+    service.setContainerReadiness('tags', 'read-only');
+    service.setContainerReadiness('planner', 'unknown');
+    service.setContainerReadiness('app', 'checking');
+
+    const action = TaskSharedActions.updateTask({
+      task: { id: 'task-1', changes: { title: 'Changed' } },
+    }) as PersistentAction;
+
+    expect(service.canApplyPersistentAction(action)).toBe(true);
+  });
+
   it('demotes proven access after authorization and connectivity failures', () => {
     const service = TestBed.inject(SolidDataLayerStateService);
     service.setContainerReadiness('tasks', 'writable');
