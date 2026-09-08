@@ -11,6 +11,7 @@ import {
 } from './solid-board.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -22,6 +23,7 @@ type SolidBoardContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidBoardRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
 
   async loadBoards(): Promise<SolidRepositoryRead<BoardCfg[]>> {
     const boardContainerScope = this.boardContainerScope();
@@ -32,7 +34,8 @@ export class SolidBoardRepository {
     });
 
     return solidRepositoryRead(
-      result.things
+      this.catalogAuthority
+        .filterThings(boardContainerScope.uri, result.things)
         .map(solidThingToBoardRecord)
         .sort((a, b) => a.order - b.order)
         .map((record) => record.board),

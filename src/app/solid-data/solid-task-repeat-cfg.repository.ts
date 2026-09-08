@@ -10,6 +10,7 @@ import {
 } from './solid-task-repeat-cfg.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -21,6 +22,7 @@ type SolidTaskRepeatCfgContainerScope = Extract<RuntimeScope, { kind: 'container
 export class SolidTaskRepeatCfgRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
 
   async loadTaskRepeatCfgs(): Promise<SolidRepositoryRead<TaskRepeatCfg[]>> {
     const taskRepeatCfgContainerScope = this.taskRepeatCfgContainerScope();
@@ -31,7 +33,9 @@ export class SolidTaskRepeatCfgRepository {
     });
 
     return solidRepositoryRead(
-      result.things.map(solidThingToTaskRepeatCfg),
+      this.catalogAuthority
+        .filterThings(taskRepeatCfgContainerScope.uri, result.things)
+        .map(solidThingToTaskRepeatCfg),
       result.metadata,
     );
   }

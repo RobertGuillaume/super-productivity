@@ -16,6 +16,7 @@ import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidMutationCoordinator } from './solid-mutation-coordinator.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 
 describe('SolidPodRefreshCoordinatorService', () => {
   const podRoot = 'https://pod.example/';
@@ -34,6 +35,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
   let dataLayerState: jasmine.SpyObj<SolidDataLayerStateService>;
   let mutations: jasmine.SpyObj<SolidMutationCoordinator>;
   let taskAccess: jasmine.SpyObj<SolidTaskAccessService>;
+  let catalogAuthority: jasmine.SpyObj<SolidCatalogAuthorityService>;
   let authState: AuthState;
   let status: DiscoveryStatus;
   let thingSubscriber: (() => void) | null;
@@ -63,13 +65,21 @@ describe('SolidPodRefreshCoordinatorService', () => {
     storage.listContainer.and.callFake(async (uri: string) => containerListing(uri));
     hydration = jasmine.createSpyObj<SolidTaskHydrationService>(
       'SolidTaskHydrationService',
-      ['reconcileStore', 'restoreLastPublishedSnapshot'],
+      [
+        'reconcileStore',
+        'restoreLastPublishedSnapshot',
+        'resetCatalogBaseline',
+        'hasDegradedState',
+      ],
     );
     hydration.reconcileStore.and.resolveTo({
       appDataComplete: {} as never,
       metadata: [],
       diagnostics: [],
+      modelOutcomes: [],
+      degraded: false,
     });
+    hydration.hasDegradedState.and.returnValue(false);
     dataLayerState = jasmine.createSpyObj<SolidDataLayerStateService>(
       'SolidDataLayerStateService',
       [
@@ -91,6 +101,10 @@ describe('SolidPodRefreshCoordinatorService', () => {
       'refreshExternalPermissions',
     ]);
     taskAccess.refreshExternalPermissions.and.resolveTo();
+    catalogAuthority = jasmine.createSpyObj<SolidCatalogAuthorityService>(
+      'SolidCatalogAuthorityService',
+      ['recordListing', 'clear'],
+    );
     const runtime = {
       auth: { state: () => authState },
       discovery,
@@ -127,6 +141,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
         { provide: SolidDataLayerStateService, useValue: dataLayerState },
         { provide: SolidMutationCoordinator, useValue: mutations },
         { provide: SolidTaskAccessService, useValue: taskAccess },
+        { provide: SolidCatalogAuthorityService, useValue: catalogAuthority },
       ],
     });
   });

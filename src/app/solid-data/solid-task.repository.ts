@@ -15,12 +15,14 @@ import {
   taskToSolidCreateInput,
 } from './solid-task.mapper';
 import { SolidTaskAccessService } from './solid-task-access.service';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 
 @Injectable({ providedIn: 'root' })
 export class SolidTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly taskAccess = inject(SolidTaskAccessService);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly taskThingUris = new Map<string, string>();
 
   async loadTasks(): Promise<SolidRepositoryRead<Task[]>> {
@@ -30,7 +32,12 @@ export class SolidTaskRepository {
     });
 
     return solidRepositoryRead(
-      result.things.map((thing) => this.rememberTaskThing(thing)),
+      this.catalogAuthority
+        .filterThings(
+          this.solidRuntime.taskProfile.target?.containerUri ?? '',
+          result.things,
+        )
+        .map((thing) => this.rememberTaskThing(thing)),
       result.metadata,
     );
   }

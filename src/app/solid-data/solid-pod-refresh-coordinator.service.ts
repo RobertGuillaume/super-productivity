@@ -14,6 +14,7 @@ import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 
 const REFRESH_BATCH_SIZE = 10;
 const MAX_DISCOVERY_CONTINUATIONS = 100;
@@ -29,6 +30,7 @@ export class SolidPodRefreshCoordinatorService {
   private readonly hydration = inject(SolidTaskHydrationService);
   private readonly mutations = inject(SolidMutationCoordinator);
   private readonly taskAccess = inject(SolidTaskAccessService);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
 
   private startPromise: Promise<void> | null = null;
   private refreshPromise: Promise<void> | null = null;
@@ -114,6 +116,8 @@ export class SolidPodRefreshCoordinatorService {
     this.lifecycleGeneration++;
     this.stopSubscriptions();
     this.knownContainers.clear();
+    this.catalogAuthority.clear();
+    this.hydration.resetCatalogBaseline();
     this.taskAccess.clear();
     this.dataLayerState.clearWriteReadiness();
     this.rootVerified = false;
@@ -144,6 +148,8 @@ export class SolidPodRefreshCoordinatorService {
       if (resolution === 'changed') {
         this.stopSubscriptions();
         this.knownContainers.clear();
+        this.catalogAuthority.clear();
+        this.hydration.resetCatalogBaseline();
         this.taskAccess.clear();
         await this.hydration.reconcileStore();
       }
@@ -178,6 +184,8 @@ export class SolidPodRefreshCoordinatorService {
         if (resolution === 'changed') {
           this.stopSubscriptions();
           this.knownContainers.clear();
+          this.catalogAuthority.clear();
+          this.hydration.resetCatalogBaseline();
           this.taskAccess.clear();
           this.dataLayerState.clearWriteReadiness();
           await this.hydration.reconcileStore();
@@ -237,6 +245,7 @@ export class SolidPodRefreshCoordinatorService {
       try {
         const listing = await this.listProvisionedContainer(containerUri);
         if (listing.status === 'ok' || listing.status === 'not-modified') {
+          this.catalogAuthority.recordListing(listing);
           this.solidRuntime.rememberAppContainerTree(containerUri, this.knownContainers);
           await this.refreshListingResources(listing);
           successfulContainerCount++;
@@ -286,6 +295,7 @@ export class SolidPodRefreshCoordinatorService {
 
     this.lastRefreshHadAuthoritativeData =
       this.rootVerified && successfulContainerCount > 0;
+    isDegraded = this.hydration.hasDegradedState() || isDegraded;
     this.dataLayerState.setPhase(isDegraded ? 'degraded' : 'ready');
     Log.normal(
       `Solid Pod refresh completed in ${Math.round(performance.now() - startedAt)}ms ` +

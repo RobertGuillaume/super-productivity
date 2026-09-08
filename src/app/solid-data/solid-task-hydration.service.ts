@@ -83,6 +83,9 @@ import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 import { SolidRepositoryRead } from './solid-repository-read';
 import { solidCatalogReconciled } from './solid-catalog-reconciled.action';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidTaskAccessService } from './solid-task-access.service';
 
 export interface SolidCatalogDiagnostic {
   model: string;
@@ -93,6 +96,35 @@ export interface SolidCatalogSnapshot {
   appDataComplete: AppDataComplete;
   metadata: readonly QueryMetadata[];
   diagnostics: readonly SolidCatalogDiagnostic[];
+  modelOutcomes: readonly SolidCatalogModelOutcome[];
+  degraded: boolean;
+}
+
+export interface SolidCatalogModelOutcome {
+  model: string;
+  status: 'complete' | 'partial' | 'failed';
+}
+
+export interface SolidCatalogInput {
+  tasks: readonly Task[];
+  archiveStates: { young: SolidArchiveState; old: SolidArchiveState };
+  boards: readonly BoardCfg[];
+  globalConfig: GlobalConfigState | null;
+  menuTree: MenuTreeState | null;
+  projects: readonly Project[];
+  tags: readonly Tag[];
+  notes: readonly Note[];
+  sections: readonly Section[];
+  issueProviders: readonly IssueProvider[];
+  taskRepeatCfgs: readonly TaskRepeatCfg[];
+  simpleCounters: readonly SimpleCounter[];
+  metrics: readonly Metric[];
+  archivedTasks: readonly SolidArchivedTask[];
+  plannerState: PlannerState;
+  pluginUserData: readonly PluginUserData[];
+  pluginMetadata: readonly PluginMetadata[];
+  appState: SolidAppState | null;
+  timeTrackingState: TimeTrackingState;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -100,6 +132,9 @@ export class SolidTaskHydrationService {
   private readonly store = inject(Store);
   private readonly archiveDbAdapter = inject(ArchiveDbAdapter);
   private readonly dataLayerState = inject(SolidDataLayerStateService);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly taskAccess = inject(SolidTaskAccessService);
   private readonly archiveStateRepository = inject(SolidArchiveStateRepository);
   private readonly taskRepository = inject(SolidTaskRepository);
   private readonly archivedTaskRepository = inject(SolidArchivedTaskRepository);
@@ -119,6 +154,12 @@ export class SolidTaskHydrationService {
   private readonly appStateRepository = inject(SolidAppStateRepository);
   private readonly timeTrackingRepository = inject(SolidTimeTrackingRepository);
   private lastPublishedSnapshot: SolidCatalogSnapshot | null = null;
+  private lastPublishedInput: SolidCatalogInput | null = null;
+  private readonly inputsBySnapshot = new WeakMap<
+    SolidCatalogSnapshot,
+    SolidCatalogInput
+  >();
+  private lastAttemptWasDegraded = false;
 
   async hydrateStore(): Promise<SolidCatalogSnapshot> {
     return this.publishSnapshot('initial');
@@ -126,6 +167,16 @@ export class SolidTaskHydrationService {
 
   async reconcileStore(): Promise<SolidCatalogSnapshot> {
     return this.publishSnapshot('reconcile');
+  }
+
+  resetCatalogBaseline(): void {
+    this.lastPublishedSnapshot = null;
+    this.lastPublishedInput = null;
+    this.lastAttemptWasDegraded = false;
+  }
+
+  hasDegradedState(): boolean {
+    return this.lastAttemptWasDegraded;
   }
 
   async restoreLastPublishedSnapshot(): Promise<boolean> {
@@ -140,7 +191,9 @@ export class SolidTaskHydrationService {
     return true;
   }
 
-  async readCatalogSnapshot(): Promise<SolidCatalogSnapshot> {
+  async readCatalogSnapshot(
+    previousInput: SolidCatalogInput | null = null,
+  ): Promise<SolidCatalogSnapshot> {
     const settled = await Promise.allSettled([
       this.taskRepository.loadTasks(),
       this.archiveStateRepository.loadArchiveStates(),
@@ -164,13 +217,64 @@ export class SolidTaskHydrationService {
     ] as const);
     const diagnostics: SolidCatalogDiagnostic[] = [];
     const metadata: QueryMetadata[] = [];
+    const modelOutcomes: SolidCatalogModelOutcome[] = [];
+    const containers = this.solidRuntime.ensureLayout().containers;
     const read = <T>(
       result: PromiseSettledResult<SolidRepositoryRead<T>>,
       fallback: T,
       model: string,
-    ): T => readSettledValue(result, fallback, model, diagnostics, metadata);
+      containerUri: string,
+      previous: T | undefined,
+      mergePartial: (oldValue: T, newValue: T) => T,
+      options: { forcePartial?: boolean } = {},
+    ): T =>
+      readSettledValue({
+        result,
+        fallback,
+        model,
+        containerUri,
+        previous,
+        mergePartial,
+        forcePartial: options.forcePartial === true,
+        catalogAuthority: this.catalogAuthority,
+        diagnostics,
+        metadata,
+        modelOutcomes,
+      });
+    const readArray = <T extends { id: string }>(
+      result: PromiseSettledResult<SolidRepositoryRead<T[]>>,
+      fallback: T[],
+      model: string,
+      containerUri: string,
+      previous: readonly T[] | undefined,
+    ): T[] =>
+      read(
+        result,
+        fallback,
+        model,
+        containerUri,
+        previous === undefined ? undefined : [...previous],
+        (oldValue, newValue) => mergeById(oldValue, newValue, (item) => item.id),
+      );
 
-    const tasks = read(settled[0], [] as Task[], 'tasks');
+    const tasks = read(
+      settled[0],
+      [] as Task[],
+      'tasks',
+      containers.tasks,
+      previousInput?.tasks === undefined ? undefined : [...previousInput.tasks],
+      (previous, current) =>
+        mergeById(
+          previous.filter(
+            (previousTask) =>
+              !this.taskAccess.isAppOwned(previousTask.id) ||
+              current.some((currentTask) => currentTask.id === previousTask.id),
+          ),
+          current,
+          (task) => task.id,
+        ),
+      { forcePartial: true },
+    );
     const archiveStates = read(
       settled[1],
       {
@@ -178,61 +282,173 @@ export class SolidTaskHydrationService {
         old: createDefaultSolidArchiveState('old'),
       },
       'archiveState',
+      containers.archiveState,
+      previousInput?.archiveStates,
+      mergeArchiveStates,
     );
-    const archivedTasks = read(settled[2], [] as SolidArchivedTask[], 'archivedTasks');
-    const boards = read(settled[3], [] as BoardCfg[], 'boards');
-    const globalConfig = read(settled[4], null, 'globalConfig');
-    const menuTree = read(settled[5], null, 'menuTree');
-    const projects = read(settled[6], [] as Project[], 'projects');
-    const tags = read(settled[7], [] as Tag[], 'tags');
-    const notes = read(settled[8], [] as Note[], 'notes');
-    const sections = read(settled[9], [] as Section[], 'sections');
-    const issueProviders = read(settled[10], [] as IssueProvider[], 'issueProviders');
-    const taskRepeatCfgs = read(settled[11], [] as TaskRepeatCfg[], 'taskRepeatCfgs');
-    const simpleCounters = read(settled[12], [] as SimpleCounter[], 'simpleCounters');
-    const metrics = read(settled[13], [] as Metric[], 'metrics');
+    const archivedTasks = read(
+      settled[2],
+      [] as SolidArchivedTask[],
+      'archivedTasks',
+      containers.archivedTasks,
+      previousInput?.archivedTasks === undefined
+        ? undefined
+        : [...previousInput.archivedTasks],
+      (previous, current) =>
+        mergeById(previous, current, ({ task: archivedTask }) => archivedTask.id),
+    );
+    const boards = readArray(
+      settled[3],
+      [],
+      'boards',
+      containers.boards,
+      previousInput?.boards,
+    );
+    const globalConfig = read(
+      settled[4],
+      null,
+      'globalConfig',
+      containers.config,
+      previousInput?.globalConfig,
+      preserveNull,
+    );
+    const menuTree = read(
+      settled[5],
+      null,
+      'menuTree',
+      containers.menuTree,
+      previousInput?.menuTree,
+      preserveNull,
+    );
+    const projects = readArray(
+      settled[6],
+      [],
+      'projects',
+      containers.projects,
+      previousInput?.projects,
+    );
+    const tags = readArray(settled[7], [], 'tags', containers.tags, previousInput?.tags);
+    const notes = readArray(
+      settled[8],
+      [],
+      'notes',
+      containers.notes,
+      previousInput?.notes,
+    );
+    const sections = readArray(
+      settled[9],
+      [],
+      'sections',
+      containers.sections,
+      previousInput?.sections,
+    );
+    const issueProviders = readArray(
+      settled[10],
+      [],
+      'issueProviders',
+      containers.issueProviders,
+      previousInput?.issueProviders,
+    );
+    const taskRepeatCfgs = readArray(
+      settled[11],
+      [],
+      'taskRepeatCfgs',
+      containers.taskRepeatCfgs,
+      previousInput?.taskRepeatCfgs,
+    );
+    const simpleCounters = readArray(
+      settled[12],
+      [],
+      'simpleCounters',
+      containers.simpleCounters,
+      previousInput?.simpleCounters,
+    );
+    const metrics = readArray(
+      settled[13],
+      [],
+      'metrics',
+      containers.metrics,
+      previousInput?.metrics,
+    );
     const plannerState = read(
       settled[14],
       { ...plannerInitialState, days: {} },
       'planner',
+      containers.planner,
+      previousInput?.plannerState,
+      mergePlannerState,
     );
-    const pluginUserData = read(settled[15], [] as PluginUserData[], 'pluginUserData');
-    const pluginMetadata = read(settled[16], [] as PluginMetadata[], 'pluginMetadata');
-    const appState = read(settled[17], null, 'appState');
-    const timeTrackingState = read(settled[18], initialTimeTrackingState, 'timeTracking');
+    const pluginUserData = readArray(
+      settled[15],
+      [],
+      'pluginUserData',
+      containers.pluginUserData,
+      previousInput?.pluginUserData,
+    );
+    const pluginMetadata = readArray(
+      settled[16],
+      [],
+      'pluginMetadata',
+      containers.pluginMetadata,
+      previousInput?.pluginMetadata,
+    );
+    const appState = read(
+      settled[17],
+      null,
+      'appState',
+      containers.app,
+      previousInput?.appState,
+      preserveNull,
+    );
+    const timeTrackingState = read(
+      settled[18],
+      initialTimeTrackingState,
+      'timeTracking',
+      containers.timeTracking,
+      previousInput?.timeTrackingState,
+      mergeTimeTracking,
+    );
 
-    return {
-      appDataComplete: createSolidAppData({
-        tasks,
-        archiveStates,
-        boards,
-        globalConfig,
-        menuTree,
-        projects,
-        tags,
-        notes,
-        sections,
-        issueProviders,
-        taskRepeatCfgs,
-        simpleCounters,
-        metrics,
-        archivedTasks,
-        plannerState,
-        pluginUserData,
-        pluginMetadata,
-        appState,
-        timeTrackingState,
-      }),
+    const catalogInput: SolidCatalogInput = {
+      tasks,
+      archiveStates,
+      boards,
+      globalConfig,
+      menuTree,
+      projects,
+      tags,
+      notes,
+      sections,
+      issueProviders,
+      taskRepeatCfgs,
+      simpleCounters,
+      metrics,
+      archivedTasks,
+      plannerState,
+      pluginUserData,
+      pluginMetadata,
+      appState,
+      timeTrackingState,
+    };
+
+    const snapshot: SolidCatalogSnapshot = {
+      appDataComplete: createSolidAppData(catalogInput),
       metadata,
       diagnostics,
+      modelOutcomes,
+      degraded: false,
     };
+    this.inputsBySnapshot.set(snapshot, catalogInput);
+    return snapshot;
   }
 
   private async publishSnapshot(
     mode: 'initial' | 'reconcile',
   ): Promise<SolidCatalogSnapshot> {
     const startedAt = performance.now();
-    const snapshot = await this.readCatalogSnapshot();
+    const snapshot = await this.readCatalogSnapshot(
+      mode === 'reconcile' ? this.lastPublishedInput : null,
+    );
     let archiveFailed = false;
 
     try {
@@ -270,11 +486,15 @@ export class SolidTaskHydrationService {
       });
     } else {
       this.lastPublishedSnapshot = snapshot;
+      this.lastPublishedInput = this.inputsBySnapshot.get(snapshot) ?? null;
     }
     if (snapshot.diagnostics.length > 0) {
       this.dataLayerState.addDiagnostics(snapshot.diagnostics.length);
     }
-    if (archiveFailed || snapshot.diagnostics.length > 0 || reducerFailures.length > 0) {
+    snapshot.degraded =
+      archiveFailed || snapshot.diagnostics.length > 0 || reducerFailures.length > 0;
+    this.lastAttemptWasDegraded = snapshot.degraded;
+    if (snapshot.degraded) {
       this.dataLayerState.setPhase('degraded');
     }
 
@@ -287,22 +507,102 @@ export class SolidTaskHydrationService {
   }
 }
 
-const readSettledValue = <T>(
-  result: PromiseSettledResult<SolidRepositoryRead<T>>,
-  fallback: T,
-  model: string,
-  diagnostics: SolidCatalogDiagnostic[],
-  metadata: QueryMetadata[],
-): T => {
+const readSettledValue = <T>({
+  result,
+  fallback,
+  model,
+  containerUri,
+  previous,
+  mergePartial,
+  forcePartial,
+  catalogAuthority,
+  diagnostics,
+  metadata,
+  modelOutcomes,
+}: {
+  result: PromiseSettledResult<SolidRepositoryRead<T>>;
+  fallback: T;
+  model: string;
+  containerUri: string;
+  previous: T | undefined;
+  mergePartial: (oldValue: T, newValue: T) => T;
+  forcePartial: boolean;
+  catalogAuthority: SolidCatalogAuthorityService;
+  diagnostics: SolidCatalogDiagnostic[];
+  metadata: QueryMetadata[];
+  modelOutcomes: SolidCatalogModelOutcome[];
+}): T => {
   if (result.status === 'fulfilled') {
     metadata.push(...result.value.metadata);
-    return result.value.value;
+    const runtimeComplete =
+      result.value.metadata.length > 0 &&
+      result.value.metadata.every((item) => item.completeness.status === 'complete');
+    const complete =
+      runtimeComplete ||
+      (!forcePartial && catalogAuthority.isAuthoritative(containerUri));
+    modelOutcomes.push({ model, status: complete ? 'complete' : 'partial' });
+    if (previous === undefined || complete) {
+      return result.value.value;
+    }
+    return mergePartial(previous, result.value.value);
   }
 
   const errorName = result.reason instanceof Error ? result.reason.name : 'UnknownError';
   diagnostics.push({ model, errorName });
+  modelOutcomes.push({ model, status: 'failed' });
   Log.err('Solid catalog model read failed', { model, errorName });
-  return fallback;
+  return previous ?? fallback;
+};
+
+const mergeById = <T>(
+  previous: readonly T[],
+  current: readonly T[],
+  id: (value: T) => string,
+): T[] => {
+  const merged = new Map(previous.map((value) => [id(value), value]));
+  for (const value of current) {
+    merged.set(id(value), value);
+  }
+  return [...merged.values()];
+};
+
+const preserveNull = <T>(previous: T | null, current: T | null): T | null =>
+  current ?? previous;
+
+const mergeArchiveStates = (
+  previous: { young: SolidArchiveState; old: SolidArchiveState },
+  current: { young: SolidArchiveState; old: SolidArchiveState },
+): { young: SolidArchiveState; old: SolidArchiveState } => ({
+  young: current.young.updated === 0 ? previous.young : current.young,
+  old: current.old.updated === 0 ? previous.old : current.old,
+});
+
+const mergePlannerState = (
+  previous: PlannerState,
+  current: PlannerState,
+): PlannerState => ({
+  days: { ...previous.days, ...current.days },
+  addPlannedTasksDialogLastShown:
+    current.addPlannedTasksDialogLastShown ?? previous.addPlannedTasksDialogLastShown,
+});
+
+const mergeTimeTracking = (
+  previous: TimeTrackingState,
+  current: TimeTrackingState,
+): TimeTrackingState => ({
+  project: mergeTimeTrackingContexts(previous.project, current.project),
+  tag: mergeTimeTrackingContexts(previous.tag, current.tag),
+});
+
+const mergeTimeTrackingContexts = <T extends Record<string, unknown>>(
+  previous: Record<string, T>,
+  current: Record<string, T>,
+): Record<string, T> => {
+  const merged = { ...previous };
+  for (const [contextId, dates] of Object.entries(current)) {
+    merged[contextId] = { ...previous[contextId], ...dates } as T;
+  }
+  return merged;
 };
 
 export const createSolidAppData = (input: {

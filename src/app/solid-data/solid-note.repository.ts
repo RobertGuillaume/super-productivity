@@ -4,6 +4,7 @@ import { Note } from '../features/note/note.model';
 import { SP_NOTE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -21,6 +22,7 @@ type SolidNoteContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidNoteRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
 
   async loadNotes(): Promise<SolidRepositoryRead<Note[]>> {
     const noteContainerScope = this.noteContainerScope();
@@ -30,7 +32,12 @@ export class SolidNoteRepository {
       autoDiscover: false,
     });
 
-    return solidRepositoryRead(result.things.map(solidThingToNote), result.metadata);
+    return solidRepositoryRead(
+      this.catalogAuthority
+        .filterThings(noteContainerScope.uri, result.things)
+        .map(solidThingToNote),
+      result.metadata,
+    );
   }
 
   saveNote(note: Note): Promise<Note> {

@@ -4,6 +4,7 @@ import { Project } from '../features/project/project.model';
 import { SP_PROJECT } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -21,6 +22,7 @@ type SolidProjectContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidProjectRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
 
   async loadProjects(): Promise<SolidRepositoryRead<Project[]>> {
     const projectContainerScope = this.projectContainerScope();
@@ -30,7 +32,12 @@ export class SolidProjectRepository {
       autoDiscover: false,
     });
 
-    return solidRepositoryRead(result.things.map(solidThingToProject), result.metadata);
+    return solidRepositoryRead(
+      this.catalogAuthority
+        .filterThings(projectContainerScope.uri, result.things)
+        .map(solidThingToProject),
+      result.metadata,
+    );
   }
 
   saveProject(project: Project): Promise<Project> {

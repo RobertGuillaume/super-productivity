@@ -67,6 +67,10 @@ export class SolidTaskAccessService {
     return capability?.origin === 'external' && capability.access !== 'writable';
   }
 
+  isAppOwned(taskId: string): boolean {
+    return this.capabilitiesSignal().get(taskId)?.origin === 'app';
+  }
+
   canMutateTasks(taskIds: readonly string[]): boolean {
     return taskIds.every((taskId) => !this.isReadOnly(taskId));
   }

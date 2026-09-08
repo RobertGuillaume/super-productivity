@@ -4,6 +4,7 @@ import { Tag } from '../features/tag/tag.model';
 import { SP_TAG } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -21,6 +22,7 @@ type SolidTagContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidTagRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
 
   async loadTags(): Promise<SolidRepositoryRead<Tag[]>> {
     const tagContainerScope = this.tagContainerScope();
@@ -30,7 +32,12 @@ export class SolidTagRepository {
       autoDiscover: false,
     });
 
-    return solidRepositoryRead(result.things.map(solidThingToTag), result.metadata);
+    return solidRepositoryRead(
+      this.catalogAuthority
+        .filterThings(tagContainerScope.uri, result.things)
+        .map(solidThingToTag),
+      result.metadata,
+    );
   }
 
   saveTag(tag: Tag): Promise<Tag> {

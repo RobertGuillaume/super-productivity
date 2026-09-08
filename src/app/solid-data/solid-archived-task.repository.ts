@@ -12,6 +12,7 @@ import {
 } from './solid-archived-task.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   settleSolidMutations,
   SolidMutationCoordinator,
@@ -24,6 +25,7 @@ type SolidArchivedTaskContainerScope = Extract<RuntimeScope, { kind: 'container'
 export class SolidArchivedTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
 
   async loadArchivedTasks(): Promise<SolidRepositoryRead<SolidArchivedTask[]>> {
     const archivedTaskContainerScope = this.archivedTaskContainerScope();
@@ -34,7 +36,9 @@ export class SolidArchivedTaskRepository {
     });
 
     return solidRepositoryRead(
-      result.things.map(solidThingToArchivedTask),
+      this.catalogAuthority
+        .filterThings(archivedTaskContainerScope.uri, result.things)
+        .map(solidThingToArchivedTask),
       result.metadata,
     );
   }

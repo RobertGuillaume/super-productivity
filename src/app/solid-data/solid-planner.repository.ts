@@ -23,6 +23,7 @@ import {
 import { SP_PLANNER_DAY, SP_PLANNER_STATE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   settleSolidMutations,
   SolidMutationCoordinator,
@@ -35,6 +36,7 @@ type SolidPlannerContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidPlannerRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
+  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
 
   async loadPlannerState(): Promise<SolidRepositoryRead<PlannerState>> {
     const plannerContainerScope = this.plannerContainerScope();
@@ -46,11 +48,19 @@ export class SolidPlannerRepository {
       }),
       this.queryPlannerStateThing(),
     ]);
-    const stateThing = stateResult.things[0] ?? null;
+    const dayThings = this.catalogAuthority.filterThings(
+      plannerContainerScope.uri,
+      daysResult.things,
+    );
+    const stateThing =
+      this.catalogAuthority.filterThings(
+        plannerContainerScope.uri,
+        stateResult.things,
+      )[0] ?? null;
 
     return solidRepositoryRead(
       createPlannerStateFromSolid(
-        daysResult.things.map(solidThingToPlannerDay),
+        dayThings.map(solidThingToPlannerDay),
         stateThing === null ? null : solidThingToPlannerState(stateThing),
       ),
       daysResult.metadata,

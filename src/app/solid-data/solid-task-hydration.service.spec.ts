@@ -59,6 +59,10 @@ import { SolidTaskRepository } from './solid-task.repository';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
 import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
+import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidTaskAccessService } from './solid-task-access.service';
+import { solidCatalogReconciled } from './solid-catalog-reconciled.action';
 
 describe('SolidTaskHydrationService', () => {
   const TODAY = '2026-08-04';
@@ -472,6 +476,44 @@ describe('SolidTaskHydrationService', () => {
       'SolidDataLayerStateService',
       ['addDiagnostics', 'setPhase'],
     );
+    const solidRuntime = jasmine.createSpyObj<SolidRuntimeService>(
+      'SolidRuntimeService',
+      ['ensureLayout'],
+    );
+    solidRuntime.ensureLayout.and.returnValue({
+      containers: {
+        tasks: 'https://pod.example/tasks/',
+        archiveState: 'https://pod.example/archive-state/',
+        archivedTasks: 'https://pod.example/archived-tasks/',
+        boards: 'https://pod.example/boards/',
+        config: 'https://pod.example/config/',
+        menuTree: 'https://pod.example/menu-tree/',
+        projects: 'https://pod.example/projects/',
+        tags: 'https://pod.example/tags/',
+        notes: 'https://pod.example/notes/',
+        sections: 'https://pod.example/sections/',
+        issueProviders: 'https://pod.example/issue-providers/',
+        taskRepeatCfgs: 'https://pod.example/task-repeat-cfgs/',
+        simpleCounters: 'https://pod.example/simple-counters/',
+        metrics: 'https://pod.example/metrics/',
+        planner: 'https://pod.example/planner/',
+        pluginUserData: 'https://pod.example/plugin-user-data/',
+        pluginMetadata: 'https://pod.example/plugin-metadata/',
+        app: 'https://pod.example/app/',
+        timeTracking: 'https://pod.example/time-tracking/',
+      },
+      types: {},
+    });
+    const catalogAuthority = jasmine.createSpyObj<SolidCatalogAuthorityService>(
+      'SolidCatalogAuthorityService',
+      ['isAuthoritative'],
+    );
+    catalogAuthority.isAuthoritative.and.returnValue(false);
+    const taskAccess = jasmine.createSpyObj<SolidTaskAccessService>(
+      'SolidTaskAccessService',
+      ['isAppOwned'],
+    );
+    taskAccess.isAppOwned.and.returnValue(false);
     archiveDbAdapter.saveArchivesAtomic.and.rejectWith(
       new Error('archive cache unavailable'),
     );
@@ -518,6 +560,9 @@ describe('SolidTaskHydrationService', () => {
         { provide: Store, useValue: store },
         { provide: ArchiveDbAdapter, useValue: archiveDbAdapter },
         { provide: SolidDataLayerStateService, useValue: dataLayerState },
+        { provide: SolidRuntimeService, useValue: solidRuntime },
+        { provide: SolidCatalogAuthorityService, useValue: catalogAuthority },
+        { provide: SolidTaskAccessService, useValue: taskAccess },
         { provide: SolidArchiveStateRepository, useValue: archiveStateRepository },
         { provide: SolidTaskRepository, useValue: taskRepository },
         { provide: SolidArchivedTaskRepository, useValue: archivedTaskRepository },
@@ -609,5 +654,27 @@ describe('SolidTaskHydrationService', () => {
     expect(dataLayerState.addDiagnostics.calls.count()).toBe(2);
     expect(dataLayerState.addDiagnostics).toHaveBeenCalledWith(1);
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('degraded');
+
+    taskRepository.loadTasks.and.rejectWith(new TypeError('malformed task'));
+    noteRepository.loadNotes.and.resolveTo(
+      solidRepositoryRead([{ ...note, id: 'note-2' }]),
+    );
+    await service.reconcileStore();
+
+    const partialAction = store.dispatch.calls.mostRecent()
+      .args[0] as unknown as ReturnType<typeof solidCatalogReconciled>;
+    expect(partialAction.type).toBe(solidCatalogReconciled.type);
+    expect(partialAction.appDataComplete.task.ids).toEqual(['task-1']);
+    expect(partialAction.appDataComplete.note.ids).toEqual(['note-1', 'note-2']);
+
+    catalogAuthority.isAuthoritative.and.callFake(
+      (containerUri) => containerUri === 'https://pod.example/notes/',
+    );
+    noteRepository.loadNotes.and.resolveTo(solidRepositoryRead([]));
+    await service.reconcileStore();
+
+    const authoritativeAction = store.dispatch.calls.mostRecent()
+      .args[0] as unknown as ReturnType<typeof solidCatalogReconciled>;
+    expect(authoritativeAction.appDataComplete.note.ids).toEqual([]);
   });
 });
