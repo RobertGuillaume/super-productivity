@@ -19,6 +19,10 @@ import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
 import { SolidContainerAccessService } from './solid-container-access.service';
+import { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
+import { PersistentAction } from '../op-log/core/persistent-action.interface';
+import { EntityType, OpType } from '../op-log/core/operation.types';
+import { AppDataComplete } from '../op-log/model/model-config';
 
 describe('SolidPodRefreshCoordinatorService', () => {
   const podRoot = 'https://pod.example/';
@@ -72,6 +76,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
       [
         'reconcileStore',
         'restoreLastPublishedSnapshot',
+        'restoreProjection',
         'resetCatalogBaseline',
         'hasDegradedState',
       ],
@@ -97,7 +102,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
     );
     mutations = jasmine.createSpyObj<SolidMutationCoordinator>(
       'SolidMutationCoordinator',
-      ['whenIdle'],
+      ['whenIdle', 'completeFailedIntent'],
     );
     mutations.whenIdle.and.resolveTo();
     taskAccess = jasmine.createSpyObj<SolidTaskAccessService>('SolidTaskAccessService', [
@@ -280,6 +285,79 @@ describe('SolidPodRefreshCoordinatorService', () => {
     expect(subscriptionInstallCount).toBeGreaterThan(initialSubscriptionCount);
     expect(runtimeService.resolveAuthenticatedStorageRoot).toHaveBeenCalledTimes(2);
   });
+
+  it('deduplicates one intent recovery and refreshes only affected targets', async () => {
+    const service = TestBed.inject(SolidPodRefreshCoordinatorService);
+    await service.start();
+    discovery.refresh.calls.reset();
+    discovery.discoverType.calls.reset();
+    storage.listContainer.calls.reset();
+    hydration.reconcileStore.calls.reset();
+    const context = mutationContext({
+      resourceUris: [`${containers.tasks}task-1.ttl`],
+      containerKeys: ['tasks'],
+    });
+
+    const first = service.recoverRejectedMutation(context);
+    const second = service.recoverRejectedMutation(context);
+
+    expect(second).toBe(first);
+    await first;
+    expect(storage.listContainer).toHaveBeenCalledOnceWith(containers.tasks);
+    expect(discovery.refresh).toHaveBeenCalledWith({
+      uris: [`${containers.tasks}task-1.ttl`],
+    });
+    expect(discovery.discoverType).not.toHaveBeenCalled();
+    expect(hydration.reconcileStore).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores the captured projection when targeted refresh is not authoritative', async () => {
+    const service = TestBed.inject(SolidPodRefreshCoordinatorService);
+    await service.start();
+    discovery.discoverType.calls.reset();
+    storage.listContainer.calls.reset();
+    storage.listContainer.and.resolveTo(
+      containerListing(containers.tasks, [], 'inaccessible', 503),
+    );
+    hydration.restoreProjection.calls.reset();
+    hydration.reconcileStore.calls.reset();
+    const projection = {} as AppDataComplete;
+    const context = mutationContext({
+      containerKeys: ['tasks'],
+      projection,
+    });
+
+    await service.recoverRejectedMutation(context);
+
+    expect(hydration.restoreProjection).toHaveBeenCalledOnceWith(projection);
+    expect(hydration.reconcileStore).not.toHaveBeenCalled();
+    expect(dataLayerState.setContainerReadiness).toHaveBeenCalledWith(
+      'tasks',
+      'unavailable',
+    );
+    expect(discovery.discoverType).not.toHaveBeenCalled();
+  });
+});
+
+const mutationContext = (
+  overrides: Partial<SolidMutationIntentContext> = {},
+): SolidMutationIntentContext => ({
+  action: {
+    type: '[TaskShared] Update Task',
+    meta: {
+      isPersistent: true,
+      entityType: 'TASK' as EntityType,
+      entityId: 'task-1',
+      opType: OpType.Update,
+    },
+  } as PersistentAction,
+  actionType: '[TaskShared] Update Task',
+  entityKeys: ['task:task-1'],
+  resourceUris: [],
+  containerKeys: ['tasks'],
+  projection: null,
+  catalogGeneration: 1,
+  ...overrides,
 });
 
 const discoveryStatus = (overrides: Partial<DiscoveryStatus> = {}): DiscoveryStatus => ({

@@ -160,6 +160,7 @@ export class SolidTaskHydrationService {
     SolidCatalogInput
   >();
   private lastAttemptWasDegraded = false;
+  private publishedGeneration = 0;
 
   async hydrateStore(): Promise<SolidCatalogSnapshot> {
     return this.publishSnapshot('initial');
@@ -173,6 +174,7 @@ export class SolidTaskHydrationService {
     this.lastPublishedSnapshot = null;
     this.lastPublishedInput = null;
     this.lastAttemptWasDegraded = false;
+    this.publishedGeneration++;
   }
 
   hasDegradedState(): boolean {
@@ -189,6 +191,35 @@ export class SolidTaskHydrationService {
       solidCatalogReconciled({ appDataComplete: snapshot.appDataComplete }),
     );
     return true;
+  }
+
+  captureLastPublishedProjection(): {
+    appDataComplete: AppDataComplete;
+    generation: number;
+  } | null {
+    return this.lastPublishedSnapshot === null
+      ? null
+      : {
+          appDataComplete: this.lastPublishedSnapshot.appDataComplete,
+          generation: this.publishedGeneration,
+        };
+  }
+
+  async restoreProjection(appDataComplete: AppDataComplete): Promise<void> {
+    try {
+      await this.archiveDbAdapter.saveArchivesAtomic(
+        appDataComplete.archiveYoung,
+        appDataComplete.archiveOld,
+      );
+    } catch (error) {
+      this.dataLayerState.addDiagnostics();
+      Log.err('Solid rejected mutation archive restore failed', {
+        operation: 'restore-projection',
+        model: 'archive',
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+    }
+    this.store.dispatch(solidCatalogReconciled({ appDataComplete }));
   }
 
   async readCatalogSnapshot(
@@ -487,6 +518,7 @@ export class SolidTaskHydrationService {
     } else {
       this.lastPublishedSnapshot = snapshot;
       this.lastPublishedInput = this.inputsBySnapshot.get(snapshot) ?? null;
+      this.publishedGeneration++;
     }
     if (snapshot.diagnostics.length > 0) {
       this.dataLayerState.addDiagnostics(snapshot.diagnostics.length);

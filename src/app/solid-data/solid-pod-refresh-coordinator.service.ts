@@ -17,6 +17,10 @@ import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
 import { SolidContainerAccessService } from './solid-container-access.service';
+import {
+  SolidMutationIntentContext,
+  SolidMutationIntentRegistry,
+} from './solid-mutation-intent-registry.service';
 
 const REFRESH_BATCH_SIZE = 10;
 const MAX_DISCOVERY_CONTINUATIONS = 100;
@@ -35,6 +39,7 @@ export class SolidPodRefreshCoordinatorService {
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly identities = inject(SolidThingIdentityRegistry);
   private readonly containerAccess = inject(SolidContainerAccessService);
+  private readonly mutationIntents = inject(SolidMutationIntentRegistry);
 
   private startPromise: Promise<void> | null = null;
   private refreshPromise: Promise<void> | null = null;
@@ -50,10 +55,12 @@ export class SolidPodRefreshCoordinatorService {
   private canCheckNativeTaskAccess = false;
   private lifecycleGeneration = 0;
   private coordinatedRefreshDepth = 0;
+  private readonly recoveryPromises = new WeakMap<object, Promise<void>>();
+  private recoveryWithoutIntent: Promise<void> | null = null;
 
   constructor() {
-    this.dataLayerState.registerMutationRecoveryHandler(() =>
-      this.recoverRejectedMutation(),
+    this.dataLayerState.registerMutationRecoveryHandler((context, error, source) =>
+      this.recoverRejectedMutation(context, error, source),
     );
     const handleOnline = (): void => {
       if (this.started) {
@@ -106,14 +113,33 @@ export class SolidPodRefreshCoordinatorService {
     return this.refreshPromise;
   }
 
-  async recoverRejectedMutation(): Promise<void> {
-    await this.mutations.whenIdle();
-    await this.refreshNow();
-    if (!this.lastRefreshHadAuthoritativeData) {
-      await this.hydration.restoreLastPublishedSnapshot();
-      this.dataLayerState.clearWriteReadiness();
-      this.dataLayerState.setPhase('degraded');
+  recoverRejectedMutation(
+    context: SolidMutationIntentContext | null = this.mutationIntents.latest(),
+    error: unknown = null,
+    source = '',
+  ): Promise<void> {
+    if (context === null) {
+      if (this.recoveryWithoutIntent !== null) {
+        return this.recoveryWithoutIntent;
+      }
+      this.recoveryWithoutIntent = this.recoverMutationIntent(null, source).finally(
+        () => {
+          this.mutations.completeFailedIntent(null, error);
+          this.recoveryWithoutIntent = null;
+        },
+      );
+      return this.recoveryWithoutIntent;
     }
+    const pending = this.recoveryPromises.get(context.action);
+    if (pending !== undefined) {
+      return pending;
+    }
+    const recovery = this.recoverMutationIntent(context, source).finally(() => {
+      this.mutations.completeFailedIntent(context.action, error);
+      this.recoveryPromises.delete(context.action);
+    });
+    this.recoveryPromises.set(context.action, recovery);
+    return recovery;
   }
 
   async restartAfterRuntimeBoot(): Promise<void> {
@@ -122,6 +148,7 @@ export class SolidPodRefreshCoordinatorService {
     this.knownContainers.clear();
     this.catalogAuthority.clear();
     this.identities.clear();
+    this.mutationIntents.clear();
     this.hydration.resetCatalogBaseline();
     this.taskAccess.clear();
     this.dataLayerState.clearWriteReadiness();
@@ -155,6 +182,7 @@ export class SolidPodRefreshCoordinatorService {
         this.knownContainers.clear();
         this.catalogAuthority.clear();
         this.identities.clear();
+        this.mutationIntents.clear();
         this.hydration.resetCatalogBaseline();
         this.taskAccess.clear();
         await this.hydration.reconcileStore();
@@ -192,6 +220,7 @@ export class SolidPodRefreshCoordinatorService {
           this.knownContainers.clear();
           this.catalogAuthority.clear();
           this.identities.clear();
+          this.mutationIntents.clear();
           this.hydration.resetCatalogBaseline();
           this.taskAccess.clear();
           this.dataLayerState.clearWriteReadiness();
@@ -326,6 +355,96 @@ export class SolidPodRefreshCoordinatorService {
     return listing;
   }
 
+  private async recoverMutationIntent(
+    context: SolidMutationIntentContext | null,
+    source: string,
+  ): Promise<void> {
+    await this.mutations.whenIdle();
+    const containerKeys = context?.containerKeys.length
+      ? context.containerKeys
+      : containerKeysForPersistenceSource(source);
+    const layout = this.solidRuntime.ensureLayout();
+    let authoritative = this.rootVerified;
+    this.coordinatedRefreshDepth++;
+    try {
+      if (context !== null && context.resourceUris.length > 0) {
+        try {
+          await this.refreshResourceUris(context.resourceUris);
+        } catch (error) {
+          authoritative = false;
+          Log.err(
+            'Solid mutation resource recovery failed',
+            safeError('recover-resources', error),
+          );
+        }
+      }
+
+      for (const containerKey of containerKeys) {
+        const containerUri = layout.containers[containerKey];
+        if (containerUri === undefined) {
+          authoritative = false;
+          continue;
+        }
+        try {
+          const listing =
+            await this.solidRuntime.client.storage.listContainer(containerUri);
+          if (listing.status !== 'ok' && listing.status !== 'not-modified') {
+            authoritative = false;
+            continue;
+          }
+          this.catalogAuthority.recordListing(listing);
+          await this.refreshResourceUris(
+            listing.entries
+              .filter((entry) => entry.kind === 'resource')
+              .map((entry) => entry.uri),
+          );
+        } catch (error) {
+          authoritative = false;
+          Log.err(
+            'Solid mutation container recovery failed',
+            safeError('recover-container', error),
+          );
+        }
+      }
+
+      await this.mutations.whenIdle();
+      if (authoritative) {
+        await this.hydration.reconcileStore();
+        for (const containerKey of containerKeys) {
+          const containerUri = layout.containers[containerKey];
+          if (containerUri !== undefined) {
+            this.dataLayerState.setContainerReadiness(
+              containerKey,
+              await this.containerAccess.check(containerUri),
+            );
+          }
+        }
+      } else {
+        if (context?.projection !== null && context?.projection !== undefined) {
+          await this.hydration.restoreProjection(context.projection);
+        } else {
+          await this.hydration.restoreLastPublishedSnapshot();
+        }
+        containerKeys.forEach((containerKey) =>
+          this.dataLayerState.setContainerReadiness(containerKey, 'unavailable'),
+        );
+        this.dataLayerState.setPhase('degraded');
+      }
+      this.reconciliationRequested = false;
+    } finally {
+      this.coordinatedRefreshDepth--;
+    }
+  }
+
+  private async refreshResourceUris(resourceUris: readonly string[]): Promise<void> {
+    const uniqueUris = Array.from(new Set(resourceUris));
+    for (let index = 0; index < uniqueUris.length; index += REFRESH_BATCH_SIZE) {
+      await this.solidRuntime.client.discovery.refresh({
+        uris: uniqueUris.slice(index, index + REFRESH_BATCH_SIZE),
+      });
+    }
+  }
+
   private async refreshListingResources(listing: ContainerListing): Promise<void> {
     const resourceUris = Array.from(
       new Set(
@@ -452,6 +571,30 @@ const orderedContainers = (layout: RuntimeLayout): Array<[SolidContainerKey, str
         (priority.get(right) ?? PRIORITY_CONTAINER_KEYS.length),
     )
     .map(([key, containerUri]) => [key as SolidContainerKey, containerUri]);
+};
+
+const containerKeysForPersistenceSource = (source: string): SolidContainerKey[] => {
+  const normalized = source.toLowerCase();
+  const matches: Array<[string, SolidContainerKey[]]> = [
+    ['archivestate', ['archiveState', 'archivedTasks']],
+    ['archivedtask', ['archiveState', 'archivedTasks']],
+    ['globalconfig', ['config']],
+    ['menutree', ['menuTree']],
+    ['issueprovider', ['issueProviders']],
+    ['simplecounter', ['simpleCounters']],
+    ['taskrepeatcfg', ['taskRepeatCfgs']],
+    ['timetracking', ['timeTracking']],
+    ['plugin', ['pluginUserData', 'pluginMetadata']],
+    ['planner', ['planner']],
+    ['project', ['projects']],
+    ['section', ['sections']],
+    ['metric', ['metrics']],
+    ['board', ['boards']],
+    ['note', ['notes']],
+    ['tag', ['tags']],
+    ['task', ['tasks']],
+  ];
+  return matches.find(([needle]) => normalized.includes(needle))?.[1] ?? [];
 };
 
 const isDiscoverySettled = (status: DiscoveryStatus): boolean =>

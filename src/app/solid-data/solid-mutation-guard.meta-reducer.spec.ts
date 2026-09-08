@@ -40,14 +40,17 @@ describe('solidMutationGuardMetaReducer', () => {
 
   it('passes write-ready and nonpersistent actions to reducers', () => {
     const reducer: ActionReducer<number> = (state) => (state ?? 0) + 1;
+    const onAccepted = jasmine.createSpy('onAccepted');
     configureSolidMutationGuard({
       owns: () => true,
       canApply: () => true,
       onBlocked: () => undefined,
+      onAccepted,
     });
     const wrapped = solidMutationGuardMetaReducer(reducer);
 
     expect(wrapped(1, action)).toBe(2);
+    expect(onAccepted).toHaveBeenCalledOnceWith(action);
     expect(wrapped(1, { type: '[Layout] Select' })).toBe(2);
   });
 });

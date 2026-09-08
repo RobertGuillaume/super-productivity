@@ -8,6 +8,7 @@ interface SolidMutationGuardPolicy {
   owns(action: PersistentAction): boolean;
   canApply(action: PersistentAction): boolean;
   onBlocked(action: PersistentAction): void;
+  onAccepted?(action: PersistentAction): void;
 }
 
 let policy: SolidMutationGuardPolicy | null = null;
@@ -35,9 +36,13 @@ export const solidMutationGuardMetaReducer = <T>(
       policy === null ||
       !isPersistentAction(action) ||
       action.meta.isRemote ||
-      !policy.owns(action) ||
-      policy.canApply(action)
+      !policy.owns(action)
     ) {
+      return reducer(state, action);
+    }
+
+    if (policy.canApply(action)) {
+      policy.onAccepted?.(action);
       return reducer(state, action);
     }
 

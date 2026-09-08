@@ -5,11 +5,11 @@ import { T } from '../t.const';
 
 interface SolidAuthenticationErrorHandler {
   handleAuthenticationError?(error: unknown): boolean;
-  recoverRejectedMutation?(): void;
+  recoverRejectedMutation?(error: unknown, source: string): Promise<void> | void;
   demoteWriteAccessAfterFailure?(error: unknown): void;
 }
 
-let isFailureNoticeDeduplicated = false;
+const noticedRecoveries = new Set<Promise<void>>();
 
 export const handleSolidPersistenceError = ({
   error,
@@ -27,20 +27,28 @@ export const handleSolidPersistenceError = ({
     ...fields,
   });
   sessionRecovery?.demoteWriteAccessAfterFailure?.(error);
-  sessionRecovery?.recoverRejectedMutation?.();
-  if (sessionRecovery?.handleAuthenticationError?.(error)) {
+  const authenticationHandled =
+    sessionRecovery?.handleAuthenticationError?.(error) === true;
+  const recoveryResult = sessionRecovery?.recoverRejectedMutation?.(error, source);
+  const recovery = recoveryResult instanceof Promise ? recoveryResult : Promise.resolve();
+  if (authenticationHandled) {
     return EMPTY;
   }
 
-  if (!isFailureNoticeDeduplicated) {
-    isFailureNoticeDeduplicated = true;
+  if (!noticedRecoveries.has(recovery)) {
+    noticedRecoveries.add(recovery);
     snackService.open({
       type: 'ERROR',
       msg: T.PS.SOLID.WRITE_RESTORED,
     });
-    queueMicrotask(() => {
-      isFailureNoticeDeduplicated = false;
-    });
+    void recovery
+      .catch((recoveryError) => {
+        Log.err('Solid rejected mutation recovery failed', {
+          operation: source,
+          errorName: recoveryError instanceof Error ? recoveryError.name : 'UnknownError',
+        });
+      })
+      .finally(() => noticedRecoveries.delete(recovery));
   }
   return EMPTY;
 };

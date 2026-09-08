@@ -27,6 +27,10 @@ export class SolidSessionRecoveryService {
     return true;
   }
 
+  whenRecoverySettled(): Promise<void> {
+    return this.authRefreshInFlight ?? Promise.resolve();
+  }
+
   promptForLogin(): void {
     if (this.isLoginPromptOpen) {
       return;

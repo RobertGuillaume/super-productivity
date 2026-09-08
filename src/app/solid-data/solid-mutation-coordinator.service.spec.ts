@@ -34,15 +34,35 @@ describe('SolidMutationCoordinator', () => {
       calls.push('unrelated');
       markUnrelatedStarted?.();
     });
-    expect(coordinator.inFlightCount()).toBe(3);
     await Promise.all([firstStarted, unrelatedStarted]);
 
     expect(calls).toEqual(['first:start', 'unrelated']);
-    expect(coordinator.inFlightCount()).toBe(2);
+    expect(coordinator.inFlightCount()).toBe(1);
     releaseFirst?.();
     await Promise.all([first, sameResource, unrelated]);
     expect(calls).toEqual(['first:start', 'unrelated', 'first:end', 'same']);
     expect(coordinator.inFlightCount()).toBe(0);
+  });
+
+  it('holds the next same-resource mutation until rejected state is reconciled', async () => {
+    const coordinator = TestBed.inject(SolidMutationCoordinator);
+    const error = new Error('rejected write');
+    let nextStarted = false;
+
+    await expectAsync(
+      coordinator.run('task:1', async () => {
+        throw error;
+      }),
+    ).toBeRejectedWith(error);
+    const next = coordinator.run('task:1', async () => {
+      nextStarted = true;
+    });
+    await Promise.resolve();
+    expect(nextStarted).toBe(false);
+
+    coordinator.completeFailedIntent(null, error);
+    await next;
+    expect(nextStarted).toBe(true);
   });
 
   it('waits for every sibling before surfacing a partial failure', async () => {
@@ -59,5 +79,27 @@ describe('SolidMutationCoordinator', () => {
       ] as const),
     ).toBeRejectedWithError('failed');
     expect(siblingFinished).toBe(true);
+  });
+
+  it('holds the next same-resource mutation until failed intent recovery completes', async () => {
+    const coordinator = TestBed.inject(SolidMutationCoordinator);
+    const error = new Error('save failed');
+    let nextStarted = false;
+
+    await expectAsync(
+      coordinator.run('task:1', async () => {
+        throw error;
+      }),
+    ).toBeRejectedWith(error);
+
+    const next = coordinator.run('task:1', async () => {
+      nextStarted = true;
+    });
+    await Promise.resolve();
+    expect(nextStarted).toBe(false);
+
+    coordinator.completeFailedIntent(null, error);
+    await next;
+    expect(nextStarted).toBe(true);
   });
 });

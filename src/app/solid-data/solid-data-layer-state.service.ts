@@ -18,6 +18,11 @@ import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidSessionRecoveryService } from './solid-session-recovery.service';
 import { configureSolidMutationGuard } from './solid-mutation-guard.meta-reducer';
 import { SolidTaskAccessService } from './solid-task-access.service';
+import {
+  SolidMutationIntentContext,
+  SolidMutationIntentRegistry,
+} from './solid-mutation-intent-registry.service';
+import { SolidTaskHydrationService } from './solid-task-hydration.service';
 
 export type SolidDataLayerPhase =
   | 'disabled'
@@ -47,8 +52,15 @@ export class SolidDataLayerStateService {
   private readonly injector = inject(Injector);
   private readonly snackService = inject(SnackService);
   private readonly taskAccess = inject(SolidTaskAccessService);
+  private readonly mutationIntents = inject(SolidMutationIntentRegistry);
   private blockedMutationWasReported = false;
-  private mutationRecoveryHandler: (() => Promise<void>) | null = null;
+  private mutationRecoveryHandler:
+    | ((
+        context: SolidMutationIntentContext | null,
+        error: unknown,
+        source: string,
+      ) => Promise<void>)
+    | null = null;
 
   readonly phase = signal<SolidDataLayerPhase>(
     isSolidDataLayerPrimaryEnabled() ? 'booting' : 'disabled',
@@ -72,6 +84,7 @@ export class SolidDataLayerStateService {
       owns: (action) => this.ownsPersistentAction(action),
       canApply: (action) => this.canApplyPersistentAction(action),
       onBlocked: (action) => this.reportBlockedMutation(action),
+      onAccepted: (action) => this.captureMutationIntent(action),
     });
   }
 
@@ -178,17 +191,40 @@ export class SolidDataLayerStateService {
     const httpStatus = findHttpStatus(error);
     const readiness: SolidWriteReadiness =
       httpStatus === 401 || httpStatus === 403 ? 'read-only' : 'unavailable';
-    this.writeReadiness.update(
-      (current) => new Map(Array.from(current.keys()).map((key) => [key, readiness])),
+    const affected = this.mutationIntents.forFailure(error)?.containerKeys ?? [];
+    this.writeReadiness.update((current) => {
+      const next = new Map(current);
+      const targets = affected.length > 0 ? affected : Array.from(current.keys());
+      targets.forEach((key) => next.set(key, readiness));
+      return next;
+    });
+  }
+
+  async recoverRejectedMutation(error: unknown, source: string): Promise<void> {
+    await this.injector.get(SolidSessionRecoveryService).whenRecoverySettled();
+    await this.mutationRecoveryHandler?.(
+      this.mutationIntents.forFailure(error),
+      error,
+      source,
     );
   }
 
-  recoverRejectedMutation(): void {
-    void this.mutationRecoveryHandler?.();
+  registerMutationRecoveryHandler(
+    handler: (
+      context: SolidMutationIntentContext | null,
+      error: unknown,
+      source: string,
+    ) => Promise<void>,
+  ): void {
+    this.mutationRecoveryHandler = handler;
   }
 
-  registerMutationRecoveryHandler(handler: () => Promise<void>): void {
-    this.mutationRecoveryHandler = handler;
+  private captureMutationIntent(action: PersistentAction): void {
+    this.mutationIntents.record(
+      action,
+      solidContainerKeysForActionType(action.type),
+      this.injector.get(SolidTaskHydrationService).captureLastPublishedProjection(),
+    );
   }
 
   private reportBlockedMutation(action: PersistentAction): void {
