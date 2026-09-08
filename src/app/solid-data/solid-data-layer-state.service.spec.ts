@@ -159,6 +159,34 @@ describe('SolidDataLayerStateService', () => {
     expect(sessionRecovery.handleAuthenticationError).toHaveBeenCalledOnceWith(error);
   });
 
+  it('enables writes only for containers with proven writable access', () => {
+    localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
+    localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
+    authState = { status: 'authenticated', webId: 'https://user.example/#me' };
+    const service = TestBed.inject(SolidDataLayerStateService);
+    const action = updateGlobalConfigSection({
+      sectionKey: 'misc',
+      sectionCfg: {},
+    }) as PersistentAction;
+
+    service.setContainerReadiness('config', 'checking');
+    expect(service.canApplyPersistentAction(action)).toBe(false);
+
+    service.setContainerReadiness('config', 'writable');
+    expect(service.canApplyPersistentAction(action)).toBe(true);
+  });
+
+  it('demotes proven access after authorization and connectivity failures', () => {
+    const service = TestBed.inject(SolidDataLayerStateService);
+    service.setContainerReadiness('tasks', 'writable');
+    service.demoteWriteAccessAfterFailure({ outcomes: [{ httpStatus: 403 }] });
+    expect(service.containerReadiness('tasks')).toBe('read-only');
+
+    service.setContainerReadiness('tasks', 'writable');
+    service.demoteWriteAccessAfterFailure(new TypeError('offline'));
+    expect(service.containerReadiness('tasks')).toBe('unavailable');
+  });
+
   it('blocks a mixed bulk task action when one external task is read-only', () => {
     localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
     localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');

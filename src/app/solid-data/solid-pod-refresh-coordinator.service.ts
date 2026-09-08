@@ -16,6 +16,7 @@ import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
+import { SolidContainerAccessService } from './solid-container-access.service';
 
 const REFRESH_BATCH_SIZE = 10;
 const MAX_DISCOVERY_CONTINUATIONS = 100;
@@ -33,6 +34,7 @@ export class SolidPodRefreshCoordinatorService {
   private readonly taskAccess = inject(SolidTaskAccessService);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly identities = inject(SolidThingIdentityRegistry);
+  private readonly containerAccess = inject(SolidContainerAccessService);
 
   private startPromise: Promise<void> | null = null;
   private refreshPromise: Promise<void> | null = null;
@@ -254,10 +256,13 @@ export class SolidPodRefreshCoordinatorService {
           this.solidRuntime.rememberAppContainerTree(containerUri, this.knownContainers);
           await this.refreshListingResources(listing);
           successfulContainerCount++;
-          this.dataLayerState.setContainerWriteReady(containerKey, !initiallyDegraded);
+          this.dataLayerState.setContainerReadiness(containerKey, 'checking');
+          const readiness = await this.containerAccess.check(containerUri);
+          this.dataLayerState.setContainerReadiness(containerKey, readiness);
+          isDegraded = readiness !== 'writable' || isDegraded;
         } else {
           isDegraded = true;
-          this.dataLayerState.setContainerWriteReady(containerKey, false);
+          this.dataLayerState.setContainerReadiness(containerKey, 'unavailable');
           this.dataLayerState.addDiagnostics();
           Log.err('Solid container refresh unavailable', {
             operation: 'list-container',
@@ -267,7 +272,7 @@ export class SolidPodRefreshCoordinatorService {
         }
       } catch (error) {
         isDegraded = true;
-        this.dataLayerState.setContainerWriteReady(containerKey, false);
+        this.dataLayerState.setContainerReadiness(containerKey, 'unavailable');
         this.dataLayerState.addDiagnostics();
         Log.err('Solid container refresh failed', safeError('list-container', error));
       }

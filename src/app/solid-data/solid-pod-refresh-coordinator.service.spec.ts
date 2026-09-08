@@ -18,6 +18,7 @@ import { SolidMutationCoordinator } from './solid-mutation-coordinator.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
+import { SolidContainerAccessService } from './solid-container-access.service';
 
 describe('SolidPodRefreshCoordinatorService', () => {
   const podRoot = 'https://pod.example/';
@@ -38,6 +39,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
   let taskAccess: jasmine.SpyObj<SolidTaskAccessService>;
   let catalogAuthority: jasmine.SpyObj<SolidCatalogAuthorityService>;
   let identities: jasmine.SpyObj<SolidThingIdentityRegistry>;
+  let containerAccess: jasmine.SpyObj<SolidContainerAccessService>;
   let authState: AuthState;
   let status: DiscoveryStatus;
   let thingSubscriber: (() => void) | null;
@@ -89,7 +91,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
         'setRefreshProgress',
         'addDiagnostics',
         'clearWriteReadiness',
-        'setContainerWriteReady',
+        'setContainerReadiness',
         'registerMutationRecoveryHandler',
       ],
     );
@@ -111,6 +113,11 @@ describe('SolidPodRefreshCoordinatorService', () => {
       'SolidThingIdentityRegistry',
       ['clear'],
     );
+    containerAccess = jasmine.createSpyObj<SolidContainerAccessService>(
+      'SolidContainerAccessService',
+      ['check'],
+    );
+    containerAccess.check.and.resolveTo('writable');
     const runtime = {
       auth: { state: () => authState },
       discovery,
@@ -149,6 +156,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
         { provide: SolidTaskAccessService, useValue: taskAccess },
         { provide: SolidCatalogAuthorityService, useValue: catalogAuthority },
         { provide: SolidThingIdentityRegistry, useValue: identities },
+        { provide: SolidContainerAccessService, useValue: containerAccess },
       ],
     });
   });
@@ -192,6 +200,25 @@ describe('SolidPodRefreshCoordinatorService', () => {
     expect(taskAccess.refreshExternalPermissions).toHaveBeenCalled();
     expect(hydration.reconcileStore).toHaveBeenCalledTimes(32);
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('ready');
+  });
+
+  it('does not enable writes from a successful listing without proven access', async () => {
+    containerAccess.check.and.resolveTo('read-only');
+
+    await TestBed.inject(SolidPodRefreshCoordinatorService).start();
+
+    expect(dataLayerState.setContainerReadiness).not.toHaveBeenCalledWith(
+      jasmine.anything(),
+      'writable',
+    );
+    expect(dataLayerState.setContainerReadiness).toHaveBeenCalledWith(
+      'tasks',
+      'checking',
+    );
+    expect(dataLayerState.setContainerReadiness).toHaveBeenCalledWith(
+      'tasks',
+      'read-only',
+    );
   });
 
   it('creates a missing app container before refreshing it', async () => {

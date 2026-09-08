@@ -6,6 +6,7 @@ import { T } from '../t.const';
 interface SolidAuthenticationErrorHandler {
   handleAuthenticationError?(error: unknown): boolean;
   recoverRejectedMutation?(): void;
+  demoteWriteAccessAfterFailure?(error: unknown): void;
 }
 
 let isFailureNoticeDeduplicated = false;
@@ -25,6 +26,7 @@ export const handleSolidPersistenceError = ({
   Log.err(source, {
     ...fields,
   });
+  sessionRecovery?.demoteWriteAccessAfterFailure?.(error);
   sessionRecovery?.recoverRejectedMutation?.();
   if (sessionRecovery?.handleAuthenticationError?.(error)) {
     return EMPTY;

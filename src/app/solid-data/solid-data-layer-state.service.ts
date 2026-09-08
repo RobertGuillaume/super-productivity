@@ -1,4 +1,4 @@
-import { inject, Injectable, Injector, signal } from '@angular/core';
+import { computed, inject, Injectable, Injector, signal } from '@angular/core';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
@@ -34,6 +34,13 @@ export interface SolidRefreshProgress {
   totalContainers: number;
 }
 
+export type SolidWriteReadiness =
+  | 'unknown'
+  | 'checking'
+  | 'writable'
+  | 'read-only'
+  | 'unavailable';
+
 @Injectable({ providedIn: 'root' })
 export class SolidDataLayerStateService {
   private readonly solidRuntime = inject(SolidRuntimeService);
@@ -48,7 +55,17 @@ export class SolidDataLayerStateService {
   );
   readonly refreshProgress = signal<SolidRefreshProgress | null>(null);
   readonly diagnosticCount = signal(0);
-  readonly writeReadyContainers = signal<ReadonlySet<SolidContainerKey>>(new Set());
+  readonly writeReadiness = signal<ReadonlyMap<SolidContainerKey, SolidWriteReadiness>>(
+    new Map(),
+  );
+  readonly writeReadyContainers = computed<ReadonlySet<SolidContainerKey>>(
+    () =>
+      new Set(
+        Array.from(this.writeReadiness())
+          .filter(([, readiness]) => readiness === 'writable')
+          .map(([container]) => container),
+      ),
+  );
 
   constructor() {
     configureSolidMutationGuard({
@@ -84,20 +101,29 @@ export class SolidDataLayerStateService {
   }
 
   setContainerWriteReady(container: SolidContainerKey, isReady: boolean): void {
-    this.writeReadyContainers.update((current) => {
-      const next = new Set(current);
-      if (isReady) {
-        next.add(container);
+    this.setContainerReadiness(container, isReady ? 'writable' : 'unknown');
+  }
+
+  setContainerReadiness(
+    container: SolidContainerKey,
+    readiness: SolidWriteReadiness,
+  ): void {
+    this.writeReadiness.update((current) => {
+      const next = new Map(current);
+      next.set(container, readiness);
+      if (readiness === 'writable') {
         this.blockedMutationWasReported = false;
-      } else {
-        next.delete(container);
       }
       return next;
     });
   }
 
+  containerReadiness(container: SolidContainerKey): SolidWriteReadiness {
+    return this.writeReadiness().get(container) ?? 'unknown';
+  }
+
   clearWriteReadiness(): void {
-    this.writeReadyContainers.set(new Set());
+    this.writeReadiness.set(new Map());
   }
 
   isActive(): boolean {
@@ -125,8 +151,11 @@ export class SolidDataLayerStateService {
     }
 
     const targets = solidContainerKeysForActionType(action.type);
-    const ready = this.writeReadyContainers();
-    if (targets.length === 0 || !targets.every((target) => ready.has(target))) {
+    const readiness = this.writeReadiness();
+    if (
+      targets.length === 0 ||
+      !targets.every((target) => readiness.get(target) === 'writable')
+    ) {
       return false;
     }
 
@@ -143,6 +172,15 @@ export class SolidDataLayerStateService {
     return this.injector
       .get(SolidSessionRecoveryService)
       .handleAuthenticationError(error);
+  }
+
+  demoteWriteAccessAfterFailure(error: unknown): void {
+    const httpStatus = findHttpStatus(error);
+    const readiness: SolidWriteReadiness =
+      httpStatus === 401 || httpStatus === 403 ? 'read-only' : 'unavailable';
+    this.writeReadiness.update(
+      (current) => new Map(Array.from(current.keys()).map((key) => [key, readiness])),
+    );
   }
 
   recoverRejectedMutation(): void {
@@ -168,3 +206,27 @@ export class SolidDataLayerStateService {
     });
   }
 }
+
+const findHttpStatus = (value: unknown, seen = new Set<unknown>()): number | null => {
+  if (typeof value !== 'object' || value === null || seen.has(value)) {
+    return null;
+  }
+  seen.add(value);
+  const record = value as Record<string, unknown>;
+  for (const key of ['httpStatus', 'status']) {
+    if (typeof record[key] === 'number') {
+      return record[key];
+    }
+  }
+  for (const key of ['details', 'outcomes', 'cause']) {
+    const child = record[key];
+    const values = Array.isArray(child) ? child : [child];
+    for (const nested of values) {
+      const status = findHttpStatus(nested, seen);
+      if (status !== null) {
+        return status;
+      }
+    }
+  }
+  return null;
+};
