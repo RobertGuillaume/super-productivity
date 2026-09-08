@@ -38,6 +38,22 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 - Plugin user data: `/super-productivity/plugins/user-data/plugin-user-data-<entry-id>.ttl#it`
 - Plugin metadata: `/super-productivity/plugins/metadata/plugin-metadata-<plugin-id>.ttl#it`
 
+## Startup And Progressive Projections
+
+- Warm-start with the WebID and storage root on different origins. Confirm
+  cached tasks, projects, tags, and navigation render before profile lookup or
+  Pod requests complete.
+- Start with an absent or empty menu-tree resource. Confirm the sidebar appears
+  after data initialization and progressively adds discovered projects/tags.
+- Seed more than 250 app resources. Confirm tasks become visible during the
+  scan, every listed resource eventually appears, and one reload does not start
+  competing scans.
+- Confirm top-level app and native tasks appear in Inbox as soon as their task
+  entities arrive. Native tasks with iCalendar or schema.org due dates should
+  also appear in Today.
+- Start offline with a populated local catalog. Confirm cached data remains
+  viewable, writes stay blocked, and browser-online recovery refreshes in place.
+
 ## Core Model Path
 
 - Create a project, tag, note, section, task, and subtask.
@@ -103,11 +119,21 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 
 ## Final Checks
 
-- While creating and editing tasks, confirm authenticated Pod requests are
-  serialized rather than sent as a burst. If the disposable Pod can be
-  configured to return HTTP 429, confirm Super Productivity honors
-  `Retry-After`, pauses later requests, and resumes without showing **Failed to
-  save changes** when a retry succeeds.
+- While creating and editing tasks, confirm unrelated authenticated requests
+  may overlap within the runtime's per-origin limit. If the disposable Pod can
+  return HTTP 429, confirm the runtime honors HTTP-date and delta-seconds
+  `Retry-After`, pauses queued starts, reduces concurrency, and recovers
+  gradually. Super Productivity should show the quiet **Pod is limiting
+  requests; retrying automatically** status without repeated snack messages.
+- Confirm native permission checks do not delay task publication or completion
+  of the main refresh. Multiple Things from one source must share one access
+  check.
+- Verify an exact resource or inherited fallback-ACL write grant enables a
+  native task. Explicit denial shows **Read-only Pod task**; unknown,
+  unavailable, and rate-limited access blocks editing without being labelled
+  as an explicit denial.
+- Confirm **Reload from Pod** refreshes in process and does not reload the
+  browser window.
 - Revoke or expire the active Solid session, attempt a task edit, and confirm a
   single persistent **Sign in again** prompt appears. Complete login and confirm
   the Pod remains the primary data source.

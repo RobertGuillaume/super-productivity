@@ -1,89 +1,115 @@
-# Solid Runtime Gap Notes
+# Solid Runtime Integration Notes
 
-This file records limitations or missing capabilities found while making this fork Solid-native through `@solid-intents/runtime` 1.0.6.
+Super Productivity consumes the immutable `@solid-intents/runtime` 1.1.1
+archive in `vendor/`. The runtime is the Solid protocol boundary; the app does
+not import or build against a runtime source checkout.
 
-Rules for this integration:
+## Integration Boundary
 
-- Use `/Users/robertguillaume/solid/solid-runtime/packages/runtime` as the Solid access layer.
-- Do not rewrite Solid protocol/auth/storage behavior in this fork.
-- Do not modify files under `/Users/robertguillaume/solid/solid-runtime`.
-- When the runtime lacks a capability needed by Super Productivity, record the gap here before adding any local workaround.
+The runtime owns authenticated HTTP scheduling, retries, catalog persistence,
+RDF normalization, discovery, Solid write execution, and effective WAC
+resolution. Super Productivity owns application-model mapping, container
+priority, progressive publication, Pod-authoritative reconciliation, and the
+policy that a write is blocked until access is proven.
 
-## Open Gaps
+Repository reads are catalog-only (`autoDiscover: false`). Startup hydrates the
+catalog for the remembered storage root before profile or Pod requests. Once
+the root is verified for the current session, one coordinator explicitly lists
+app containers in priority order and refreshes their resources in batches of
+ten. A successful listing is authoritative for that app container; failed or
+inaccessible listings preserve the cached slice.
 
-### Authenticated Request Serialization
+The app deliberately does not use `discovery.reconcileContainer()` on the
+startup critical path yet. The runtime API atomically records membership and
+queues every listed child, while the app needs to publish the first ten
+resources before the rest of a large listing is queued. The app therefore
+retains its authority registry and explicit batching while benefiting from the
+runtime scheduler, catalog deltas, active-record filtering, and normalized
+types underneath those calls.
 
-- Found while measuring the initial refresh of populated Pods.
-- One authenticated runtime session sends every request through one `RequestRateLimiter` promise chain. The default minimum interval is 300 ms, and the next request does not start until the previous request has completed. Reads and writes for unrelated resources therefore cannot overlap.
-- Current app approach: hydrate the local catalog before network work, refresh high-value containers first, publish incremental catalog snapshots, and allow unrelated app mutations to progress independently up to the runtime boundary.
-- Remaining impact: a cold scan still grows roughly linearly with its request count, and app-level batches cannot create actual HTTP concurrency. The runtime needs a configurable per-origin limiter that rate-limits dispatch without globally serializing request completion.
+Native task permission checks run in a source-deduplicated background queue.
+The runtime resolves permission provenance and reports rate limiting; the app
+turns those results into task/container readiness and keeps every ambiguous
+state blocked.
 
-### Full IndexedDB Catalog Rewrites
-
-- Found while tracing catalog persistence during resource discovery.
-- `putRecord()` replaces the entire Thing-record object store. Resource refresh state changes call `persistAllRecords()`, which clears and rewrites both the Thing-record and resource-record stores, one record transaction at a time.
-- Current app approach: catalog reads remain local, UI reconciliation is coalesced, and network refreshes are processed in bounded batches.
-- Remaining impact: each discovered resource can cause work proportional to the complete catalog, making large initial scans progressively slower. The runtime needs transactional per-resource updates, indexes for affected records, and compaction separate from normal writes.
-
-### Catalog Tombstones Returned From Queries
-
-- Found while reconciling a successful authoritative container listing after remote deletes.
-- Missing, inaccessible, and invalid records remain in the catalog with a non-active `recordStatus`, but ordinary catalog queries do not exclude those records unless the caller can express an equivalent content-level filter. The public Thing query result does not expose `recordStatus` for app-side filtering.
-- Current app approach: retain cached data when a listing fails and refresh exact resources after rejected writes. Only successful app-container listings are treated as authoritative by the refresh lifecycle.
-- Remaining impact: a deleted Thing can continue to appear in a model query until tombstone compaction. The runtime needs active-only queries by default, an explicit record-status query option, or status on public query results.
-
-### Bounded Discovery Continuation
-
-- Found while tracing startup hydration against Pods with enough resources to exceed one discovery run.
-- `discovery.start()`, `refresh()`, and `discoverType()` resolve after a bounded run even when `discovery.status().queuedJobs` is still nonzero. Container scans also enqueue only the first `maxResourcesPerRun` entries while marking the scope incomplete.
-- Current app approach: enumerate Super Productivity containers in priority order, refresh every listed resource in batches of 10, publish between batches, and call no-URI `discovery.refresh()` until the queue settles or stops making progress. Preserve the cached slice when an app container is inaccessible.
-- Remaining impact: callers must implement their own continuation loop, cancellation, and no-progress detection. Pod-wide native VTODO fallback discovery still depends on bounded traversal; a type index with exact task instances avoids that limit.
-
-### Container Listing And Scope Metadata Diverge
-
-- Found while using explicit container listings to drive an authoritative progressive refresh.
-- `storage.listContainer()` returns a source-backed listing but does not update the catalog's scope-scan metadata. Only the internal discovery container worker marks a catalog scope scanned, and a container-scoped query considers resources only when their stored `containerUri` exactly matches that scope.
-- Current app approach: use listings as the refresh coordinator's authority and retain query metadata for diagnostics rather than starting discovery from repository reads.
-- Remaining impact: catalog completeness can report unknown or partial after the app has successfully listed a container, and the app cannot publish that authoritative scope knowledge back to the runtime. The runtime needs a public reconcile-listing operation that updates scope metadata and marks absent children missing atomically.
+## Open Runtime Gaps
 
 ### Missing Container Provisioning API
 
-- Found while writing to a fresh Pod whose Super Productivity parent and model containers do not exist.
-- The public storage API exposes roots, listing, and subscriptions, but no operation for creating a container tree. Thing creation assumes its target container already exists.
-- Current app approach: lazily create only missing parent/app containers with authenticated HTTP `PUT` requests and cache successful listings so normal activation does not repeat probes.
-- Remaining impact: the app owns Solid protocol details and recovery for a prerequisite of runtime writes. The runtime needs an idempotent `ensureContainer()` or layout-provisioning API with structured failure information.
+The public storage API exposes roots, listing, and subscriptions, but no
+idempotent operation for creating a missing container tree. Thing creation
+assumes its target container exists.
 
-### Incomplete Inherited-Permission Reporting
+Current app approach: after root verification, lazily create only missing
+parent/app containers with authenticated HTTP `PUT` requests and remember
+successful listings/provisioning for the refresh. The runtime should eventually
+provide `ensureContainer()` or layout provisioning with structured outcomes.
 
-- Found while deciding whether native VTODOs outside app-owned containers can be edited safely.
-- `share.permissions(uri)` reads only a resource ACL through `getResourceAcl()`. When no resource ACL is present it returns an empty result, even when effective access may be inherited from a fallback ACL. Its public contract describes the result as effective permissions, so empty cannot distinguish no access from unreported inherited access.
-- Current app approach: external VTODOs are read-only unless the permission result explicitly grants the authenticated WebID write access. Empty, failed, unrelated-agent, and ambiguous results remain read-only.
-- Remaining impact: users cannot edit an externally discovered VTODO whose write permission is inherited but not reported. The runtime needs effective access resolution with provenance and an explicit unknown result when it cannot prove access.
+### Standalone Node 22 Packaging Override
 
-### RDF Class Alias Catalog Types
+The 1.1.1 archive documents a transitive JSON-LD loader incompatibility for a
+fresh standalone Node 22 consumer unless the consumer applies the runtime
+workspace's `@digitalbazaar/http-client: 4.3.0` override. This is a packaging
+limitation rather than a request-scheduling issue. Super Productivity consumes
+the checked vendored archive through its locked Angular workspace; any future
+dependency refresh must repeat the archive import/build check.
 
-- Found while loading native RDF iCalendar tasks that were not created through a runtime-managed write profile.
-- The runtime catalogs a discovered `ical:Vtodo` Thing as the URI-local type `Vtodo` instead of applying the layout vocabulary's runtime type `Task`.
-- Current local approach: include `Vtodo` in the task query alongside `Task` and the legacy Super Productivity task type.
-- Impact: every consumer that maps an RDF class to a differently named runtime type needs a query alias until discovery normalizes catalog types through the registered vocabulary.
+## Capabilities Resolved In Runtime 1.1.x
 
-### Local File Dependency Bundling
+### Adaptive Per-Origin Request Scheduling
 
-- Found while running Angular/Karma bundling against the app that imports `@solid-intents/runtime` from `file:../solid-runtime/packages/runtime`.
-- The local runtime package exposes its dependency list, but Angular's bundler failed to resolve runtime imports such as `n3`, `soukai`, `soukai-solid`, `rdf-validate-shacl`, and Inrupt packages from the symlinked package.
-- Current local approach: declare the runtime's dependencies explicitly in this app package so the app can bundle the runtime.
-- Impact: this appears to be a local `file:` development bundler workaround, not an intended runtime consumer contract for a published package.
+Authenticated requests no longer wait on one global completion chain. Exact
+origins have independent start intervals and concurrency. A 429 episode pauses
+queued starts, reduces effective concurrency, increases spacing, honors both
+HTTP-date and delta-seconds `Retry-After`, and recovers gradually after
+successful responses. A final 429 still establishes cooldown protection.
 
-## Resolved By Runtime
+The app does not add HTTP retries or Pod-specific tuning. It subscribes once to
+the runtime's content-safe rate-limit event and presents a quiet transient
+status. Semantic permission work remains capped at two concurrent source
+checks, while all actual HTTP scheduling stays inside the runtime.
 
-### Deterministic Thing Resource Names
+### Transactional Catalog Deltas And Version-1 Migration
 
-- Found while mapping Super Productivity tasks to Solid Things.
-- Runtime now supports `target.resourceName`, so Super Productivity can create task resources from stable app ids while still storing the stable id as an RDF property and querying by it.
-- App integration: task creates pass `resourceName: task.id` through `@solid-intents/runtime`.
+Catalog persistence now writes affected records and membership as one bounded
+delta instead of clearing and rewriting both IndexedDB stores per resource.
+Catalog schema version 2 migrates the existing version-1 data during startup,
+so no application-model migration is required.
 
-### Replace Semantics For RDF Properties
+### Active-Record Query Filtering
 
-- Found while designing task updates.
-- Runtime now supports `replaceProperties`, `replaceLinks`, `deleteProperties`, and `deleteLinks` on `things.update()`, plus planned update writes via `runtime.writes.planUpdate(uri, changes)`.
-- App integration: task updates use `replaceProperties` for scalar/set replacement and `deleteProperties` with empty arrays for optional values that have been cleared.
+Records confirmed missing are excluded from `things.get()`, queries,
+subscriptions, and contexts. Stale, refreshing, inaccessible, and invalid
+cached knowledge remains available for degraded/offline reads. Super
+Productivity still filters app-owned Things through successful listing
+authority because that is its replacement boundary.
+
+### Discovery Reconciliation And Lifecycle Control
+
+The runtime provides authoritative container reconciliation, bounded
+`discovery.settle()`, and cancellation. Successful changed listings replace
+direct membership and tombstone absent children; failed and inaccessible
+listings preserve prior knowledge. The app retains explicit ten-resource
+startup batching for first-item latency, as described above.
+
+### Normalized Native Task Types And Dates
+
+Discovered iCalendar `Vtodo` Things normalize to the runtime `Task` type, and
+the runtime Task view normalizes supported native due-date predicates. The app
+therefore queries `Task` without the old `Vtodo` alias and maps generic due
+dates through `thing.as(views.Task)`.
+
+### Effective Permission Resolution
+
+`share.resolvePermissions()` distinguishes known resource ACLs, known inherited
+fallback ACLs, unsupported/absent/unavailable access, and final rate limiting.
+Rate-limited results include an optional retry deadline and do not imply
+denial. Super Productivity accepts only an exact authenticated-WebID write
+grant, labels only an explicit matching denial as read-only, and blocks all
+unknown/transient states until a later check succeeds.
+
+### Write Plan Version 2
+
+Runtime write plans use version 2 and include subject-safe RDF deletion. The
+app's create/update/delete semantics are unchanged; fixtures and validation use
+the current plan version.
