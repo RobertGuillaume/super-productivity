@@ -5,6 +5,7 @@ import {
   computed,
   DestroyRef,
   ElementRef,
+  effect,
   HostListener,
   inject,
   input,
@@ -149,6 +150,10 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   private _destroyRef = inject(DestroyRef);
   private _dateTimeFormatService = inject(DateTimeFormatService);
   private readonly _solidTaskAccess = inject(SolidTaskAccessService);
+
+  constructor() {
+    effect(() => this._solidTaskAccess.prioritizeTask(this.task().id));
+  }
 
   // Exposed so the template can pass the reactive locale to the now-pure
   // `localeDate` pipe, preserving re-render on a locale change.

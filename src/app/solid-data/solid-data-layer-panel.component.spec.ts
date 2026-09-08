@@ -14,7 +14,7 @@ import { SnackService } from '../core/snack/snack.service';
 import { T } from '../t.const';
 import { SolidPodRefreshCoordinatorService } from './solid-pod-refresh-coordinator.service';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 
 describe('SolidDataLayerPanelComponent', () => {
   let fixture: ComponentFixture<SolidDataLayerPanelComponent>;
@@ -25,9 +25,11 @@ describe('SolidDataLayerPanelComponent', () => {
   let uploadService: jasmine.SpyObj<SolidInitialUploadService>;
   let refreshCoordinator: jasmine.SpyObj<SolidPodRefreshCoordinatorService>;
   let authState: AuthState;
+  let rateLimitedUntil: WritableSignal<Date | null>;
 
   beforeEach(async () => {
     authState = { status: 'anonymous' };
+    rateLimitedUntil = signal<Date | null>(null);
     solidRuntime = {
       boot: jasmine.createSpy('boot').and.resolveTo(authState),
       login: jasmine.createSpy('login').and.resolveTo(authState),
@@ -65,7 +67,7 @@ describe('SolidDataLayerPanelComponent', () => {
         { provide: SolidPodRefreshCoordinatorService, useValue: refreshCoordinator },
         {
           provide: SolidDataLayerStateService,
-          useValue: { phase: signal('disabled') },
+          useValue: { phase: signal('disabled'), rateLimitedUntil },
         },
       ],
     }).compileComponents();
@@ -87,6 +89,13 @@ describe('SolidDataLayerPanelComponent', () => {
     expect(component.statusLabel()).toBe(T.PS.SOLID.STATUS_OFF);
     expect(fixture.nativeElement.textContent).toContain(T.PS.SOLID.TITLE);
     expect(fixture.nativeElement.textContent).toContain(T.PS.SOLID.LOGIN);
+  });
+
+  it('shows runtime rate limiting through the quiet status label', () => {
+    rateLimitedUntil.set(new Date(Date.now() + 1_000));
+
+    expect(fixture.componentInstance.statusLabel()).toBe(T.PS.SOLID.STATUS_RATE_LIMITED);
+    expect(snackService.open).not.toHaveBeenCalled();
   });
 
   it('stores the issuer and starts Solid login outside the sync-provider flow', async () => {

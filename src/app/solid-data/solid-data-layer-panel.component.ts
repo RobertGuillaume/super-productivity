@@ -51,6 +51,7 @@ export class SolidDataLayerPanelComponent {
   readonly isEnabled = this.settings.isEnabled;
   readonly isPrimaryEnabled = this.settings.isPrimaryEnabled;
   readonly lifecyclePhase = this.dataLayerState.phase;
+  readonly rateLimitedUntil = this.dataLayerState.rateLimitedUntil;
   readonly isRefreshing = computed(() => this.lifecyclePhase() === 'refreshing');
   readonly webId = computed(() => {
     const authState = this.authState();
@@ -59,6 +60,9 @@ export class SolidDataLayerPanelComponent {
   readonly statusLabel = computed(() => {
     const authState = this.authState();
     const phase = this.lifecyclePhase();
+    if (this.rateLimitedUntil() !== null) {
+      return T.PS.SOLID.STATUS_RATE_LIMITED;
+    }
     if (phase === 'booting' || phase === 'hydrating-cache') {
       return T.PS.SOLID.STATUS_CONNECTING;
     }

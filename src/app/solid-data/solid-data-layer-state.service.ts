@@ -1,4 +1,11 @@
-import { computed, inject, Injectable, Injector, signal } from '@angular/core';
+import {
+  computed,
+  DestroyRef,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+} from '@angular/core';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
@@ -44,12 +51,14 @@ export type SolidWriteReadiness = SolidAccessState;
 
 @Injectable({ providedIn: 'root' })
 export class SolidDataLayerStateService {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly injector = inject(Injector);
   private readonly snackService = inject(SnackService);
   private readonly taskAccess = inject(SolidTaskAccessService);
   private readonly mutationIntents = inject(SolidMutationIntentRegistry);
   private blockedMutationWasReported = false;
+  private rateLimitClearTimer: ReturnType<typeof setTimeout> | null = null;
   private mutationRecoveryHandler:
     | ((
         context: SolidMutationIntentContext | null,
@@ -63,6 +72,7 @@ export class SolidDataLayerStateService {
   );
   readonly refreshProgress = signal<SolidRefreshProgress | null>(null);
   readonly diagnosticCount = signal(0);
+  readonly rateLimitedUntil = signal<Date | null>(null);
   readonly writeReadiness = signal<ReadonlyMap<SolidContainerKey, SolidWriteReadiness>>(
     new Map(),
   );
@@ -81,6 +91,15 @@ export class SolidDataLayerStateService {
       canApply: (action) => this.canApplyPersistentAction(action),
       onBlocked: (action) => this.reportBlockedMutation(action),
       onAccepted: (action) => this.captureMutationIntent(action),
+    });
+    const unsubscribe = this.solidRuntime.client.diagnostics?.subscribeRateLimits?.(
+      (event) => this.recordRateLimit(event.status.cooldownUntil),
+    );
+    this.destroyRef.onDestroy(() => {
+      unsubscribe?.();
+      if (this.rateLimitClearTimer !== null) {
+        clearTimeout(this.rateLimitClearTimer);
+      }
     });
   }
 
@@ -133,6 +152,31 @@ export class SolidDataLayerStateService {
 
   clearWriteReadiness(): void {
     this.writeReadiness.set(new Map());
+  }
+
+  private recordRateLimit(cooldownUntil: Date | null): void {
+    if (cooldownUntil === null) {
+      return;
+    }
+    const current = this.rateLimitedUntil();
+    const next =
+      current !== null && current.getTime() > cooldownUntil.getTime()
+        ? current
+        : cooldownUntil;
+    this.rateLimitedUntil.set(next);
+    if (this.rateLimitClearTimer !== null) {
+      clearTimeout(this.rateLimitClearTimer);
+    }
+    this.rateLimitClearTimer = setTimeout(
+      () => {
+        this.rateLimitClearTimer = null;
+        const active = this.rateLimitedUntil();
+        if (active !== null && active.getTime() <= Date.now()) {
+          this.rateLimitedUntil.set(null);
+        }
+      },
+      Math.max(0, next.getTime() - Date.now()),
+    );
   }
 
   isActive(): boolean {

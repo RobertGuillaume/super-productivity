@@ -52,9 +52,14 @@ export class SolidPodRefreshCoordinatorService {
   private firstRefreshedEntityLogged = false;
   private rootVerified = false;
   private lastRefreshHadAuthoritativeData = false;
-  private canCheckNativeTaskAccess = false;
+  private lastRefreshDataDegraded = false;
   private lifecycleGeneration = 0;
   private coordinatedRefreshDepth = 0;
+  private readonly containerAccessRetryTimers = new Map<
+    SolidContainerKey,
+    ReturnType<typeof setTimeout>
+  >();
+  private readonly containerAccessRetryAt = new Map<SolidContainerKey, number>();
   private readonly recoveryPromises = new WeakMap<object, Promise<void>>();
   private recoveryWithoutIntent: Promise<void> | null = null;
 
@@ -74,6 +79,7 @@ export class SolidPodRefreshCoordinatorService {
       if (this.reconciliationTimer !== null) {
         clearTimeout(this.reconciliationTimer);
       }
+      this.clearContainerAccessRetries();
     });
   }
 
@@ -151,6 +157,7 @@ export class SolidPodRefreshCoordinatorService {
     this.mutationIntents.clear();
     this.hydration.resetCatalogBaseline();
     this.taskAccess.clear();
+    this.clearContainerAccessRetries();
     this.dataLayerState.clearWriteReadiness();
     this.rootVerified = false;
     this.started = false;
@@ -185,6 +192,7 @@ export class SolidPodRefreshCoordinatorService {
         this.mutationIntents.clear();
         this.hydration.resetCatalogBaseline();
         this.taskAccess.clear();
+        this.clearContainerAccessRetries();
         await this.hydration.reconcileStore();
       }
     } catch (error) {
@@ -204,9 +212,11 @@ export class SolidPodRefreshCoordinatorService {
     }
 
     this.installSubscriptions();
-    this.refreshPromise = this.refreshCatalog(rootUnavailable, generation).finally(() => {
-      this.refreshPromise = null;
-    });
+    this.refreshPromise = this.refreshCatalog(rootUnavailable, generation, false).finally(
+      () => {
+        this.refreshPromise = null;
+      },
+    );
     await this.refreshPromise;
   }
 
@@ -223,6 +233,7 @@ export class SolidPodRefreshCoordinatorService {
           this.mutationIntents.clear();
           this.hydration.resetCatalogBaseline();
           this.taskAccess.clear();
+          this.clearContainerAccessRetries();
           this.dataLayerState.clearWriteReadiness();
           await this.hydration.reconcileStore();
           this.installSubscriptions();
@@ -240,16 +251,21 @@ export class SolidPodRefreshCoordinatorService {
     if (this.subscriptions.length === 0) {
       this.installSubscriptions();
     }
-    await this.refreshCatalog(!this.rootVerified, this.lifecycleGeneration);
+    await this.refreshCatalog(!this.rootVerified, this.lifecycleGeneration, true);
   }
 
   private async refreshCatalog(
     initiallyDegraded: boolean,
     generation: number,
+    forceExternalAccess: boolean,
   ): Promise<void> {
     this.coordinatedRefreshDepth++;
     try {
-      await this.refreshCatalogInternal(initiallyDegraded, generation);
+      await this.refreshCatalogInternal(
+        initiallyDegraded,
+        generation,
+        forceExternalAccess,
+      );
     } finally {
       this.coordinatedRefreshDepth--;
       if (this.coordinatedRefreshDepth === 0 && this.reconciliationRequested) {
@@ -261,6 +277,7 @@ export class SolidPodRefreshCoordinatorService {
   private async refreshCatalogInternal(
     initiallyDegraded: boolean,
     generation: number,
+    forceExternalAccess: boolean,
   ): Promise<void> {
     const startedAt = performance.now();
     const containers = orderedContainers(this.solidRuntime.ensureLayout());
@@ -268,7 +285,7 @@ export class SolidPodRefreshCoordinatorService {
     let successfulContainerCount = 0;
     const accessCandidates: Array<[SolidContainerKey, string]> = [];
     this.lastRefreshHadAuthoritativeData = false;
-    this.canCheckNativeTaskAccess = false;
+    this.clearContainerAccessRetries();
 
     this.dataLayerState.setRefreshProgress({
       completedContainers: 0,
@@ -348,8 +365,6 @@ export class SolidPodRefreshCoordinatorService {
         }
         await this.refreshListingResources(listing);
       }
-      this.canCheckNativeTaskAccess = true;
-      await this.taskAccess.refreshExternalPermissions();
     } catch (error) {
       isDegraded = true;
       this.dataLayerState.addDiagnostics();
@@ -359,6 +374,11 @@ export class SolidPodRefreshCoordinatorService {
       );
     }
 
+    void this.taskAccess.scheduleExternalPermissionChecks({
+      force: forceExternalAccess,
+    });
+
+    this.lastRefreshDataDegraded = this.hydration.hasDegradedState() || isDegraded;
     isDegraded =
       (await this.refreshContainerAccess(accessCandidates, generation)) || isDegraded;
 
@@ -527,18 +547,27 @@ export class SolidPodRefreshCoordinatorService {
       const results = await Promise.allSettled(
         batch.map(async ([containerKey, containerUri]) => ({
           containerKey,
-          readiness: (await this.containerAccess.check(containerUri)).state,
+          containerUri,
+          decision: await this.containerAccess.check(containerUri),
         })),
       );
       if (generation !== this.lifecycleGeneration) {
         return true;
       }
       results.forEach((result, resultIndex) => {
-        const containerKey = batch[resultIndex][0];
+        const [containerKey, containerUri] = batch[resultIndex];
         const readiness =
-          result.status === 'fulfilled' ? result.value.readiness : 'unavailable';
+          result.status === 'fulfilled' ? result.value.decision.state : 'unavailable';
         this.dataLayerState.setContainerReadiness(containerKey, readiness);
         isDegraded = readiness !== 'writable' || isDegraded;
+        if (result.status === 'fulfilled' && readiness === 'rate-limited') {
+          this.scheduleContainerAccessRetry(
+            containerKey,
+            containerUri,
+            result.value.decision.retryAt,
+            generation,
+          );
+        }
         if (result.status === 'rejected') {
           this.dataLayerState.addDiagnostics();
           Log.err(
@@ -549,6 +578,86 @@ export class SolidPodRefreshCoordinatorService {
       });
     }
     return isDegraded;
+  }
+
+  private scheduleContainerAccessRetry(
+    containerKey: SolidContainerKey,
+    containerUri: string,
+    retryAt: Date | undefined,
+    generation: number,
+  ): void {
+    if (retryAt === undefined) {
+      return;
+    }
+    const retryAtMs = retryAt.getTime();
+    if (
+      !Number.isFinite(retryAtMs) ||
+      this.containerAccessRetryAt.get(containerKey) === retryAtMs
+    ) {
+      return;
+    }
+    const existing = this.containerAccessRetryTimers.get(containerKey);
+    if (existing !== undefined) {
+      clearTimeout(existing);
+    }
+    this.containerAccessRetryAt.set(containerKey, retryAtMs);
+    const timer = setTimeout(
+      () => {
+        this.containerAccessRetryTimers.delete(containerKey);
+        void this.retryContainerAccess(containerKey, containerUri, generation);
+      },
+      Math.max(0, retryAtMs - Date.now()),
+    );
+    this.containerAccessRetryTimers.set(containerKey, timer);
+  }
+
+  private async retryContainerAccess(
+    containerKey: SolidContainerKey,
+    containerUri: string,
+    generation: number,
+  ): Promise<void> {
+    if (generation !== this.lifecycleGeneration || !this.rootVerified) {
+      return;
+    }
+    try {
+      const decision = await this.containerAccess.check(containerUri);
+      if (generation !== this.lifecycleGeneration) {
+        return;
+      }
+      this.dataLayerState.setContainerReadiness(containerKey, decision.state);
+      if (decision.state === 'rate-limited') {
+        this.scheduleContainerAccessRetry(
+          containerKey,
+          containerUri,
+          decision.retryAt,
+          generation,
+        );
+        return;
+      }
+      if (
+        decision.state === 'writable' &&
+        !this.lastRefreshDataDegraded &&
+        orderedContainers(this.solidRuntime.ensureLayout()).every(
+          ([key]) => this.dataLayerState.containerReadiness(key) === 'writable',
+        )
+      ) {
+        this.dataLayerState.setPhase('ready');
+      }
+    } catch (error) {
+      this.dataLayerState.setContainerReadiness(containerKey, 'unavailable');
+      Log.err(
+        'Solid container access retry failed',
+        safeError('retry-container-access', error),
+      );
+    }
+  }
+
+  private clearContainerAccessRetries(): void {
+    for (const timer of this.containerAccessRetryTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.containerAccessRetryTimers.clear();
+    this.containerAccessRetryAt.clear();
   }
 
   private installSubscriptions(): void {
@@ -602,9 +711,6 @@ export class SolidPodRefreshCoordinatorService {
       this.reconciliationRequested = false;
       await this.mutations.whenIdle();
       await this.hydration.reconcileStore();
-      if (this.canCheckNativeTaskAccess) {
-        await this.taskAccess.refreshExternalPermissions({ unknownOnly: true });
-      }
     }
   }
 }

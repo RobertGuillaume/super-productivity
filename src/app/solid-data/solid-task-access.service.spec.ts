@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
 import type { RdfValue, SolidRuntime, Thing, ThingView } from '@solid-intents/runtime';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
@@ -158,6 +158,94 @@ describe('SolidTaskAccessService', () => {
 
     expect(service.accessDecision('external-task')).toEqual({ state: 'unknown' });
     expect(resolvePermissions).not.toHaveBeenCalled();
+  });
+
+  it('checks one source once for multiple Things and repeated catalog registration', async () => {
+    authenticatedFetch.and.resolveTo(
+      response(200, new Headers([['WAC-Allow', 'user="read write"']])),
+    );
+    service.registerThing(
+      'external-task-1',
+      thing('https://pod.example/calendar/tasks.ttl#todo-1'),
+    );
+    service.registerThing(
+      'external-task-2',
+      thing('https://pod.example/calendar/tasks.ttl#todo-2'),
+    );
+
+    await service.scheduleExternalPermissionChecks();
+    service.registerThing(
+      'external-task-1',
+      thing('https://pod.example/calendar/tasks.ttl#todo-1'),
+    );
+    await service.scheduleExternalPermissionChecks();
+
+    expect(authenticatedFetch).toHaveBeenCalledTimes(1);
+    expect(service.accessDecision('external-task-1')).toEqual({ state: 'writable' });
+    expect(service.accessDecision('external-task-2')).toEqual({ state: 'writable' });
+  });
+
+  it('retries a rate-limited source at the runtime-provided time', fakeAsync(() => {
+    const retryAt = new Date(Date.now() + 1_000);
+    resolvePermissions.and.returnValues(
+      Promise.resolve({
+        status: 'unknown',
+        permissions: [],
+        reason: 'rate-limited',
+        retryAt,
+      }),
+      Promise.resolve({
+        status: 'known',
+        provenance: 'fallback-acl',
+        permissions: [{ agent: webId, read: true, write: true }],
+      }),
+    );
+    service.registerThing(
+      'rate-limited',
+      thing('https://pod.example/calendar/rate-limited.ttl#todo-1'),
+    );
+
+    void service.scheduleExternalPermissionChecks();
+    flushMicrotasks();
+    expect(service.accessDecision('rate-limited')).toEqual({
+      state: 'rate-limited',
+      retryAt,
+    });
+
+    tick(1_000);
+    flushMicrotasks();
+
+    expect(resolvePermissions).toHaveBeenCalledTimes(2);
+    expect(service.accessDecision('rate-limited')).toEqual({ state: 'writable' });
+  }));
+
+  it('rechecks an ambiguous source only after direct user interest', async () => {
+    resolvePermissions.and.returnValues(
+      Promise.resolve({
+        status: 'unknown',
+        permissions: [],
+        reason: 'unsupported-access-model',
+      }),
+      Promise.resolve({
+        status: 'known',
+        provenance: 'resource-acl',
+        permissions: [{ agent: webId, read: true, write: true }],
+      }),
+    );
+    service.registerThing(
+      'external-task',
+      thing('https://pod.example/calendar/interest.ttl#todo-1'),
+    );
+
+    await service.scheduleExternalPermissionChecks();
+    await service.scheduleExternalPermissionChecks();
+    expect(resolvePermissions).toHaveBeenCalledTimes(1);
+
+    service.prioritizeTask('external-task');
+    await service.scheduleExternalPermissionChecks();
+
+    expect(resolvePermissions).toHaveBeenCalledTimes(2);
+    expect(service.accessDecision('external-task')).toEqual({ state: 'writable' });
   });
 });
 

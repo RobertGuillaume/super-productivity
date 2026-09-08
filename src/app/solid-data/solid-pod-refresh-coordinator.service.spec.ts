@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
 import type {
   AuthState,
   ContainerListing,
@@ -107,9 +107,11 @@ describe('SolidPodRefreshCoordinatorService', () => {
         'addDiagnostics',
         'clearWriteReadiness',
         'setContainerReadiness',
+        'containerReadiness',
         'registerMutationRecoveryHandler',
       ],
     );
+    dataLayerState.containerReadiness.and.returnValue('writable');
     mutations = jasmine.createSpyObj<SolidMutationCoordinator>(
       'SolidMutationCoordinator',
       ['whenIdle', 'completeFailedIntent'],
@@ -117,9 +119,9 @@ describe('SolidPodRefreshCoordinatorService', () => {
     mutations.whenIdle.and.resolveTo();
     taskAccess = jasmine.createSpyObj<SolidTaskAccessService>('SolidTaskAccessService', [
       'clear',
-      'refreshExternalPermissions',
+      'scheduleExternalPermissionChecks',
     ]);
-    taskAccess.refreshExternalPermissions.and.resolveTo();
+    taskAccess.scheduleExternalPermissionChecks.and.resolveTo();
     catalogAuthority = jasmine.createSpyObj<SolidCatalogAuthorityService>(
       'SolidCatalogAuthorityService',
       ['recordListing', 'clear'],
@@ -213,7 +215,9 @@ describe('SolidPodRefreshCoordinatorService', () => {
     expect(resourceRefreshes.every((uris) => uris.length <= 10)).toBe(true);
     expect(new Set(resourceRefreshes.flat()).size).toBe(251);
     expect(discovery.discoverType).not.toHaveBeenCalled();
-    expect(taskAccess.refreshExternalPermissions).toHaveBeenCalled();
+    expect(taskAccess.scheduleExternalPermissionChecks).toHaveBeenCalledWith({
+      force: false,
+    });
     expect(hydration.reconcileStore).toHaveBeenCalledTimes(31);
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('ready');
   });
@@ -268,7 +272,74 @@ describe('SolidPodRefreshCoordinatorService', () => {
 
     expect(nativeTaskIndex.readTargets).toHaveBeenCalledTimes(1);
     expect(discovery.discoverType).not.toHaveBeenCalled();
-    expect(taskAccess.refreshExternalPermissions).toHaveBeenCalled();
+    expect(taskAccess.scheduleExternalPermissionChecks).toHaveBeenCalled();
+  });
+
+  it('does not await native permission discovery before completing refresh', async () => {
+    let releasePermissions!: () => void;
+    taskAccess.scheduleExternalPermissionChecks.and.returnValue(
+      new Promise<void>((resolve) => {
+        releasePermissions = resolve;
+      }),
+    );
+
+    await TestBed.inject(SolidPodRefreshCoordinatorService).start();
+
+    expect(dataLayerState.setPhase).toHaveBeenCalledWith('ready');
+    releasePermissions();
+  });
+
+  it('retries a rate-limited app container without restarting discovery', fakeAsync(() => {
+    const retryAt = new Date(Date.now() + 1_000);
+    let taskAccessChecks = 0;
+    containerAccess.check.and.callFake(async (uri: string) => {
+      if (uri === containers.tasks && taskAccessChecks++ === 0) {
+        return { state: 'rate-limited', retryAt };
+      }
+      return { state: 'writable' };
+    });
+
+    void TestBed.inject(SolidPodRefreshCoordinatorService).start();
+    flushMicrotasks();
+    storage.listContainer.calls.reset();
+    discovery.refresh.calls.reset();
+    nativeTaskIndex.readTargets.calls.reset();
+    containerAccess.check.calls.reset();
+
+    tick(1_000);
+    flushMicrotasks();
+
+    expect(containerAccess.check).toHaveBeenCalledOnceWith(containers.tasks);
+    expect(storage.listContainer).not.toHaveBeenCalled();
+    expect(discovery.refresh).not.toHaveBeenCalled();
+    expect(nativeTaskIndex.readTargets).not.toHaveBeenCalled();
+    expect(dataLayerState.setContainerReadiness).toHaveBeenCalledWith(
+      'tasks',
+      'writable',
+    );
+  }));
+
+  it('deduplicates concurrent manual refresh requests', async () => {
+    const service = TestBed.inject(SolidPodRefreshCoordinatorService);
+    await service.start();
+    let releaseListing!: () => void;
+    storage.listContainer.and.callFake(
+      (uri: string) =>
+        new Promise<ContainerListing>((resolve) => {
+          releaseListing = () => resolve(containerListing(uri));
+        }),
+    );
+
+    const first = service.refreshNow();
+    const second = service.refreshNow();
+
+    expect(second).toBe(first);
+    releaseListing();
+    storage.listContainer.and.callFake(async (uri: string) => containerListing(uri));
+    await first;
+    expect(taskAccess.scheduleExternalPermissionChecks).toHaveBeenCalledWith({
+      force: true,
+    });
   });
 
   it('creates a missing app container before refreshing it', async () => {

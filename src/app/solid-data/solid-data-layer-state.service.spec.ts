@@ -1,5 +1,9 @@
-import { TestBed } from '@angular/core/testing';
-import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
+import type {
+  AuthState,
+  RequestRateLimitEvent,
+  SolidRuntime,
+} from '@solid-intents/runtime';
 import { ActionType, OpType } from '../op-log/core/operation.types';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import {
@@ -91,9 +95,11 @@ describe('SolidDataLayerStateService', () => {
   let authState: AuthState;
   let sessionRecovery: jasmine.SpyObj<SolidSessionRecoveryService>;
   let taskAccess: jasmine.SpyObj<SolidTaskAccessService>;
+  let rateLimitListener: ((event: RequestRateLimitEvent) => void) | null;
 
   beforeEach(() => {
     authState = { status: 'anonymous' };
+    rateLimitListener = null;
     sessionRecovery = jasmine.createSpyObj<SolidSessionRecoveryService>(
       'SolidSessionRecoveryService',
       ['handleAuthenticationError'],
@@ -113,6 +119,14 @@ describe('SolidDataLayerStateService', () => {
             client: {
               auth: {
                 state: () => authState,
+              },
+              diagnostics: {
+                subscribeRateLimits: (
+                  listener: (event: RequestRateLimitEvent) => void,
+                ) => {
+                  rateLimitListener = listener;
+                  return (): void => undefined;
+                },
               },
             } as SolidRuntime,
           },
@@ -158,6 +172,31 @@ describe('SolidDataLayerStateService', () => {
     ).toBe(true);
     expect(sessionRecovery.handleAuthenticationError).toHaveBeenCalledOnceWith(error);
   });
+
+  it('exposes and clears content-safe runtime rate-limit status', fakeAsync(() => {
+    const service = TestBed.inject(SolidDataLayerStateService);
+    const cooldownUntil = new Date(Date.now() + 1_000);
+
+    rateLimitListener?.({
+      type: 'request.rate-limited',
+      status: {
+        origin: 'https://pod.example',
+        activeRequests: 1,
+        queuedRequests: 2,
+        baselineMinIntervalMs: 0,
+        effectiveMinIntervalMs: 500,
+        baselineMaxConcurrent: 3,
+        effectiveMaxConcurrent: 1,
+        cooldownUntil,
+        consecutiveNonRateLimitedResponses: 0,
+        rateLimitEpisodeCount: 1,
+      },
+    });
+
+    expect(service.rateLimitedUntil()).toEqual(cooldownUntil);
+    tick(1_000);
+    expect(service.rateLimitedUntil()).toBeNull();
+  }));
 
   it('enables writes only for containers with proven writable access', () => {
     localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');

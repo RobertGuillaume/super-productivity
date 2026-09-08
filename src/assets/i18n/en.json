@@ -3232,6 +3232,7 @@
       "STATUS_DEGRADED": "Pod data available with limited access",
       "STATUS_ENABLED": "Enabled",
       "STATUS_OFF": "Off",
+      "STATUS_RATE_LIMITED": "Pod is limiting requests; retrying automatically",
       "STATUS_REFRESHING": "Refreshing Pod data…",
       "STATUS_SIGN_IN_REQUIRED": "Sign-in required",
       "SUBTITLE": "Your primary productivity data source, in storage you control.",
