@@ -413,6 +413,21 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.project.entities[INBOX_PROJECT.id]?.taskIds).toEqual([nativeTask.id]);
   });
 
+  it('supplies an in-memory menu tree when the Pod resource is absent', () => {
+    const appData = createSolidAppData({
+      tasks: [task],
+      projects: [project],
+      tags: [tag],
+      notes: [],
+      menuTree: null,
+    });
+
+    expect(appData.menuTree).toEqual({
+      projectTree: [{ id: project.id, k: MenuTreeKind.PROJECT }],
+      tagTree: [{ id: tag.id, k: MenuTreeKind.TAG }],
+    });
+  });
+
   it('dispatches a complete snapshot despite malformed model and archive cache failures', async () => {
     const store = jasmine.createSpyObj<Store>('Store', ['dispatch']);
     const archiveDbAdapter = jasmine.createSpyObj<ArchiveDbAdapter>('ArchiveDbAdapter', [

@@ -92,9 +92,7 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
     this._dataInitStateService.isAllDataLoadedInitially$,
     { initialValue: false },
   );
-  readonly isDataLoaded = computed(
-    () => this._isDataLoaded() && this._sideNavConfigService.areInitialTreesReady(),
-  );
+  readonly isDataLoaded = computed(() => this._isDataLoaded());
   readonly WorkContextType = WorkContextType;
   readonly T = T;
   readonly isMobile = this._layoutService.isXs;

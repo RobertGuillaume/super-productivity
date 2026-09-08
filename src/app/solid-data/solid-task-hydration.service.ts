@@ -87,6 +87,7 @@ import { SolidCatalogAuthorityService } from './solid-catalog-authority.service'
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { normalizeSolidTaskProjection } from './solid-task-projection';
+import { normalizeSolidMenuTreeProjection } from './solid-menu-tree-projection';
 
 export interface SolidCatalogDiagnostic {
   model: string;
@@ -677,6 +678,11 @@ export const createSolidAppData = (input: {
   const sections = applyOrder(input.sections ?? [], input.appState?.sectionOrder ?? []);
   const archiveYoungTasks = archivedTasksForBucket(input.archivedTasks ?? [], 'young');
   const archiveOldTasks = archivedTasksForBucket(input.archivedTasks ?? [], 'old');
+  const menuTree = normalizeSolidMenuTreeProjection(
+    input.menuTree ?? appDataComplete.menuTree,
+    projects,
+    tags,
+  );
 
   return {
     ...appDataComplete,
@@ -684,7 +690,7 @@ export const createSolidAppData = (input: {
       boardCfgs: [...(input.boards ?? [])],
     },
     globalConfig: input.globalConfig ?? appDataComplete.globalConfig,
-    menuTree: input.menuTree ?? appDataComplete.menuTree,
+    menuTree,
     task: taskAdapter.setAll([...input.tasks], initialTaskState),
     project: projectAdapter.setAll(projects, initialProjectState),
     tag: tagAdapter.setAll(tags, initialTagState),

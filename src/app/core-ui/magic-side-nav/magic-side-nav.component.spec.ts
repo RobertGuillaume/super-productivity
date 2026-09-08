@@ -6,7 +6,7 @@ import { DragDropRegistry } from '@angular/cdk/drag-drop';
 import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { By } from '@angular/platform-browser';
 import { TranslateModule } from '@ngx-translate/core';
-import { EMPTY, of } from 'rxjs';
+import { BehaviorSubject, EMPTY } from 'rxjs';
 
 import { MagicSideNavComponent } from './magic-side-nav.component';
 import { MagicNavConfigService } from './magic-nav-config.service';
@@ -20,6 +20,7 @@ describe('MagicSideNavComponent mobile behavior', () => {
   let fixture: ComponentFixture<MagicSideNavComponent>;
   let isXs: ReturnType<typeof signal<boolean>>;
   let browserMatches: boolean;
+  let isAllDataLoaded$: BehaviorSubject<boolean>;
 
   const navConfig: NavConfig = {
     items: [],
@@ -36,6 +37,7 @@ describe('MagicSideNavComponent mobile behavior', () => {
   beforeEach(async () => {
     isXs = signal(false);
     browserMatches = false;
+    isAllDataLoaded$ = new BehaviorSubject(false);
     spyOn(window, 'matchMedia').and.callFake(
       () =>
         ({
@@ -52,7 +54,6 @@ describe('MagicSideNavComponent mobile behavior', () => {
           provide: MagicNavConfigService,
           useValue: {
             navConfig: signal(navConfig),
-            areInitialTreesReady: signal(false),
             isProjectsExpanded: signal(false),
             isTagsExpanded: signal(false),
           },
@@ -73,7 +74,7 @@ describe('MagicSideNavComponent mobile behavior', () => {
         },
         {
           provide: DataInitStateService,
-          useValue: { isAllDataLoadedInitially$: of(false) },
+          useValue: { isAllDataLoadedInitially$: isAllDataLoaded$ },
         },
         { provide: Router, useValue: { events: EMPTY } },
         { provide: DragDropRegistry, useValue: { pointerUp: EMPTY } },
@@ -101,6 +102,18 @@ describe('MagicSideNavComponent mobile behavior', () => {
     fixture = TestBed.createComponent(MagicSideNavComponent);
 
     expect(fixture.componentInstance.isMobile()).toBe(true);
+  });
+
+  it('renders the navigation shell as soon as app data is loaded', () => {
+    fixture = TestBed.createComponent(MagicSideNavComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.nav-list')).toBeNull();
+
+    isAllDataLoaded$.next(true);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.nav-list')).not.toBeNull();
   });
 
   it('exposes the open mobile drawer as labelled navigation with a focus trap', () => {
