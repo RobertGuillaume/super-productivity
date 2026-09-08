@@ -70,7 +70,7 @@ describe('SolidTaskHydrationService', () => {
     ...DEFAULT_TASK,
     id: 'task-1',
     title: 'Load me from Solid',
-    projectId: INBOX_PROJECT.id,
+    projectId: 'project-1',
     created: 1710000000000,
   };
   const project: Project = {
@@ -394,6 +394,23 @@ describe('SolidTaskHydrationService', () => {
     expect(appData.tag.ids).toEqual(['tag-2', TODAY_TAG.id, 'tag-1']);
     expect(appData.note.todayOrder).toEqual(['note-2', 'note-1', 'note-3']);
     expect(appData.section.ids).toEqual(['section-2', 'section-1', 'section-3']);
+  });
+
+  it('projects native tasks into Inbox as soon as their entity is available', () => {
+    const nativeTask: Task = {
+      ...task,
+      id: 'https://pod.example/calendar/tasks.ttl#todo-1',
+      projectId: INBOX_PROJECT.id,
+    };
+
+    const appData = createSolidAppData({
+      tasks: [nativeTask],
+      projects: [],
+      tags: [],
+      notes: [],
+    });
+
+    expect(appData.project.entities[INBOX_PROJECT.id]?.taskIds).toEqual([nativeTask.id]);
   });
 
   it('dispatches a complete snapshot despite malformed model and archive cache failures', async () => {

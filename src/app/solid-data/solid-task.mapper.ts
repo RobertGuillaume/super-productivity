@@ -1,3 +1,4 @@
+import { views } from '@solid-intents/runtime';
 import type {
   CreateThingInput,
   Thing,
@@ -161,7 +162,9 @@ const taskToSolidDeleteProperties = (task: Task): ThingRdfPropertyInput => {
 };
 
 export const solidThingToTask = (thing: Thing): Task => {
-  const nativeDue = dateProp(thing, ICAL_TASK.due)?.getTime();
+  const nativeDue = thing.as(views.Task).dueDate?.getTime();
+  const dueWithTime = numberOrNullProp(thing, SP_TASK.dueWithTime);
+  const dueDay = stringOrNullProp(thing, SP_TASK.dueDay);
   const nativeStatus = stringProp(thing, ICAL_TASK.status)?.toLowerCase();
   const nativeTitle = stringProp(thing, ICAL_TASK.summary);
   const facetStatus = thing.facets.status?.toLowerCase();
@@ -185,8 +188,8 @@ export const solidThingToTask = (thing: Thing): Task => {
     timeEstimate: numberProp(thing, SP_TASK.timeEstimate) ?? 0,
     timeSpentOnDay:
       jsonProp<TaskCopy['timeSpentOnDay']>(thing, SP_TASK.timeSpentOnDay) ?? {},
-    dueWithTime: numberOrNullProp(thing, SP_TASK.dueWithTime) ?? nativeDue,
-    dueDay: stringOrNullProp(thing, SP_TASK.dueDay),
+    dueWithTime: dueWithTime !== undefined ? dueWithTime : dueDay ? undefined : nativeDue,
+    dueDay,
     hasPlannedTime: booleanProp(thing, SP_TASK.hasPlannedTime),
     deadlineDay: stringOrNullProp(thing, SP_TASK.deadlineDay),
     deadlineWithTime: numberOrNullProp(thing, SP_TASK.deadlineWithTime),
@@ -214,22 +217,6 @@ export const solidThingToTask = (thing: Thing): Task => {
   };
 
   return task;
-};
-
-const dateProp = (thing: Thing, predicate: string): Date | undefined => {
-  const value = thing.property(predicate)[0];
-  if (value?.kind !== 'literal') {
-    return undefined;
-  }
-  if (value.value instanceof Date) {
-    return value.value;
-  }
-  if (typeof value.value !== 'string') {
-    return undefined;
-  }
-
-  const parsed = new Date(value.value);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
 export const solidTaskQuery = {

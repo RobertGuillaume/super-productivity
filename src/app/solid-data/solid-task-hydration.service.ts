@@ -86,6 +86,7 @@ import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
+import { normalizeSolidTaskProjection } from './solid-task-projection';
 
 export interface SolidCatalogDiagnostic {
   model: string;
@@ -665,7 +666,7 @@ export const createSolidAppData = (input: {
     Object.entries(MODEL_CONFIGS).map(([key, config]) => [key, config.defaultData]),
   ) as AppDataComplete;
   const projects = applyProjectOrder(
-    ensureInboxProject(input.projects),
+    normalizeSolidTaskProjection(input.tasks, ensureInboxProject(input.projects)),
     input.appState?.projectOrder ?? [],
   );
   const tags = applyOrder(ensureTodayTag(input.tags), input.appState?.tagOrder ?? []);

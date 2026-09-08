@@ -1,3 +1,4 @@
+import { vocab } from '@solid-intents/runtime';
 import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { INBOX_PROJECT } from '../features/project/project.const';
@@ -121,6 +122,41 @@ describe('solidTask.mapper', () => {
     expect(mapped.projectId).toBe(INBOX_PROJECT.id);
     expect(mapped.isDone).toBe(true);
     expect(mapped.dueWithTime).toBe(due.getTime());
+  });
+
+  it('maps a schema.org payment due date through the normalized Task view', () => {
+    const due = new Date('2026-09-08T11:30:00.000Z');
+    const thing = createThing(
+      {
+        [vocab.schema.paymentDueDate.uri]: [literal(due)],
+      },
+      {},
+    );
+
+    expect(solidThingToTask(thing).dueWithTime).toBe(due.getTime());
+  });
+
+  it('keeps app-specific due fields ahead of native due dates', () => {
+    const nativeDue = new Date('2026-09-08T11:30:00.000Z');
+    const explicitDue = new Date('2026-09-09T12:00:00.000Z').getTime();
+    const withTimedDue = createThing(
+      {
+        [ICAL_TASK.due]: [literal(nativeDue)],
+        [SP_TASK.dueWithTime]: [literal(explicitDue)],
+      },
+      {},
+    );
+    const withAllDayDue = createThing(
+      {
+        [ICAL_TASK.due]: [literal(nativeDue)],
+        [SP_TASK.dueDay]: [literal('2026-09-10')],
+      },
+      {},
+    );
+
+    expect(solidThingToTask(withTimedDue).dueWithTime).toBe(explicitDue);
+    expect(solidThingToTask(withAllDayDue).dueWithTime).toBeUndefined();
+    expect(solidThingToTask(withAllDayDue).dueDay).toBe('2026-09-10');
   });
 });
 
