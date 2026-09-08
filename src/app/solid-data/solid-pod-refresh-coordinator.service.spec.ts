@@ -36,6 +36,8 @@ describe('SolidPodRefreshCoordinatorService', () => {
   let taskAccess: jasmine.SpyObj<SolidTaskAccessService>;
   let authState: AuthState;
   let status: DiscoveryStatus;
+  let thingSubscriber: (() => void) | null;
+  let subscriptionInstallCount: number;
 
   beforeEach(() => {
     localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
@@ -45,6 +47,8 @@ describe('SolidPodRefreshCoordinatorService', () => {
       webId: 'https://pod.example/profile/card#me',
     };
     status = discoveryStatus();
+    thingSubscriber = null;
+    subscriptionInstallCount = 0;
     discovery = jasmine.createSpyObj('discovery', [
       'refresh',
       'discoverType',
@@ -92,16 +96,28 @@ describe('SolidPodRefreshCoordinatorService', () => {
       discovery,
       storage,
       things: {
-        subscribe: () => (): void => undefined,
+        subscribe: (_query: unknown, subscriber: () => void): (() => void) => {
+          subscriptionInstallCount++;
+          thingSubscriber = subscriber;
+          return (): void => undefined;
+        },
       },
     } as unknown as SolidRuntime;
     runtimeService = jasmine.createSpyObj<SolidRuntimeService>(
       'SolidRuntimeService',
-      ['resolveAuthenticatedStorageRoot', 'ensureAppContainer', 'ensureLayout'],
+      [
+        'resolveAuthenticatedStorageRoot',
+        'ensureAppContainer',
+        'ensureLayout',
+        'rememberAppContainerTree',
+      ],
       { client: runtime },
     );
     runtimeService.resolveAuthenticatedStorageRoot.and.resolveTo('unchanged');
     runtimeService.ensureAppContainer.and.resolveTo();
+    runtimeService.rememberAppContainerTree.and.callFake((_uri, known) => {
+      known.add(_uri);
+    });
     runtimeService.ensureLayout.and.returnValue({ containers } as never);
 
     TestBed.configureTestingModule({
@@ -129,6 +145,9 @@ describe('SolidPodRefreshCoordinatorService', () => {
     storage.listContainer.and.callFake(async (uri: string) =>
       containerListing(uri, uri === containers.tasks ? taskEntries : []),
     );
+    discovery.refresh.and.callFake(async (options) => {
+      (options?.uris ?? []).forEach(() => thingSubscriber?.());
+    });
 
     await TestBed.inject(SolidPodRefreshCoordinatorService).start();
 
@@ -149,7 +168,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
     expect(new Set(resourceRefreshes.flat()).size).toBe(251);
     expect(discovery.discoverType).toHaveBeenCalledOnceWith(SOLID_PRODUCTIVITY_TASK_TYPE);
     expect(taskAccess.refreshExternalPermissions).toHaveBeenCalled();
-    expect(hydration.reconcileStore).toHaveBeenCalled();
+    expect(hydration.reconcileStore).toHaveBeenCalledTimes(32);
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('ready');
   });
 
@@ -204,12 +223,12 @@ describe('SolidPodRefreshCoordinatorService', () => {
   it('rehydrates and reinstalls subscriptions after a runtime reboot', async () => {
     const service = TestBed.inject(SolidPodRefreshCoordinatorService);
     await service.start();
-    const subscriptionCount = discovery.subscribe.calls.count();
+    const initialSubscriptionCount = subscriptionInstallCount;
 
     await service.restartAfterRuntimeBoot();
 
     expect(hydration.reconcileStore).toHaveBeenCalled();
-    expect(discovery.subscribe.calls.count()).toBeGreaterThan(subscriptionCount);
+    expect(subscriptionInstallCount).toBeGreaterThan(initialSubscriptionCount);
     expect(runtimeService.resolveAuthenticatedStorageRoot).toHaveBeenCalledTimes(2);
   });
 });

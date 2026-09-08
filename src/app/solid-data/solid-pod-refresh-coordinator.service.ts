@@ -17,6 +17,7 @@ import { SolidTaskAccessService } from './solid-task-access.service';
 
 const REFRESH_BATCH_SIZE = 10;
 const MAX_DISCOVERY_CONTINUATIONS = 100;
+const OUT_OF_BAND_RECONCILIATION_DEBOUNCE_MS = 100;
 const PRIORITY_CONTAINER_KEYS = ['tasks', 'projects', 'tags', 'app', 'config'] as const;
 
 /** Coordinates all network-backed Solid catalog refresh work for the application. */
@@ -42,6 +43,7 @@ export class SolidPodRefreshCoordinatorService {
   private lastRefreshHadAuthoritativeData = false;
   private canCheckNativeTaskAccess = false;
   private lifecycleGeneration = 0;
+  private coordinatedRefreshDepth = 0;
 
   constructor() {
     this.dataLayerState.registerMutationRecoveryHandler(() =>
@@ -201,6 +203,21 @@ export class SolidPodRefreshCoordinatorService {
     initiallyDegraded: boolean,
     generation: number,
   ): Promise<void> {
+    this.coordinatedRefreshDepth++;
+    try {
+      await this.refreshCatalogInternal(initiallyDegraded, generation);
+    } finally {
+      this.coordinatedRefreshDepth--;
+      if (this.coordinatedRefreshDepth === 0 && this.reconciliationRequested) {
+        this.scheduleReconciliation();
+      }
+    }
+  }
+
+  private async refreshCatalogInternal(
+    initiallyDegraded: boolean,
+    generation: number,
+  ): Promise<void> {
     const startedAt = performance.now();
     const containers = orderedContainers(this.solidRuntime.ensureLayout());
     let isDegraded = initiallyDegraded;
@@ -220,7 +237,7 @@ export class SolidPodRefreshCoordinatorService {
       try {
         const listing = await this.listProvisionedContainer(containerUri);
         if (listing.status === 'ok' || listing.status === 'not-modified') {
-          this.knownContainers.add(containerUri);
+          this.solidRuntime.rememberAppContainerTree(containerUri, this.knownContainers);
           await this.refreshListingResources(listing);
           successfulContainerCount++;
           this.dataLayerState.setContainerWriteReady(containerKey, !initiallyDegraded);
@@ -253,8 +270,8 @@ export class SolidPodRefreshCoordinatorService {
 
     try {
       await this.solidRuntime.client.discovery.discoverType(SOLID_PRODUCTIVITY_TASK_TYPE);
-      isDegraded = (await this.drainDiscoveryQueue()) || isDegraded;
       await this.enqueueReconciliation();
+      isDegraded = (await this.drainDiscoveryQueue()) || isDegraded;
       this.canCheckNativeTaskAccess = true;
       await this.taskAccess.refreshExternalPermissions();
     } catch (error) {
@@ -307,6 +324,9 @@ export class SolidPodRefreshCoordinatorService {
       }
       await this.enqueueReconciliation();
     }
+    if (resourceUris.length === 0) {
+      await this.enqueueReconciliation();
+    }
   }
 
   /** Returns true when discovery stopped before reaching a settled state. */
@@ -324,6 +344,9 @@ export class SolidPodRefreshCoordinatorService {
 
       await discovery.refresh();
       const after = discovery.status();
+      if (after.completedJobs > before.completedJobs) {
+        await this.enqueueReconciliation();
+      }
       if (isDiscoverySettled(after)) {
         return false;
       }
@@ -342,9 +365,6 @@ export class SolidPodRefreshCoordinatorService {
   private installSubscriptions(): void {
     this.stopSubscriptions();
     this.subscriptions.push(
-      this.solidRuntime.client.discovery.subscribe(() => {
-        this.scheduleReconciliation();
-      }),
       this.solidRuntime.client.things.subscribe(
         {},
         () => {
@@ -363,13 +383,17 @@ export class SolidPodRefreshCoordinatorService {
   }
 
   private scheduleReconciliation(): void {
-    if (this.reconciliationTimer !== null) {
+    this.reconciliationRequested = true;
+    if (this.coordinatedRefreshDepth > 0) {
       return;
+    }
+    if (this.reconciliationTimer !== null) {
+      clearTimeout(this.reconciliationTimer);
     }
     this.reconciliationTimer = setTimeout(() => {
       this.reconciliationTimer = null;
       void this.enqueueReconciliation();
-    }, 0);
+    }, OUT_OF_BAND_RECONCILIATION_DEBOUNCE_MS);
   }
 
   private enqueueReconciliation(): Promise<void> {

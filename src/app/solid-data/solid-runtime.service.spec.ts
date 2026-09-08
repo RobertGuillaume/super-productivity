@@ -233,6 +233,30 @@ describe('SolidRuntimeService', () => {
       );
   });
 
+  it('reuses known parents and skips the probe for a listing-proven missing target', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+    await service.boot({ podUrl: discoveredStorageRoot });
+    const known = new Set<string>();
+    const firstTarget = 'https://pod.example/super-productivity/archive/tasks/';
+    const secondTarget = 'https://pod.example/super-productivity/archive/state/';
+
+    await service.ensureAppContainer(firstTarget, known);
+    await service.ensureAppContainer(secondTarget, known);
+
+    expect(
+      fetchRequests.filter(
+        ({ uri, method }) =>
+          uri === 'https://pod.example/super-productivity/archive/' && method === 'HEAD',
+      ).length,
+    ).toBe(1);
+    expect(
+      fetchRequests.some(({ uri, method }) => uri === firstTarget && method === 'HEAD'),
+    ).toBe(false);
+    expect(
+      fetchRequests.some(({ uri, method }) => uri === secondTarget && method === 'HEAD'),
+    ).toBe(false);
+  });
+
   const createRuntimeStub = (): SolidRuntime =>
     ({
       boot: async (options: RuntimeBootOptions = {}): Promise<void> => {

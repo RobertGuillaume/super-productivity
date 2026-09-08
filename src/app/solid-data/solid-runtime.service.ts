@@ -199,7 +199,7 @@ export class SolidRuntimeService {
 
   async ensureAppContainer(
     containerUri: string,
-    knownExisting: ReadonlySet<string> = new Set(),
+    knownExisting: Set<string> = new Set(),
   ): Promise<void> {
     const podUrl = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
     const fetchResource = this.runtime.auth.fetch();
@@ -207,8 +207,16 @@ export class SolidRuntimeService {
 
     for (const uri of containerUris) {
       if (!knownExisting.has(uri)) {
-        await ensureContainer(fetchResource, uri);
+        await ensureContainer(fetchResource, uri, uri === containerUri);
+        knownExisting.add(uri);
       }
+    }
+  }
+
+  rememberAppContainerTree(containerUri: string, knownExisting: Set<string>): void {
+    const podUrl = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
+    for (const uri of collectContainerUris(podUrl, [containerUri])) {
+      knownExisting.add(uri);
     }
   }
 
@@ -318,18 +326,24 @@ const normalizeContainerPath = (path: string): string =>
 const ensureContainer = async (
   fetchResource: typeof fetch,
   containerUri: string,
+  isKnownMissing = false,
 ): Promise<void> => {
-  const existing = await fetchResource(containerUri, { method: 'HEAD' });
-  if (existing.ok) {
-    return;
-  }
+  if (!isKnownMissing) {
+    const existing = await fetchResource(containerUri, { method: 'HEAD' });
+    if (existing.ok) {
+      return;
+    }
 
-  if (existing.status !== 404 && existing.status !== 410 && existing.status !== 405) {
-    throw new Error(`Failed to inspect Solid container: HTTP ${existing.status}`);
-  }
+    if (existing.status !== 404 && existing.status !== 410 && existing.status !== 405) {
+      throw new Error(`Failed to inspect Solid container: HTTP ${existing.status}`);
+    }
 
-  if (existing.status === 405 && (await canReadContainer(fetchResource, containerUri))) {
-    return;
+    if (
+      existing.status === 405 &&
+      (await canReadContainer(fetchResource, containerUri))
+    ) {
+      return;
+    }
   }
 
   const created = await fetchResource(containerUri, {
