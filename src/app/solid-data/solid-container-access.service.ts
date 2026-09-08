@@ -1,16 +1,16 @@
 import { inject, Injectable } from '@angular/core';
 import { Log } from '../core/log';
-import { SolidWriteReadiness } from './solid-data-layer-state.service';
+import type { SolidAccessDecision, SolidAccessState } from './solid-access.model';
 import { SolidRuntimeService } from './solid-runtime.service';
 
 @Injectable({ providedIn: 'root' })
 export class SolidContainerAccessService {
   private readonly solidRuntime = inject(SolidRuntimeService);
 
-  async check(containerUri: string): Promise<SolidWriteReadiness> {
+  async check(containerUri: string): Promise<SolidAccessDecision> {
     const auth = this.solidRuntime.client.auth.state();
     if (auth.status !== 'authenticated') {
-      return 'read-only';
+      return { state: 'unknown' };
     }
 
     let response: Response;
@@ -20,37 +20,68 @@ export class SolidContainerAccessService {
       });
     } catch (error) {
       Log.err('Solid container access check unavailable', safeAccessError(error));
-      return 'unavailable';
+      return { state: 'unavailable' };
     }
 
     if (!response.ok) {
-      return response.status === 401 || response.status === 403
-        ? 'read-only'
-        : 'unavailable';
+      if (response.status === 429) {
+        return {
+          state: 'rate-limited',
+          retryAt: this.retryAtFor(containerUri),
+        };
+      }
+      return {
+        state:
+          response.status === 401 || response.status === 403
+            ? 'read-only'
+            : 'unavailable',
+      };
     }
 
     const headerAccess = accessFromWacAllow(response.headers.get('WAC-Allow'));
     if (headerAccess !== null) {
-      return headerAccess;
+      return { state: headerAccess };
     }
 
     try {
-      const permissions = await this.solidRuntime.client.share.permissions(containerUri);
-      return permissions.some(
-        (permission) => permission.agent === auth.webId && permission.write === true,
-      )
-        ? 'writable'
-        : 'read-only';
+      const resolution =
+        await this.solidRuntime.client.share.resolvePermissions(containerUri);
+      if (resolution.status === 'unknown') {
+        return resolution.reason === 'rate-limited'
+          ? { state: 'rate-limited', retryAt: resolution.retryAt }
+          : { state: 'unknown' };
+      }
+      const ownPermission = resolution.permissions.find(
+        (permission) => permission.agent === auth.webId,
+      );
+      return ownPermission === undefined
+        ? { state: 'unknown' }
+        : { state: ownPermission.write ? 'writable' : 'read-only' };
     } catch (error) {
       Log.err('Solid container permission check failed', safeAccessError(error));
-      return 'read-only';
+      return { state: 'unknown' };
     }
+  }
+
+  private retryAtFor(containerUri: string): Date | undefined {
+    let origin: string;
+    try {
+      origin = new URL(containerUri).origin;
+    } catch {
+      return undefined;
+    }
+    return (
+      this.solidRuntime.client.diagnostics
+        .status()
+        .requestScheduling.find((status) => status.origin === origin)?.cooldownUntil ??
+      undefined
+    );
   }
 }
 
 export const accessFromWacAllow = (
   header: string | null,
-): 'writable' | 'read-only' | null => {
+): Extract<SolidAccessState, 'writable' | 'read-only'> | null => {
   if (header === null) {
     return null;
   }

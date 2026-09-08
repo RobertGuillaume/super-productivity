@@ -1,17 +1,17 @@
 <div class="wrapper">
   <header class="task-title-wrapper">
     <task-title
-      [readonly]="isSolidReadOnly()"
+      [readonly]="isSolidMutationBlocked()"
       [resetToLastExternalValueTrigger]="task()"
       (valueEdited)="updateTaskTitleIfChanged($event.wasChanged, $event.newVal)"
       [value]="task().title || ''"
       class="task-title"
     ></task-title>
-    @if (isSolidReadOnly()) {
+    @if (solidAccessUi().tooltip; as accessTooltip) {
       <mat-icon
-        [matTooltip]="T.F.TASK.CMP.SOLID_READ_ONLY | translate"
-        [attr.aria-label]="T.F.TASK.CMP.SOLID_READ_ONLY | translate"
-        >lock</mat-icon
+        [matTooltip]="accessTooltip | translate"
+        [attr.aria-label]="accessTooltip | translate"
+        >{{ solidAccessUi().icon }}</mat-icon
       >
     }
     @if (layoutService.isXs() && !isDialogMode()) {
@@ -78,7 +78,7 @@
         <div class="add-btn-wrapper">
           <button
             #addSubTaskBtn
-            [disabled]="isSolidReadOnly()"
+            [disabled]="isSolidMutationBlocked()"
             (click)="addSubTask()"
             mat-button
           >
@@ -206,7 +206,7 @@
       @if (task().deadlineWithTime || task().deadlineDay) {
         <button
           mat-icon-button
-          [disabled]="isSolidReadOnly()"
+          [disabled]="isSolidMutationBlocked()"
           class="quick-chip"
           (click)="removeDeadline($event)"
           [matTooltip]="T.F.TASK.CMP.REMOVE_DEADLINE | translate"
@@ -273,7 +273,7 @@
         (changed)="changeTaskNotes($event); panelState.isFocusNotes.set(false)"
         (keyboardUnToggle)="focusItem(noteWrapperElRef)"
         [isFocus]="panelState.isFocusNotes()"
-        [isLock]="isSolidReadOnly()"
+        [isLock]="isSolidMutationBlocked()"
         [isShowControls]="true"
         [isShowChecklistToggle]="true"
         [isDefaultText]="!task().notes"
@@ -314,12 +314,12 @@
           }
           <task-attachment-list
             [attachments]="localAttachments()"
-            [isDisableControls]="isSolidReadOnly()"
+            [isDisableControls]="isSolidMutationBlocked()"
             [taskId]="task().id || ''"
           ></task-attachment-list>
           <div class="add-btn-wrapper">
             <button
-              [disabled]="isSolidReadOnly()"
+              [disabled]="isSolidMutationBlocked()"
               (click)="addAttachment()"
               [matTooltip]="pasteImageHintKey | translate"
               matTooltipPosition="above"
@@ -356,8 +356,8 @@
     (keyPress)="onItemKeyPress($event)"
     (editActionTriggered)="tagEditElRef.focusInput()"
     type="fullSizeInput"
-    [attr.aria-disabled]="isSolidReadOnly()"
-    [style.pointer-events]="isSolidReadOnly() ? 'none' : null"
+    [attr.aria-disabled]="isSolidMutationBlocked()"
+    [style.pointer-events]="isSolidMutationBlocked() ? 'none' : null"
     class="input-item --estimate"
   >
     <ng-container input-title>
@@ -376,8 +376,8 @@
   <div class="date-info">
     <div
       class="edit-date-info"
-      [attr.aria-disabled]="isSolidReadOnly()"
-      [attr.tabindex]="isSolidReadOnly() ? -1 : 0"
+      [attr.aria-disabled]="isSolidMutationBlocked()"
+      [attr.tabindex]="isSolidMutationBlocked() ? -1 : 0"
       [title]="T.G.EDIT | translate"
       (click)="editCreated()"
       (keydown.enter)="editCreated()"
@@ -390,8 +390,8 @@
     @if (task().doneOn) {
       <div
         class="edit-date-info"
-        [attr.aria-disabled]="isSolidReadOnly()"
-        [attr.tabindex]="isSolidReadOnly() ? -1 : 0"
+        [attr.aria-disabled]="isSolidMutationBlocked()"
+        [attr.tabindex]="isSolidMutationBlocked() ? -1 : 0"
         [title]="T.G.EDIT | translate"
         (click)="editCompleted()"
         (keydown.enter)="editCompleted()"

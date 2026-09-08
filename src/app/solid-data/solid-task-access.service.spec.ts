@@ -7,14 +7,14 @@ describe('SolidTaskAccessService', () => {
   const webId = 'https://pod.example/profile/card#me';
   let authState: ReturnType<SolidRuntime['auth']['state']>;
   let authenticatedFetch: jasmine.Spy;
-  let permissions: jasmine.Spy;
+  let resolvePermissions: jasmine.Spy;
   let service: SolidTaskAccessService;
 
   beforeEach(() => {
     authState = { status: 'authenticated', webId };
     authenticatedFetch = jasmine.createSpy('authenticatedFetch');
     authenticatedFetch.and.resolveTo(response(200));
-    permissions = jasmine.createSpy('permissions');
+    resolvePermissions = jasmine.createSpy('resolvePermissions');
     TestBed.configureTestingModule({
       providers: [
         {
@@ -30,7 +30,8 @@ describe('SolidTaskAccessService', () => {
                 state: () => authState,
                 fetch: () => authenticatedFetch,
               },
-              share: { permissions },
+              share: { resolvePermissions },
+              diagnostics: { status: () => ({ requestScheduling: [] }) },
             },
           },
         },
@@ -47,28 +48,32 @@ describe('SolidTaskAccessService', () => {
 
     await service.refreshExternalPermissions();
 
-    expect(service.isReadOnly('app-task')).toBe(false);
-    expect(permissions).not.toHaveBeenCalled();
+    expect(service.isMutationBlocked('app-task')).toBe(false);
+    expect(resolvePermissions).not.toHaveBeenCalled();
   });
 
-  it('grants external task writes only for an explicit matching WebID permission', async () => {
-    permissions.and.resolveTo([{ agent: webId, read: true, write: true }]);
+  it('grants external task writes for an exact effective WebID permission', async () => {
+    resolvePermissions.and.resolveTo({
+      status: 'known',
+      provenance: 'fallback-acl',
+      permissions: [{ agent: webId, read: true, write: true }],
+    });
     service.registerThing(
       'external-task',
       thing('https://pod.example/calendar/tasks.ttl#todo-1'),
     );
 
-    expect(service.isReadOnly('external-task')).toBe(true);
+    expect(service.isMutationBlocked('external-task')).toBe(true);
     await service.refreshExternalPermissions();
 
-    expect(service.isReadOnly('external-task')).toBe(false);
+    expect(service.isMutationBlocked('external-task')).toBe(false);
+    expect(service.accessDecision('external-task')).toEqual({ state: 'writable' });
   });
 
   it('uses an effective WAC-Allow response for an external task resource', async () => {
     authenticatedFetch.and.resolveTo(
       response(200, new Headers([['WAC-Allow', 'user="read write"']])),
     );
-    permissions.and.resolveTo([]);
     service.registerThing(
       'external-task',
       thing('https://pod.example/calendar/tasks.ttl#todo-1'),
@@ -76,49 +81,73 @@ describe('SolidTaskAccessService', () => {
 
     await service.refreshExternalPermissions();
 
-    expect(service.isReadOnly('external-task')).toBe(false);
+    expect(service.isMutationBlocked('external-task')).toBe(false);
     expect(authenticatedFetch).toHaveBeenCalledOnceWith(
       'https://pod.example/calendar/tasks.ttl',
       { method: 'HEAD' },
     );
-    expect(permissions).not.toHaveBeenCalled();
+    expect(resolvePermissions).not.toHaveBeenCalled();
   });
 
-  it('keeps explicit read-only, empty, and unrelated permissions read-only', async () => {
-    permissions.and.resolveTo([
-      { agent: webId, read: true, write: false },
-      { agent: 'https://other.example/#me', read: true, write: true },
-    ]);
+  it('labels only an explicit matching denial as read-only', async () => {
+    resolvePermissions.and.resolveTo({
+      status: 'known',
+      provenance: 'resource-acl',
+      permissions: [{ agent: webId, read: true, write: false }],
+    });
     service.registerThing(
-      'external-task',
-      thing('https://pod.example/calendar/tasks.ttl#todo-1'),
-    );
-
-    await service.refreshExternalPermissions();
-    expect(service.isReadOnly('external-task')).toBe(true);
-
-    permissions.and.resolveTo([]);
-    service.registerThing(
-      'empty-permissions',
-      thing('https://pod.example/calendar/empty.ttl#todo-2'),
-    );
-    await service.refreshExternalPermissions({ unknownOnly: true });
-    expect(service.isReadOnly('empty-permissions')).toBe(true);
-  });
-
-  it('keeps a task read-only when permission lookup fails', async () => {
-    permissions.and.rejectWith(new Error('ACL unavailable'));
-    service.registerThing(
-      'external-task',
-      thing('https://pod.example/calendar/tasks.ttl#todo-1'),
+      'explicit-denial',
+      thing('https://pod.example/calendar/denied.ttl#todo-1'),
     );
 
     await service.refreshExternalPermissions();
 
-    expect(service.isReadOnly('external-task')).toBe(true);
+    expect(service.isReadOnly('explicit-denial')).toBe(true);
+    expect(service.isMutationBlocked('explicit-denial')).toBe(true);
   });
 
-  it('marks external tasks read-only without an authenticated WebID', async () => {
+  it('keeps ambiguous and unavailable ACL results blocked without calling them read-only', async () => {
+    resolvePermissions.and.resolveTo({
+      status: 'unknown',
+      permissions: [],
+      reason: 'acl-unavailable',
+    });
+    service.registerThing(
+      'unknown-access',
+      thing('https://pod.example/calendar/unknown.ttl#todo-1'),
+    );
+
+    await service.refreshExternalPermissions();
+
+    expect(service.accessDecision('unknown-access')).toEqual({ state: 'unknown' });
+    expect(service.isMutationBlocked('unknown-access')).toBe(true);
+    expect(service.isReadOnly('unknown-access')).toBe(false);
+  });
+
+  it('keeps rate limiting transient and distinct from read-only access', async () => {
+    const retryAt = new Date('2026-09-08T14:00:00.000Z');
+    resolvePermissions.and.resolveTo({
+      status: 'unknown',
+      permissions: [],
+      reason: 'rate-limited',
+      retryAt,
+    });
+    service.registerThing(
+      'rate-limited',
+      thing('https://pod.example/calendar/rate-limited.ttl#todo-1'),
+    );
+
+    await service.refreshExternalPermissions();
+
+    expect(service.accessDecision('rate-limited')).toEqual({
+      state: 'rate-limited',
+      retryAt,
+    });
+    expect(service.isMutationBlocked('rate-limited')).toBe(true);
+    expect(service.isReadOnly('rate-limited')).toBe(false);
+  });
+
+  it('leaves external access unknown without an authenticated WebID', async () => {
     authState = { status: 'anonymous' };
     service.registerThing(
       'external-task',
@@ -127,8 +156,8 @@ describe('SolidTaskAccessService', () => {
 
     await service.refreshExternalPermissions();
 
-    expect(service.isReadOnly('external-task')).toBe(true);
-    expect(permissions).not.toHaveBeenCalled();
+    expect(service.accessDecision('external-task')).toEqual({ state: 'unknown' });
+    expect(resolvePermissions).not.toHaveBeenCalled();
   });
 });
 

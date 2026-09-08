@@ -25,7 +25,9 @@ export class TaskContextMenuComponent {
 
   task = input.required<TaskWithSubTasks | Task>();
   isAdvancedControls = input<boolean>(false);
-  readonly isReadOnly = computed(() => this._solidTaskAccess.isReadOnly(this.task().id));
+  readonly isReadOnly = computed(() =>
+    this._solidTaskAccess.isMutationBlocked(this.task().id),
+  );
 
   readonly isOpen = signal(false);
 

@@ -31,6 +31,7 @@ import { DoneToggleComponent } from '../../../ui/done-toggle/done-toggle.compone
 import { SwipeBlockComponent } from '../../../ui/swipe-block/swipe-block.component';
 import { TranslatePipe } from '@ngx-translate/core';
 import { SolidTaskAccessService } from '../../../solid-data/solid-task-access.service';
+import { solidTaskAccessUi } from '../../../solid-data/solid-task-access-ui';
 
 @Component({
   selector: 'planner-task',
@@ -72,9 +73,10 @@ export class PlannerTaskComponent implements OnInit, OnDestroy, AfterViewInit {
   private readonly _solidTaskAccess = inject(SolidTaskAccessService);
 
   readonly task = input.required<TaskCopy>();
-  readonly isSolidReadOnly = computed(() =>
-    this._solidTaskAccess.isReadOnly(this.task().id),
+  private readonly solidAccessUi = computed(() =>
+    solidTaskAccessUi(this._solidTaskAccess.accessDecision(this.task().id)),
   );
+  readonly isSolidMutationBlocked = computed(() => this.solidAccessUi().blocked);
 
   readonly titleHasLinks = computed<boolean>(() => {
     const title = this.task().title;
@@ -194,7 +196,7 @@ export class PlannerTaskComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   toggleTaskDone(): void {
-    if (this.isSolidReadOnly()) return;
+    if (this.isSolidMutationBlocked()) return;
     window.clearTimeout(this._doneAnimationTimeout);
     const t = this.task();
     this._doneAnimationTimeout = this._taskService.toggleDoneWithAnimation(
@@ -225,7 +227,7 @@ export class PlannerTaskComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   updateTimeEstimate(val: number): void {
-    if (this.isSolidReadOnly()) return;
+    if (this.isSolidMutationBlocked()) return;
     this._taskService.update(this.task().id, {
       timeEstimate: val,
     });

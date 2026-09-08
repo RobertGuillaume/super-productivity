@@ -100,10 +100,10 @@ describe('SolidDataLayerStateService', () => {
     );
     taskAccess = jasmine.createSpyObj<SolidTaskAccessService>('SolidTaskAccessService', [
       'canMutateTasks',
-      'hasReadOnlyExternalTask',
+      'hasBlockedExternalTask',
     ]);
     taskAccess.canMutateTasks.and.returnValue(true);
-    taskAccess.hasReadOnlyExternalTask.and.returnValue(false);
+    taskAccess.hasBlockedExternalTask.and.returnValue(false);
 
     TestBed.configureTestingModule({
       providers: [
@@ -185,6 +185,10 @@ describe('SolidDataLayerStateService', () => {
     service.setContainerReadiness('tasks', 'writable');
     service.demoteWriteAccessAfterFailure(new TypeError('offline'));
     expect(service.containerReadiness('tasks')).toBe('unavailable');
+
+    service.setContainerReadiness('tasks', 'writable');
+    service.demoteWriteAccessAfterFailure({ status: 429 });
+    expect(service.containerReadiness('tasks')).toBe('rate-limited');
   });
 
   it('blocks a mixed bulk task action when one external task is read-only', () => {
@@ -216,7 +220,7 @@ describe('SolidDataLayerStateService', () => {
     localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
     localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
-    taskAccess.hasReadOnlyExternalTask.and.returnValue(true);
+    taskAccess.hasBlockedExternalTask.and.returnValue(true);
     const service = TestBed.inject(SolidDataLayerStateService);
     service.setContainerWriteReady('tasks', true);
     service.setContainerWriteReady('tags', true);

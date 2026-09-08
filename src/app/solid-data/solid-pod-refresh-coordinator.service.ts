@@ -449,7 +449,7 @@ export class SolidPodRefreshCoordinatorService {
           if (containerUri !== undefined) {
             this.dataLayerState.setContainerReadiness(
               containerKey,
-              await this.containerAccess.check(containerUri),
+              (await this.containerAccess.check(containerUri)).state,
             );
           }
         }
@@ -527,7 +527,7 @@ export class SolidPodRefreshCoordinatorService {
       const results = await Promise.allSettled(
         batch.map(async ([containerKey, containerUri]) => ({
           containerKey,
-          readiness: await this.containerAccess.check(containerUri),
+          readiness: (await this.containerAccess.check(containerUri)).state,
         })),
       );
       if (generation !== this.lifecycleGeneration) {

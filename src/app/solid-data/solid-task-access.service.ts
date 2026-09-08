@@ -2,10 +2,10 @@ import { inject, Injectable, signal } from '@angular/core';
 import type { Thing } from '@solid-intents/runtime';
 import { SolidContainerAccessService } from './solid-container-access.service';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidAccessDecision, SolidAccessState } from './solid-access.model';
 
 const ACCESS_CHECK_BATCH_SIZE = 2;
 
-export type SolidTaskAccess = 'writable' | 'read-only' | 'unknown';
 export type SolidTaskOrigin = 'app' | 'external';
 
 export interface SolidTaskCapability {
@@ -13,7 +13,8 @@ export interface SolidTaskCapability {
   thingUri: string;
   sourceUri: string;
   origin: SolidTaskOrigin;
-  access: SolidTaskAccess;
+  access: SolidAccessState;
+  retryAt?: Date;
 }
 
 /** Transient access data for app-owned tasks and VTODOs discovered elsewhere. */
@@ -48,6 +49,10 @@ export class SolidTaskAccessService {
       sourceUri,
       origin,
       access,
+      retryAt:
+        current?.origin === 'external' && current.sourceUri === sourceUri
+          ? current.retryAt
+          : undefined,
     };
 
     if (capabilitiesEqual(current, capability)) {
@@ -65,9 +70,23 @@ export class SolidTaskAccessService {
     this.pendingPermissionChecks.clear();
   }
 
-  isReadOnly(taskId: string): boolean {
+  accessDecision(taskId: string): SolidAccessDecision | null {
     const capability = this.capabilitiesSignal().get(taskId);
-    return capability?.origin === 'external' && capability.access !== 'writable';
+    if (capability?.origin !== 'external') {
+      return null;
+    }
+    return capability.retryAt === undefined
+      ? { state: capability.access }
+      : { state: capability.access, retryAt: capability.retryAt };
+  }
+
+  isMutationBlocked(taskId: string): boolean {
+    const decision = this.accessDecision(taskId);
+    return decision !== null && decision.state !== 'writable';
+  }
+
+  isReadOnly(taskId: string): boolean {
+    return this.accessDecision(taskId)?.state === 'read-only';
   }
 
   isAppOwned(taskId: string): boolean {
@@ -75,10 +94,10 @@ export class SolidTaskAccessService {
   }
 
   canMutateTasks(taskIds: readonly string[]): boolean {
-    return taskIds.every((taskId) => !this.isReadOnly(taskId));
+    return taskIds.every((taskId) => !this.isMutationBlocked(taskId));
   }
 
-  hasReadOnlyExternalTask(): boolean {
+  hasBlockedExternalTask(): boolean {
     return Array.from(this.capabilitiesSignal().values()).some(
       (capability) =>
         capability.origin === 'external' && capability.access !== 'writable',
@@ -88,7 +107,7 @@ export class SolidTaskAccessService {
   async refreshExternalPermissions(options?: { unknownOnly?: boolean }): Promise<void> {
     const auth = this.solidRuntime.client.auth.state();
     if (auth.status !== 'authenticated') {
-      this.markExternalTasksReadOnly();
+      this.markExternalTasks('unknown');
       return;
     }
 
@@ -126,11 +145,11 @@ export class SolidTaskAccessService {
   }
 
   private async readSourcePermission(sourceUri: string): Promise<void> {
-    const readiness = await this.containerAccess.check(sourceUri);
-    this.setSourceAccess(sourceUri, readiness === 'writable' ? 'writable' : 'read-only');
+    const decision = await this.containerAccess.check(sourceUri);
+    this.setSourceDecision(sourceUri, decision);
   }
 
-  private setSourceAccess(sourceUri: string, access: SolidTaskAccess): void {
+  private setSourceDecision(sourceUri: string, decision: SolidAccessDecision): void {
     this.capabilitiesSignal.update((capabilities) => {
       let changed = false;
       const next = new Map(capabilities);
@@ -138,9 +157,14 @@ export class SolidTaskAccessService {
         if (
           capability.origin === 'external' &&
           capability.sourceUri === sourceUri &&
-          capability.access !== access
+          (capability.access !== decision.state ||
+            capability.retryAt?.getTime() !== decision.retryAt?.getTime())
         ) {
-          next.set(taskId, { ...capability, access });
+          next.set(taskId, {
+            ...capability,
+            access: decision.state,
+            retryAt: decision.retryAt,
+          });
           changed = true;
         }
       }
@@ -148,13 +172,13 @@ export class SolidTaskAccessService {
     });
   }
 
-  private markExternalTasksReadOnly(): void {
+  private markExternalTasks(access: SolidAccessState): void {
     this.capabilitiesSignal.update((capabilities) => {
       let changed = false;
       const next = new Map(capabilities);
       for (const [taskId, capability] of capabilities) {
-        if (capability.origin === 'external' && capability.access !== 'read-only') {
-          next.set(taskId, { ...capability, access: 'read-only' });
+        if (capability.origin === 'external' && capability.access !== access) {
+          next.set(taskId, { ...capability, access, retryAt: undefined });
           changed = true;
         }
       }
@@ -170,7 +194,8 @@ const capabilitiesEqual = (
   left?.thingUri === right.thingUri &&
   left.sourceUri === right.sourceUri &&
   left.origin === right.origin &&
-  left.access === right.access;
+  left.access === right.access &&
+  left.retryAt?.getTime() === right.retryAt?.getTime();
 
 const isWithinContainer = (resourceUri: string, containerUri: string): boolean => {
   try {

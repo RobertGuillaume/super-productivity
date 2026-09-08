@@ -132,7 +132,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
       'SolidContainerAccessService',
       ['check'],
     );
-    containerAccess.check.and.resolveTo('writable');
+    containerAccess.check.and.resolveTo({ state: 'writable' });
     const runtime = {
       auth: { state: () => authState },
       discovery,
@@ -219,7 +219,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
   });
 
   it('does not enable writes from a successful listing without proven access', async () => {
-    containerAccess.check.and.resolveTo('read-only');
+    containerAccess.check.and.resolveTo({ state: 'read-only' });
 
     await TestBed.inject(SolidPodRefreshCoordinatorService).start();
 
@@ -244,7 +244,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
     });
     containerAccess.check.and.callFake(async () => {
       await accessGate;
-      return 'writable';
+      return { state: 'writable' };
     });
 
     const refresh = TestBed.inject(SolidPodRefreshCoordinatorService).start();

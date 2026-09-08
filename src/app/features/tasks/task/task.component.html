@@ -1,7 +1,7 @@
 @let t = task();
 <swipe-block
   [isDone]="t.isDone"
-  [canSwipe]="!isSolidReadOnly() && !taskTitleEditEl?.isEditing()"
+  [canSwipe]="!isSolidMutationBlocked() && !taskTitleEditEl?.isEditing()"
   (swipeStart)="onSwipeStart()"
   (swipeRight)="toggleTaskDone()"
   (swipeRightTriggered)="onSwipeRightTriggered($event)"
@@ -20,7 +20,7 @@
         (click)="titleBarClick($event)"
       >
         <done-toggle
-          [disabled]="isSolidReadOnly()"
+          [disabled]="isSolidMutationBlocked()"
           [isDone]="t.isDone"
           [isCurrent]="isCurrent()"
           [showDoneAnimation]="showDoneAnimation()"
@@ -37,7 +37,7 @@
           }
 
           <task-title
-            [readonly]="isSolidReadOnly()"
+            [readonly]="isSolidMutationBlocked()"
             [resetToLastExternalValueTrigger]="t"
             [style.pointer-events]="isTouchActive() && t.title.length ? 'none' : 'auto'"
             #taskTitleEditEl
@@ -46,11 +46,11 @@
             class="task-title"
           ></task-title>
 
-          @if (isSolidReadOnly()) {
+          @if (solidAccessUi().tooltip; as accessTooltip) {
             <mat-icon
-              [matTooltip]="T.F.TASK.CMP.SOLID_READ_ONLY | translate"
-              [attr.aria-label]="T.F.TASK.CMP.SOLID_READ_ONLY | translate"
-              >lock</mat-icon
+              [matTooltip]="accessTooltip | translate"
+              [attr.aria-label]="accessTooltip | translate"
+              >{{ solidAccessUi().icon }}</mat-icon
             >
           }
 
@@ -68,9 +68,9 @@
           (click)="estimateTime()"
           (keydown.enter)="estimateTime()"
           (keydown.space)="$event.preventDefault(); estimateTime()"
-          [attr.role]="!t.subTasks?.length && !isSolidReadOnly() ? 'button' : null"
-          [attr.tabindex]="!t.subTasks?.length && !isSolidReadOnly() ? 0 : null"
-          [attr.aria-disabled]="isSolidReadOnly()"
+          [attr.role]="!t.subTasks?.length && !isSolidMutationBlocked() ? 'button' : null"
+          [attr.tabindex]="!t.subTasks?.length && !isSolidMutationBlocked() ? 0 : null"
+          [attr.aria-disabled]="isSolidMutationBlocked()"
           [attr.aria-label]="
             !t.subTasks?.length ? (T.F.TASK.CMP.ESTIMATE | translate) : null
           "
@@ -117,7 +117,7 @@
         <div class="controls">
           @if (isFirstLineHover && !isTouchActive()) {
             <task-hover-controls
-              [isReadOnly]="isSolidReadOnly()"
+              [isReadOnly]="isSolidMutationBlocked()"
               [isShowAddToToday]="isShowAddToToday()"
               [isShowRemoveFromToday]="isShowRemoveFromToday()"
               [task]="t"
@@ -139,7 +139,7 @@
           }
           @if (t.remindAt) {
             <button
-              [disabled]="isSolidReadOnly()"
+              [disabled]="isSolidMutationBlocked()"
               (click)="scheduleTask()"
               [title]="T.F.TASK.CMP.EDIT_SCHEDULED | translate"
               [matTooltip]="
@@ -162,7 +162,7 @@
             </button>
           } @else if (t.dueWithTime) {
             <button
-              [disabled]="isSolidReadOnly()"
+              [disabled]="isSolidMutationBlocked()"
               (click)="scheduleTask()"
               [title]="T.F.TASK.CMP.EDIT_SCHEDULED | translate"
               [matTooltip]="
@@ -189,7 +189,7 @@
             </button>
           } @else if (isShowDueDayBtn()) {
             <button
-              [disabled]="isSolidReadOnly()"
+              [disabled]="isSolidMutationBlocked()"
               (click)="scheduleTask()"
               [title]="T.F.TASK.CMP.EDIT_SCHEDULED | translate"
               [matTooltip]="
@@ -229,7 +229,7 @@
           }
           @if (hasDeadline()) {
             <button
-              [disabled]="isSolidReadOnly()"
+              [disabled]="isSolidMutationBlocked()"
               (click)="openDeadlineDialog()"
               [title]="T.F.TASK.ADDITIONAL_INFO.DEADLINE | translate"
               class="ico-btn deadline-btn"
@@ -383,7 +383,7 @@
       @if (moveToProjectList()) {
         @for (project of moveToProjectList(); track trackByProjectId($index, project)) {
           <button
-            [disabled]="isSolidReadOnly()"
+            [disabled]="isSolidMutationBlocked()"
             (click)="moveTaskToProject(project.id)"
             mat-menu-item
           >

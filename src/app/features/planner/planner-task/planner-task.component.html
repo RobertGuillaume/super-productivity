@@ -2,7 +2,7 @@
 
 <swipe-block
   [isDone]="task().isDone"
-  [canSwipe]="!isSolidReadOnly()"
+  [canSwipe]="!isSolidMutationBlocked()"
   (swipeStart)="onSwipeStart()"
   (swipeRight)="toggleTaskDone()"
   (swipeRightTriggered)="onSwipeRightTriggered($event)"
@@ -10,7 +10,7 @@
 >
   <div class="task-content">
     <done-toggle
-      [disabled]="isSolidReadOnly()"
+      [disabled]="isSolidMutationBlocked()"
       [isDone]="task().isDone"
       [isCurrent]="isCurrent()"
       [showDoneAnimation]="showDoneAnimation()"
@@ -46,7 +46,7 @@
         (click)="estimateTimeClick($event)"
         [class.hasNoTimeSpentOrEstimate]="!task().timeSpent && !task().timeEstimate"
         [style.pointer-events]="
-          isSolidReadOnly() || task().subTaskIds?.length ? 'none' : null
+          isSolidMutationBlocked() || task().subTaskIds?.length ? 'none' : null
         "
         class="planner-time-remaining-shared"
       >

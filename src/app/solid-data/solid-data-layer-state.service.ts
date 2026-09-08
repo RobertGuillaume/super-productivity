@@ -23,6 +23,7 @@ import {
   SolidMutationIntentRegistry,
 } from './solid-mutation-intent-registry.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
+import type { SolidAccessState } from './solid-access.model';
 
 export type SolidDataLayerPhase =
   | 'disabled'
@@ -39,12 +40,7 @@ export interface SolidRefreshProgress {
   totalContainers: number;
 }
 
-export type SolidWriteReadiness =
-  | 'unknown'
-  | 'checking'
-  | 'writable'
-  | 'read-only'
-  | 'unavailable';
+export type SolidWriteReadiness = SolidAccessState;
 
 @Injectable({ providedIn: 'root' })
 export class SolidDataLayerStateService {
@@ -174,7 +170,7 @@ export class SolidDataLayerStateService {
 
     if (
       solidActionAffectsAllTasks(action.type) &&
-      this.taskAccess.hasReadOnlyExternalTask()
+      this.taskAccess.hasBlockedExternalTask()
     ) {
       return false;
     }
@@ -190,7 +186,11 @@ export class SolidDataLayerStateService {
   demoteWriteAccessAfterFailure(error: unknown): void {
     const httpStatus = findHttpStatus(error);
     const readiness: SolidWriteReadiness =
-      httpStatus === 401 || httpStatus === 403 ? 'read-only' : 'unavailable';
+      httpStatus === 401 || httpStatus === 403
+        ? 'read-only'
+        : httpStatus === 429
+          ? 'rate-limited'
+          : 'unavailable';
     const affected = this.mutationIntents.forFailure(error)?.containerKeys ?? [];
     this.writeReadiness.update((current) => {
       const next = new Map(current);
