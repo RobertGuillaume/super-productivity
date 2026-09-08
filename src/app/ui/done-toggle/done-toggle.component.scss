@@ -52,6 +52,11 @@ $check-len: 18;
     transform: scale(1.15);
   }
 
+  &.is-disabled {
+    cursor: default;
+    opacity: var(--muted-alpha);
+  }
+
   .done-shape {
     stroke: currentColor;
     stroke-width: 2;

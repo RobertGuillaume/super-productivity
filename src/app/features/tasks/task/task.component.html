@@ -1,7 +1,7 @@
 @let t = task();
 <swipe-block
   [isDone]="t.isDone"
-  [canSwipe]="!taskTitleEditEl?.isEditing()"
+  [canSwipe]="!isSolidReadOnly() && !taskTitleEditEl?.isEditing()"
   (swipeStart)="onSwipeStart()"
   (swipeRight)="toggleTaskDone()"
   (swipeRightTriggered)="onSwipeRightTriggered($event)"
@@ -20,6 +20,7 @@
         (click)="titleBarClick($event)"
       >
         <done-toggle
+          [disabled]="isSolidReadOnly()"
           [isDone]="t.isDone"
           [isCurrent]="isCurrent()"
           [showDoneAnimation]="showDoneAnimation()"
@@ -36,6 +37,7 @@
           }
 
           <task-title
+            [readonly]="isSolidReadOnly()"
             [resetToLastExternalValueTrigger]="t"
             [style.pointer-events]="isTouchActive() && t.title.length ? 'none' : 'auto'"
             #taskTitleEditEl
@@ -43,6 +45,14 @@
             [value]="t.title"
             class="task-title"
           ></task-title>
+
+          @if (isSolidReadOnly()) {
+            <mat-icon
+              [matTooltip]="T.F.TASK.CMP.SOLID_READ_ONLY | translate"
+              [attr.aria-label]="T.F.TASK.CMP.SOLID_READ_ONLY | translate"
+              >lock</mat-icon
+            >
+          }
 
           @if (t.tagIds?.length || t.projectId || t.repeatCfgId || t.issueId) {
             <tag-list
@@ -58,8 +68,9 @@
           (click)="estimateTime()"
           (keydown.enter)="estimateTime()"
           (keydown.space)="$event.preventDefault(); estimateTime()"
-          [attr.role]="!t.subTasks?.length ? 'button' : null"
-          [attr.tabindex]="!t.subTasks?.length ? 0 : null"
+          [attr.role]="!t.subTasks?.length && !isSolidReadOnly() ? 'button' : null"
+          [attr.tabindex]="!t.subTasks?.length && !isSolidReadOnly() ? 0 : null"
+          [attr.aria-disabled]="isSolidReadOnly()"
           [attr.aria-label]="
             !t.subTasks?.length ? (T.F.TASK.CMP.ESTIMATE | translate) : null
           "
@@ -106,6 +117,7 @@
         <div class="controls">
           @if (isFirstLineHover && !isTouchActive()) {
             <task-hover-controls
+              [isReadOnly]="isSolidReadOnly()"
               [isShowAddToToday]="isShowAddToToday()"
               [isShowRemoveFromToday]="isShowRemoveFromToday()"
               [task]="t"
@@ -127,6 +139,7 @@
           }
           @if (t.remindAt) {
             <button
+              [disabled]="isSolidReadOnly()"
               (click)="scheduleTask()"
               [title]="T.F.TASK.CMP.EDIT_SCHEDULED | translate"
               [matTooltip]="
@@ -149,6 +162,7 @@
             </button>
           } @else if (t.dueWithTime) {
             <button
+              [disabled]="isSolidReadOnly()"
               (click)="scheduleTask()"
               [title]="T.F.TASK.CMP.EDIT_SCHEDULED | translate"
               [matTooltip]="
@@ -175,6 +189,7 @@
             </button>
           } @else if (isShowDueDayBtn()) {
             <button
+              [disabled]="isSolidReadOnly()"
               (click)="scheduleTask()"
               [title]="T.F.TASK.CMP.EDIT_SCHEDULED | translate"
               [matTooltip]="
@@ -214,6 +229,7 @@
           }
           @if (hasDeadline()) {
             <button
+              [disabled]="isSolidReadOnly()"
               (click)="openDeadlineDialog()"
               [title]="T.F.TASK.ADDITIONAL_INFO.DEADLINE | translate"
               class="ico-btn deadline-btn"
@@ -367,6 +383,7 @@
       @if (moveToProjectList()) {
         @for (project of moveToProjectList(); track trackByProjectId($index, project)) {
           <button
+            [disabled]="isSolidReadOnly()"
             (click)="moveTaskToProject(project.id)"
             mat-menu-item
           >

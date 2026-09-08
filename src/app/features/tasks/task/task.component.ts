@@ -123,6 +123,7 @@ import {
 } from '../add-subtask-input/add-subtask-input.component';
 import { AddSubtaskInputService } from '../add-subtask-input/add-subtask-input.service';
 import { getSubTaskTimeLeftForDisplay } from '../util/get-sub-task-time-left-for-display';
+import { SolidTaskAccessService } from '../../../solid-data/solid-task-access.service';
 
 @Component({
   selector: 'task',
@@ -141,6 +142,8 @@ import { getSubTaskTimeLeftForDisplay } from '../util/get-sub-task-time-left-for
     '[class.hasNoSubTasks]': 'task().subTaskIds.length === 0',
     '[class.isDragReady]': 'isDragReady()',
     '[class.isOverdue]': 'isOverdue()',
+    '[class.isSolidReadOnly]': 'isSolidReadOnly()',
+    '[attr.aria-readonly]': 'isSolidReadOnly()',
     '(contextmenu)': 'onHostContextMenu($event)',
   },
   imports: [
@@ -191,6 +194,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   private readonly _datePipe = inject(LocaleDatePipe);
   private readonly _plannerService = inject(PlannerService);
   private readonly _addSubtaskInputService = inject(AddSubtaskInputService);
+  private readonly _solidTaskAccess = inject(SolidTaskAccessService);
 
   readonly workContextService = inject(WorkContextService);
   readonly layoutService = inject(LayoutService);
@@ -205,6 +209,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   // Use shared signals from services to avoid creating 600+ subscriptions on initial render
   isCurrent = computed(() => this._taskService.currentTaskId() === this.task().id);
   isSelected = computed(() => this._taskService.selectedTaskId() === this.task().id);
+  isSolidReadOnly = computed(() => this._solidTaskAccess.isReadOnly(this.task().id));
   isShowCloseButton = computed(() => {
     // Only show close button when task is selected AND not on mobile (bottom panel)
     return this.isSelected() && !this.layoutService.isXs();
@@ -555,6 +560,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   scheduleTask(): void {
+    if (this.isSolidReadOnly()) return;
     this._storeNextFocusEl();
     this._matDialog
       .open(DialogScheduleTaskComponent, {
@@ -569,6 +575,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   openDeadlineDialog(): void {
+    if (this.isSolidReadOnly()) return;
     this._storeNextFocusEl();
     this._matDialog
       .open(DialogDeadlineComponent, {
@@ -602,6 +609,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   private async _scheduleForDay(dayDate: Date): Promise<void> {
+    if (this.isSolidReadOnly()) return;
     const day = getDbDateStr(dayDate);
     const task = this.task();
     if (task.dueWithTime) {
@@ -636,6 +644,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   async editTaskRepeatCfg(): Promise<void> {
+    if (this.isSolidReadOnly()) return;
     const { DialogEditTaskRepeatCfgComponent } =
       await import('../../task-repeat-cfg/dialog-edit-task-repeat-cfg/dialog-edit-task-repeat-cfg.component');
     this._matDialog
@@ -650,6 +659,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   deleteTask(isClick: boolean = false): void {
+    if (this.isSolidReadOnly()) return;
     // NOTE: prevents attempts to delete the same task multiple times
     if (this._isTaskDeleteTriggered) {
       return;
@@ -865,6 +875,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
     blurEvent?: FocusEvent;
     submitTrigger: SubmitTrigger;
   }): void {
+    if (this.isSolidReadOnly()) return;
     const task = this.task();
 
     if (wasChanged) {
@@ -891,6 +902,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   openNotesFullscreen(): void {
+    if (this.isSolidReadOnly()) return;
     const task = this.task();
     // Saves-and-closes on a navigation (resize across the mobile breakpoint,
     // Android back) instead of dropping the edit — see openFullscreenMarkdownDialog
@@ -911,6 +923,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   estimateTime(): void {
+    if (this.isSolidReadOnly()) return;
     if (this.task().subTaskIds?.length > 0) {
       return;
     }
@@ -924,6 +937,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   addAttachment(): void {
+    if (this.isSolidReadOnly()) return;
     this._matDialog
       .open(DialogEditTaskAttachmentComponent, {
         data: {},
@@ -938,6 +952,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   addSubTask(): void {
+    if (this.isSolidReadOnly()) return;
     const task = this.task();
     const parentId = task.parentId || task.id;
     if (!task.parentId && task._hideSubTasksMode === HideSubTasksMode.HideAll) {
@@ -1007,6 +1022,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   toggleTaskDone(): void {
+    if (this.isSolidReadOnly()) return;
     window.clearTimeout(this._doneAnimationTimeout);
     this.focusNext(true, true);
     this._doneAnimationTimeout = this._taskService.toggleDoneWithAnimation(
@@ -1088,6 +1104,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   toggleSubTaskMode(): void {
+    if (this.isSolidReadOnly()) return;
     this._taskService.toggleSubTaskMode(this.task().id, true, true);
     this.focusSelf();
   }
@@ -1095,6 +1112,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   isTagMenuVisible = signal(false);
 
   async editTags(): Promise<void> {
+    if (this.isSolidReadOnly()) return;
     this.isTagMenuVisible.set(true);
     setTimeout(() => {
       this.tagToggleMenuList()?.openMenu();
@@ -1102,6 +1120,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   toggleTag(tagId: string): void {
+    if (this.isSolidReadOnly()) return;
     const task = this.task();
     const tagIds = task.tagIds.includes(tagId)
       ? task.tagIds.filter((id) => id !== tagId)
@@ -1111,6 +1130,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   addToMyDay(): void {
+    if (this.isSolidReadOnly()) return;
     const task = this.task();
     this._store.dispatch(
       TaskSharedActions.planTasksForToday({
@@ -1123,6 +1143,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   }
 
   unschedule(): void {
+    if (this.isSolidReadOnly()) return;
     this._store.dispatch(
       TaskSharedActions.unscheduleTask({
         id: this.task().id,

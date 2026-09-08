@@ -93,6 +93,7 @@ import {
 } from '../add-subtask-input/add-subtask-input.component';
 import { findNextTaskAfterSubtree } from '../../../util/find-adjacent-focusable';
 import { TaskContextMenuComponent } from '../task-context-menu/task-context-menu.component';
+import { SolidTaskAccessService } from '../../../solid-data/solid-task-access.service';
 
 @Component({
   selector: 'task-detail-panel',
@@ -146,6 +147,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   private _translateService = inject(TranslateService);
   private _destroyRef = inject(DestroyRef);
   private _dateTimeFormatService = inject(DateTimeFormatService);
+  private readonly _solidTaskAccess = inject(SolidTaskAccessService);
 
   // Exposed so the template can pass the reactive locale to the now-pure
   // `localeDate` pipe, preserving re-render on a locale change.
@@ -153,6 +155,9 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
 
   // Inputs
   task = input.required<TaskWithSubTasks>();
+  readonly isSolidReadOnly = computed(() =>
+    this._solidTaskAccess.isReadOnly(this.task().id),
+  );
   isOver = input<boolean>(false);
   isDialogMode = input<boolean>(false);
 
@@ -610,6 +615,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   changeTaskNotes($event: string): void {
+    if (this.isSolidReadOnly()) return;
     const defaultNotes = this.defaultTaskNotes();
     if (!defaultNotes || !$event || $event.trim() !== defaultNotes.trim()) {
       this.taskService.update(this.task().id, { notes: $event });
@@ -626,12 +632,14 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   estimateTime(): void {
+    if (this.isSolidReadOnly()) return;
     this._matDialog.open(DialogTimeEstimateComponent, {
       data: { task: this.task() },
     });
   }
 
   scheduleTask(): void {
+    if (this.isSolidReadOnly()) return;
     this._matDialog.open(DialogScheduleTaskComponent, {
       autoFocus: false,
       restoreFocus: true,
@@ -640,6 +648,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   openDeadlineDialog(): void {
+    if (this.isSolidReadOnly()) return;
     this._matDialog.open(DialogDeadlineComponent, {
       autoFocus: false,
       restoreFocus: true,
@@ -649,10 +658,12 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
 
   removeDeadline(ev: Event): void {
     ev.stopPropagation();
+    if (this.isSolidReadOnly()) return;
     this._store.dispatch(TaskSharedActions.removeDeadline({ taskId: this.task().id }));
   }
 
   addAttachment(): void {
+    if (this.isSolidReadOnly()) return;
     this._matDialog
       .open(DialogEditTaskAttachmentComponent, {
         data: {},
@@ -668,6 +679,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   addSubTask(): void {
+    if (this.isSolidReadOnly()) return;
     const task = this.task();
     // The sub-task section (and thus the inline input) only renders for a
     // top-level task. On a subtask's own panel "add subtask" means "add a
@@ -743,6 +755,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   editCompleted(): void {
+    if (this.isSolidReadOnly()) return;
     const dialogRef = this._matDialog.open(DialogSelectDateTimeComponent, {
       data: {
         dateTime: this.task().doneOn,
@@ -757,6 +770,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   editCreated(): void {
+    if (this.isSolidReadOnly()) return;
     const dialogRef = this._matDialog.open(DialogSelectDateTimeComponent, {
       data: {
         dateTime: this.task().created,
@@ -829,6 +843,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   updateTaskTitleIfChanged(isChanged: boolean, newTitle: string): void {
+    if (this.isSolidReadOnly()) return;
     if (isChanged) {
       this.taskService.update(this.task().id, { title: newTitle });
     }

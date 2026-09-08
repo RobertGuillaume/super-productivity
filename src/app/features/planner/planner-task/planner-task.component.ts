@@ -30,6 +30,7 @@ import { hasLinkHints, RenderLinksPipe } from '../../../ui/pipes/render-links.pi
 import { DoneToggleComponent } from '../../../ui/done-toggle/done-toggle.component';
 import { SwipeBlockComponent } from '../../../ui/swipe-block/swipe-block.component';
 import { TranslatePipe } from '@ngx-translate/core';
+import { SolidTaskAccessService } from '../../../solid-data/solid-task-access.service';
 
 @Component({
   selector: 'planner-task',
@@ -68,8 +69,12 @@ export class PlannerTaskComponent implements OnInit, OnDestroy, AfterViewInit {
   private _cd = inject(ChangeDetectorRef);
   private _destroyRef = inject(DestroyRef);
   private _elementRef = inject(ElementRef);
+  private readonly _solidTaskAccess = inject(SolidTaskAccessService);
 
   readonly task = input.required<TaskCopy>();
+  readonly isSolidReadOnly = computed(() =>
+    this._solidTaskAccess.isReadOnly(this.task().id),
+  );
 
   readonly titleHasLinks = computed<boolean>(() => {
     const title = this.task().title;
@@ -189,6 +194,7 @@ export class PlannerTaskComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   toggleTaskDone(): void {
+    if (this.isSolidReadOnly()) return;
     window.clearTimeout(this._doneAnimationTimeout);
     const t = this.task();
     this._doneAnimationTimeout = this._taskService.toggleDoneWithAnimation(
@@ -219,6 +225,7 @@ export class PlannerTaskComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   updateTimeEstimate(val: number): void {
+    if (this.isSolidReadOnly()) return;
     this._taskService.update(this.task().id, {
       timeEstimate: val,
     });

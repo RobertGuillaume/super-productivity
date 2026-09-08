@@ -85,10 +85,12 @@ import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidSessionRecoveryService } from './solid-session-recovery.service';
 import { SnackService } from '../core/snack/snack.service';
 import { resetSolidMutationGuard } from './solid-mutation-guard.meta-reducer';
+import { SolidTaskAccessService } from './solid-task-access.service';
 
 describe('SolidDataLayerStateService', () => {
   let authState: AuthState;
   let sessionRecovery: jasmine.SpyObj<SolidSessionRecoveryService>;
+  let taskAccess: jasmine.SpyObj<SolidTaskAccessService>;
 
   beforeEach(() => {
     authState = { status: 'anonymous' };
@@ -96,6 +98,12 @@ describe('SolidDataLayerStateService', () => {
       'SolidSessionRecoveryService',
       ['handleAuthenticationError'],
     );
+    taskAccess = jasmine.createSpyObj<SolidTaskAccessService>('SolidTaskAccessService', [
+      'canMutateTasks',
+      'hasReadOnlyExternalTask',
+    ]);
+    taskAccess.canMutateTasks.and.returnValue(true);
+    taskAccess.hasReadOnlyExternalTask.and.returnValue(false);
 
     TestBed.configureTestingModule({
       providers: [
@@ -110,6 +118,7 @@ describe('SolidDataLayerStateService', () => {
           },
         },
         { provide: SolidSessionRecoveryService, useValue: sessionRecovery },
+        { provide: SolidTaskAccessService, useValue: taskAccess },
         {
           provide: SnackService,
           useValue: jasmine.createSpyObj('SnackService', ['open']),
@@ -148,6 +157,47 @@ describe('SolidDataLayerStateService', () => {
       TestBed.inject(SolidDataLayerStateService).handleAuthenticationError(error),
     ).toBe(true);
     expect(sessionRecovery.handleAuthenticationError).toHaveBeenCalledOnceWith(error);
+  });
+
+  it('blocks a mixed bulk task action when one external task is read-only', () => {
+    localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
+    localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
+    authState = { status: 'authenticated', webId: 'https://user.example/#me' };
+    taskAccess.canMutateTasks.and.callFake(
+      (taskIds) => !taskIds.includes('external-read-only'),
+    );
+    const service = TestBed.inject(SolidDataLayerStateService);
+    for (const container of ['tasks', 'projects', 'tags', 'planner', 'app'] as const) {
+      service.setContainerWriteReady(container, true);
+    }
+    const action = TaskSharedActions.updateTasks({
+      tasks: [
+        { id: 'app-task', changes: { title: 'Saved' } },
+        { id: 'external-read-only', changes: { title: 'Blocked' } },
+      ],
+    }) as PersistentAction;
+
+    expect(service.canApplyPersistentAction(action)).toBe(false);
+    expect(taskAccess.canMutateTasks).toHaveBeenCalledWith([
+      'app-task',
+      'external-read-only',
+    ]);
+  });
+
+  it('blocks actions that implicitly modify all tasks when any external task is read-only', () => {
+    localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
+    localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
+    authState = { status: 'authenticated', webId: 'https://user.example/#me' };
+    taskAccess.hasReadOnlyExternalTask.and.returnValue(true);
+    const service = TestBed.inject(SolidDataLayerStateService);
+    service.setContainerWriteReady('tasks', true);
+    service.setContainerWriteReady('tags', true);
+
+    const action = TaskSharedActions.removeTagsForAllTasks({
+      tagIdsToRemove: ['tag-1'],
+    }) as PersistentAction;
+
+    expect(service.canApplyPersistentAction(action)).toBe(false);
   });
 
   it('keeps Solid ownership while offline and gates application on readiness', () => {

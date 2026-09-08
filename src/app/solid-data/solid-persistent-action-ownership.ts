@@ -24,6 +24,7 @@ import { SOLID_TIME_TRACKING_ACTION_TYPES } from './solid-time-tracking-action-t
 import { SOLID_TODAY_ACTION_TYPES } from './solid-today-action-types';
 import { SOLID_WORK_CONTEXT_MOVE_ACTION_TYPES } from './solid-work-context-action-types';
 import { SOLID_PRODUCTIVITY_LAYOUT } from './solid-productivity-vocab';
+import { PersistentAction } from '../op-log/core/persistent-action.interface';
 
 export type SolidContainerKey = keyof typeof SOLID_PRODUCTIVITY_LAYOUT.containers;
 
@@ -216,6 +217,72 @@ export const solidContainerKeysForActionType = (
 ): readonly SolidContainerKey[] => [
   ...(SOLID_ACTION_CONTAINER_TARGETS.get(actionType) ?? []),
 ];
+
+export const solidTaskIdsForAction = (action: PersistentAction): readonly string[] => {
+  const taskIds = new Set<string>();
+  if (action.meta.entityType === 'TASK') {
+    addString(taskIds, action.meta.entityId);
+    addStrings(taskIds, action.meta.entityIds);
+  }
+
+  const payload = action as unknown as Record<string, unknown>;
+  for (const key of [
+    'taskId',
+    'fromTaskId',
+    'toTaskId',
+    'targetParentId',
+    'parentTaskId',
+  ]) {
+    addString(taskIds, payload[key]);
+  }
+  for (const key of [
+    'taskIds',
+    'allTaskIds',
+    'taskIdsToUnlink',
+    'projectMoveSubTaskIds',
+  ]) {
+    addStrings(taskIds, payload[key]);
+  }
+  addTaskLike(taskIds, payload['task']);
+  addTaskLikes(taskIds, payload['tasks']);
+  addTaskLikes(taskIds, payload['subTasks']);
+
+  return [...taskIds];
+};
+
+export const solidActionAffectsAllTasks = (actionType: string): boolean =>
+  actionType === TaskSharedActions.removeTagsForAllTasks.type ||
+  SOLID_TASK_BATCH_ACTION_TYPES.has(actionType);
+
+const addString = (values: Set<string>, value: unknown): void => {
+  if (typeof value === 'string') {
+    values.add(value);
+  }
+};
+
+const addStrings = (values: Set<string>, value: unknown): void => {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => addString(values, entry));
+  }
+};
+
+const addTaskLike = (values: Set<string>, value: unknown): void => {
+  if (typeof value === 'object' && value !== null && 'id' in value) {
+    addString(values, value.id);
+    if ('subTaskIds' in value) {
+      addStrings(values, value.subTaskIds);
+    }
+    if ('subTasks' in value) {
+      addTaskLikes(values, value.subTasks);
+    }
+  }
+};
+
+const addTaskLikes = (values: Set<string>, value: unknown): void => {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => addTaskLike(values, entry));
+  }
+};
 
 export const classifySolidPersistentActionType = (
   actionType: string,

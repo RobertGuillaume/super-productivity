@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  computed,
   input,
   signal,
   viewChild,
@@ -10,6 +11,7 @@ import {
 import { TranslateModule } from '@ngx-translate/core';
 import { Task, TaskWithSubTasks } from '../task.model';
 import { TaskContextMenuInnerComponent } from './task-context-menu-inner/task-context-menu-inner.component';
+import { SolidTaskAccessService } from '../../../solid-data/solid-task-access.service';
 
 @Component({
   selector: 'task-context-menu',
@@ -19,9 +21,11 @@ import { TaskContextMenuInnerComponent } from './task-context-menu-inner/task-co
 })
 export class TaskContextMenuComponent {
   private _cd = inject(ChangeDetectorRef);
+  private readonly _solidTaskAccess = inject(SolidTaskAccessService);
 
   task = input.required<TaskWithSubTasks | Task>();
   isAdvancedControls = input<boolean>(false);
+  readonly isReadOnly = computed(() => this._solidTaskAccess.isReadOnly(this.task().id));
 
   readonly isOpen = signal(false);
 

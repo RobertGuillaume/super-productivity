@@ -32,6 +32,7 @@ export class TaskHoverControlsComponent {
   isSelected = input.required<boolean>();
   isShowAddToToday = input.required<boolean>();
   isShowRemoveFromToday = input.required<boolean>();
+  isReadOnly = input<boolean>(false);
 
   readonly isTimeTrackingEnabled = computed(() => {
     return this._configService.appFeatures().isTimeTrackingEnabled;

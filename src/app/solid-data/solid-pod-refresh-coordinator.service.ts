@@ -13,6 +13,7 @@ import { SolidContainerKey } from './solid-persistent-action-ownership';
 import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
+import { SolidTaskAccessService } from './solid-task-access.service';
 
 const REFRESH_BATCH_SIZE = 10;
 const MAX_DISCOVERY_CONTINUATIONS = 100;
@@ -26,6 +27,7 @@ export class SolidPodRefreshCoordinatorService {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly hydration = inject(SolidTaskHydrationService);
   private readonly mutations = inject(SolidMutationCoordinator);
+  private readonly taskAccess = inject(SolidTaskAccessService);
 
   private startPromise: Promise<void> | null = null;
   private refreshPromise: Promise<void> | null = null;
@@ -38,6 +40,7 @@ export class SolidPodRefreshCoordinatorService {
   private firstRefreshedEntityLogged = false;
   private rootVerified = false;
   private lastRefreshHadAuthoritativeData = false;
+  private canCheckNativeTaskAccess = false;
 
   constructor() {
     this.dataLayerState.registerMutationRecoveryHandler(() =>
@@ -120,6 +123,7 @@ export class SolidPodRefreshCoordinatorService {
       if (resolution === 'changed') {
         this.stopSubscriptions();
         this.knownContainers.clear();
+        this.taskAccess.clear();
         await this.hydration.reconcileStore();
       }
     } catch (error) {
@@ -145,6 +149,7 @@ export class SolidPodRefreshCoordinatorService {
         if (resolution === 'changed') {
           this.stopSubscriptions();
           this.knownContainers.clear();
+          this.taskAccess.clear();
           this.dataLayerState.clearWriteReadiness();
           await this.hydration.reconcileStore();
           this.installSubscriptions();
@@ -164,6 +169,7 @@ export class SolidPodRefreshCoordinatorService {
     let isDegraded = initiallyDegraded;
     let successfulContainerCount = 0;
     this.lastRefreshHadAuthoritativeData = false;
+    this.canCheckNativeTaskAccess = false;
 
     this.dataLayerState.setRefreshProgress({
       completedContainers: 0,
@@ -205,6 +211,8 @@ export class SolidPodRefreshCoordinatorService {
       await this.solidRuntime.client.discovery.discoverType(SOLID_PRODUCTIVITY_TASK_TYPE);
       isDegraded = (await this.drainDiscoveryQueue()) || isDegraded;
       await this.enqueueReconciliation();
+      this.canCheckNativeTaskAccess = true;
+      await this.taskAccess.refreshExternalPermissions();
     } catch (error) {
       isDegraded = true;
       this.dataLayerState.addDiagnostics();
@@ -333,6 +341,9 @@ export class SolidPodRefreshCoordinatorService {
       this.reconciliationRequested = false;
       await this.mutations.whenIdle();
       await this.hydration.reconcileStore();
+      if (this.canCheckNativeTaskAccess) {
+        await this.taskAccess.refreshExternalPermissions({ unknownOnly: true });
+      }
     }
   }
 }

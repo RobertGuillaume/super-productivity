@@ -14,11 +14,13 @@ import {
   taskToSolidChanges,
   taskToSolidCreateInput,
 } from './solid-task.mapper';
+import { SolidTaskAccessService } from './solid-task-access.service';
 
 @Injectable({ providedIn: 'root' })
 export class SolidTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
+  private readonly taskAccess = inject(SolidTaskAccessService);
   private readonly taskThingUris = new Map<string, string>();
 
   async loadTasks(): Promise<SolidRepositoryRead<Task[]>> {
@@ -175,6 +177,7 @@ export class SolidTaskRepository {
   private rememberTaskThing(thing: Thing): Task {
     const task = solidThingToTask(thing);
     this.taskThingUris.set(task.id, thing.uri);
+    this.taskAccess.registerThing(task.id, thing);
     return task;
   }
 }

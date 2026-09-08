@@ -15,6 +15,7 @@ import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidMutationCoordinator } from './solid-mutation-coordinator.service';
+import { SolidTaskAccessService } from './solid-task-access.service';
 
 describe('SolidPodRefreshCoordinatorService', () => {
   const podRoot = 'https://pod.example/';
@@ -32,6 +33,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
   let runtimeService: jasmine.SpyObj<SolidRuntimeService>;
   let dataLayerState: jasmine.SpyObj<SolidDataLayerStateService>;
   let mutations: jasmine.SpyObj<SolidMutationCoordinator>;
+  let taskAccess: jasmine.SpyObj<SolidTaskAccessService>;
   let authState: AuthState;
   let status: DiscoveryStatus;
 
@@ -80,6 +82,11 @@ describe('SolidPodRefreshCoordinatorService', () => {
       ['whenIdle'],
     );
     mutations.whenIdle.and.resolveTo();
+    taskAccess = jasmine.createSpyObj<SolidTaskAccessService>('SolidTaskAccessService', [
+      'clear',
+      'refreshExternalPermissions',
+    ]);
+    taskAccess.refreshExternalPermissions.and.resolveTo();
     const runtime = {
       auth: { state: () => authState },
       discovery,
@@ -103,6 +110,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
         { provide: SolidTaskHydrationService, useValue: hydration },
         { provide: SolidDataLayerStateService, useValue: dataLayerState },
         { provide: SolidMutationCoordinator, useValue: mutations },
+        { provide: SolidTaskAccessService, useValue: taskAccess },
       ],
     });
   });
@@ -140,6 +148,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
     expect(resourceRefreshes.every((uris) => uris.length <= 10)).toBe(true);
     expect(new Set(resourceRefreshes.flat()).size).toBe(251);
     expect(discovery.discoverType).toHaveBeenCalledOnceWith(SOLID_PRODUCTIVITY_TASK_TYPE);
+    expect(taskAccess.refreshExternalPermissions).toHaveBeenCalled();
     expect(hydration.reconcileStore).toHaveBeenCalled();
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('ready');
   });

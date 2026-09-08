@@ -27,6 +27,7 @@
   >
     <button
       mat-icon-button
+      [disabled]="isReadOnly()"
       tabindex="0"
       (click)="quickAccessBtnClick(1)"
       [matTooltip]="T.F.TASK.D_SCHEDULE_TASK.QA_TODAY | translate"
@@ -37,6 +38,7 @@
 
     <button
       mat-icon-button
+      [disabled]="isReadOnly()"
       tabindex="0"
       (click)="quickAccessBtnClick(2)"
       [matTooltip]="T.F.TASK.D_SCHEDULE_TASK.QA_TOMORROW | translate"
@@ -46,6 +48,7 @@
     </button>
     <button
       mat-icon-button
+      [disabled]="isReadOnly()"
       tabindex="0"
       (click)="quickAccessBtnClick(3)"
       [matTooltip]="T.F.TASK.D_SCHEDULE_TASK.QA_NEXT_WEEK | translate"
@@ -63,6 +66,7 @@
     <!--      </button>-->
     <button
       mat-icon-button
+      [disabled]="isReadOnly()"
       tabindex="0"
       [matTooltip]="
         (task.dueWithTime || task.dueDay
@@ -83,6 +87,7 @@
     @if (task.dueWithTime || task.dueDay) {
       <button
         mat-icon-button
+        [disabled]="isReadOnly()"
         tabindex="0"
         (click)="unscheduleTask()"
         [matTooltip]="T.F.TASK.CMP.UNSCHEDULE_TASK | translate"
@@ -102,6 +107,7 @@
   ) {
     <button
       (click)="startTask()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -119,6 +125,7 @@
   ) {
     <button
       (click)="goToFocusMode()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -137,6 +144,7 @@
   ) {
     <button
       (click)="pauseTask()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -149,6 +157,7 @@
   @if (isTouchActive() || !isAdvancedControls()) {
     <button
       (click)="toggleTaskDone()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -168,6 +177,7 @@
   @if (isAdvancedControls() && !task.isDone && (!task.parentId || isInSubTaskList)) {
     <button
       (click)="moveToTop()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -178,6 +188,7 @@
     </button>
     <button
       (click)="moveToBottom()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -190,6 +201,7 @@
   @if (isAdvancedControls() && !task.parentId && !task.isDone) {
     <button
       (click)="addSubTask()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -229,6 +241,7 @@
   @if (task.issueId && task.issueType !== ICAL_TYPE) {
     <button
       (click)="updateIssueData()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <mat-icon [svgIcon]="task.issueType | issueIcon"></mat-icon>
@@ -244,6 +257,7 @@
   ) {
     <button
       (click)="moveToBacklog()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -262,6 +276,7 @@
   ) {
     <button
       (click)="moveToToday()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <span class="menuItemLeft">
@@ -277,6 +292,7 @@
   @if (!task.subTaskIds.length) {
     <button
       #estimateMenuTrigger="matMenuTrigger"
+      [disabled]="isReadOnly()"
       [matMenuTriggerFor]="estimateMenu"
       mat-menu-item
       [menuTouchFix]="estimateMenuTrigger"
@@ -291,6 +307,7 @@
 
   <button
     #tagMenuTrigger="matMenuTrigger"
+    [disabled]="isReadOnly()"
     [matMenuTriggerFor]="tagMenu"
     mat-menu-item
     [menuTouchFix]="tagMenuTrigger"
@@ -307,6 +324,7 @@
   @if (!task.parentId && ((moveToProjectList$ | async)?.length || 0) > 0) {
     <button
       #projectMenuTrigger="matMenuTrigger"
+      [disabled]="isReadOnly()"
       [matMenuTriggerFor]="projectMenu"
       mat-menu-item
       [menuTouchFix]="projectMenuTrigger"
@@ -327,6 +345,7 @@
   @if (task.parentId) {
     <button
       (click)="convertToMainTask()"
+      [disabled]="isReadOnly()"
       mat-menu-item
     >
       <mat-icon>subdirectory_arrow_left</mat-icon>
@@ -336,6 +355,7 @@
 
   <button
     (click)="deleteTask()"
+    [disabled]="isReadOnly()"
     class="color-warn"
     mat-menu-item
   >
@@ -356,6 +376,7 @@
       <button
         mat-menu-item
         menuTouchFix
+        [disabled]="isReadOnly()"
         (click)="setEstimate(option.ms)"
       >
         @if (option.ms === task.timeEstimate) {
@@ -368,6 +389,7 @@
     <button
       mat-menu-item
       menuTouchFix
+      [disabled]="isReadOnly()"
       (click)="estimateTime()"
     >
       <mat-icon>tune</mat-icon>
@@ -377,6 +399,7 @@
       <button
         mat-menu-item
         menuTouchFix
+        [disabled]="isReadOnly()"
         (click)="setEstimate(0)"
       >
         <mat-icon>clear</mat-icon>
@@ -392,6 +415,7 @@
       @for (project of list; track trackByProjectId($index, project)) {
         <button
           (click)="moveTaskToProject(project.id)"
+          [disabled]="isReadOnly()"
           mat-menu-item
           menuTouchFix
         >
@@ -414,6 +438,7 @@
       @for (tag of toggleTagList(); track tag.id) {
         <button
           (click)="toggleTag(tag.id)"
+          [disabled]="isReadOnly()"
           mat-menu-item
           menuTouchFix
         >

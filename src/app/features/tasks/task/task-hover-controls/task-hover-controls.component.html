@@ -1,6 +1,7 @@
 @if (isTimeTrackingEnabled() && !task().isDone && !task().subTasks?.length) {
   @if (isCurrent()) {
     <button
+      [disabled]="isReadOnly()"
       (click)="parent.pauseTask()"
       title="{{ T.F.TASK.CMP.TRACK_TIME_STOP | translate }} {{
         kb.togglePlay ? '[' + kb.togglePlay + ']' : ''
@@ -13,6 +14,7 @@
     </button>
   } @else {
     <button
+      [disabled]="isReadOnly()"
       (click)="parent.startTask()"
       title="{{ T.F.TASK.CMP.TRACK_TIME | translate }} {{
         kb.togglePlay ? '[' + kb.togglePlay + ']' : ''
@@ -27,6 +29,7 @@
 }
 @if (isShowAddToToday()) {
   <button
+    [disabled]="isReadOnly()"
     (click)="parent.addToMyDay()"
     title="{{ T.F.TASK.CMP.ADD_TO_MY_DAY | translate }} {{
       kb.taskScheduleToday ? '[' + kb.taskScheduleToday + ']' : ''
@@ -40,6 +43,7 @@
 }
 @if (isShowRemoveFromToday()) {
   <button
+    [disabled]="isReadOnly()"
     (click)="parent.unschedule()"
     [title]="T.F.TASK.CMP.REMOVE_FROM_MY_DAY | translate"
     class="ico-btn"

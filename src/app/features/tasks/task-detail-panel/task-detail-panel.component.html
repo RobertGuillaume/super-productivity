@@ -1,11 +1,19 @@
 <div class="wrapper">
   <header class="task-title-wrapper">
     <task-title
+      [readonly]="isSolidReadOnly()"
       [resetToLastExternalValueTrigger]="task()"
       (valueEdited)="updateTaskTitleIfChanged($event.wasChanged, $event.newVal)"
       [value]="task().title || ''"
       class="task-title"
     ></task-title>
+    @if (isSolidReadOnly()) {
+      <mat-icon
+        [matTooltip]="T.F.TASK.CMP.SOLID_READ_ONLY | translate"
+        [attr.aria-label]="T.F.TASK.CMP.SOLID_READ_ONLY | translate"
+        >lock</mat-icon
+      >
+    }
     @if (layoutService.isXs() && !isDialogMode()) {
       <button
         mat-icon-button
@@ -70,6 +78,7 @@
         <div class="add-btn-wrapper">
           <button
             #addSubTaskBtn
+            [disabled]="isSolidReadOnly()"
             (click)="addSubTask()"
             mat-button
           >
@@ -197,6 +206,7 @@
       @if (task().deadlineWithTime || task().deadlineDay) {
         <button
           mat-icon-button
+          [disabled]="isSolidReadOnly()"
           class="quick-chip"
           (click)="removeDeadline($event)"
           [matTooltip]="T.F.TASK.CMP.REMOVE_DEADLINE | translate"
@@ -263,6 +273,7 @@
         (changed)="changeTaskNotes($event); panelState.isFocusNotes.set(false)"
         (keyboardUnToggle)="focusItem(noteWrapperElRef)"
         [isFocus]="panelState.isFocusNotes()"
+        [isLock]="isSolidReadOnly()"
         [isShowControls]="true"
         [isShowChecklistToggle]="true"
         [isDefaultText]="!task().notes"
@@ -303,10 +314,12 @@
           }
           <task-attachment-list
             [attachments]="localAttachments()"
+            [isDisableControls]="isSolidReadOnly()"
             [taskId]="task().id || ''"
           ></task-attachment-list>
           <div class="add-btn-wrapper">
             <button
+              [disabled]="isSolidReadOnly()"
               (click)="addAttachment()"
               [matTooltip]="pasteImageHintKey | translate"
               matTooltipPosition="above"
@@ -343,6 +356,8 @@
     (keyPress)="onItemKeyPress($event)"
     (editActionTriggered)="tagEditElRef.focusInput()"
     type="fullSizeInput"
+    [attr.aria-disabled]="isSolidReadOnly()"
+    [style.pointer-events]="isSolidReadOnly() ? 'none' : null"
     class="input-item --estimate"
   >
     <ng-container input-title>
@@ -361,12 +376,13 @@
   <div class="date-info">
     <div
       class="edit-date-info"
+      [attr.aria-disabled]="isSolidReadOnly()"
+      [attr.tabindex]="isSolidReadOnly() ? -1 : 0"
       [title]="T.G.EDIT | translate"
       (click)="editCreated()"
       (keydown.enter)="editCreated()"
       (keydown.space)="$event.preventDefault(); editCreated()"
       role="button"
-      tabindex="0"
     >
       {{ T.F.TASK.ADDITIONAL_INFO.CREATED_ON | translate }}
       {{ task().created | localeDate: 'short' : undefined : locale() }}
@@ -374,12 +390,13 @@
     @if (task().doneOn) {
       <div
         class="edit-date-info"
+        [attr.aria-disabled]="isSolidReadOnly()"
+        [attr.tabindex]="isSolidReadOnly() ? -1 : 0"
         [title]="T.G.EDIT | translate"
         (click)="editCompleted()"
         (keydown.enter)="editCompleted()"
         (keydown.space)="$event.preventDefault(); editCompleted()"
         role="button"
-        tabindex="0"
       >
         {{ T.F.TASK.ADDITIONAL_INFO.COMPLETED_ON | translate }}
         {{ task().doneOn | localeDate: 'short' : undefined : locale() }}

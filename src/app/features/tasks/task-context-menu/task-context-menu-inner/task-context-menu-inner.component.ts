@@ -133,6 +133,7 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
   readonly DEFAULT_PROJECT_ICON = DEFAULT_PROJECT_ICON;
 
   isAdvancedControls = input<boolean>(false);
+  isReadOnly = input<boolean>(false);
   todayList = toSignal(this._store.select(selectTodayTaskIds), { initialValue: [] });
   isOnTodayList = computed(() => this.task && this.todayList().includes(this.task.id));
   readonly isTimeTrackingEnabled = computed(

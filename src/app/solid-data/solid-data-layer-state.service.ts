@@ -9,12 +9,15 @@ import {
 } from './solid-data-layer-feature-flag';
 import {
   SolidContainerKey,
+  solidActionAffectsAllTasks,
   solidContainerKeysForActionType,
+  solidTaskIdsForAction,
   SOLID_OWNED_PERSISTENT_ACTION_TYPES,
 } from './solid-persistent-action-ownership';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidSessionRecoveryService } from './solid-session-recovery.service';
 import { configureSolidMutationGuard } from './solid-mutation-guard.meta-reducer';
+import { SolidTaskAccessService } from './solid-task-access.service';
 
 export type SolidDataLayerPhase =
   | 'disabled'
@@ -36,6 +39,7 @@ export class SolidDataLayerStateService {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly injector = inject(Injector);
   private readonly snackService = inject(SnackService);
+  private readonly taskAccess = inject(SolidTaskAccessService);
   private blockedMutationWasReported = false;
   private mutationRecoveryHandler: (() => Promise<void>) | null = null;
 
@@ -122,7 +126,17 @@ export class SolidDataLayerStateService {
 
     const targets = solidContainerKeysForActionType(action.type);
     const ready = this.writeReadyContainers();
-    return targets.length > 0 && targets.every((target) => ready.has(target));
+    if (targets.length === 0 || !targets.every((target) => ready.has(target))) {
+      return false;
+    }
+
+    if (
+      solidActionAffectsAllTasks(action.type) &&
+      this.taskAccess.hasReadOnlyExternalTask()
+    ) {
+      return false;
+    }
+    return this.taskAccess.canMutateTasks(solidTaskIdsForAction(action));
   }
 
   handleAuthenticationError(error: unknown): boolean {
