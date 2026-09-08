@@ -36,6 +36,9 @@ import { SolidStorageRootCacheService } from './solid-storage-root-cache.service
 
 const PIM_STORAGE = 'http://www.w3.org/ns/pim/space#storage';
 const LDP_BASIC_CONTAINER = 'http://www.w3.org/ns/ldp#BasicContainer';
+const SOLID_TERMS = 'http://www.w3.org/ns/solid/terms#';
+const PUBLIC_TYPE_INDEX = `${SOLID_TERMS}publicTypeIndex`;
+const PRIVATE_TYPE_INDEX = `${SOLID_TERMS}privateTypeIndex`;
 
 export type SolidStorageRootResolution = 'unchanged' | 'changed' | 'unavailable';
 
@@ -45,6 +48,7 @@ export class SolidRuntimeService {
   private readonly storageRootCache = inject(SolidStorageRootCacheService);
   private layout: RuntimeLayout | null = null;
   private layoutPodUrl: string | null = null;
+  private verifiedTypeIndexUris: readonly string[] | null = null;
 
   get client(): SolidRuntime {
     return this.runtime;
@@ -131,6 +135,7 @@ export class SolidRuntimeService {
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
+    this.verifiedTypeIndexUris = null;
     this.clearLayout();
     await this.runtime.boot(options);
     this.clearLayout();
@@ -138,6 +143,7 @@ export class SolidRuntimeService {
   }
 
   async restoreSession(options: AuthSessionOptions = {}): Promise<AuthState> {
+    this.verifiedTypeIndexUris = null;
     this.clearLayout();
     const state = await this.runtime.auth.restoreSession({
       clientName: 'Super Productivity',
@@ -172,7 +178,12 @@ export class SolidRuntimeService {
 
   async logout(): Promise<void> {
     await this.runtime.auth.logout();
+    this.verifiedTypeIndexUris = null;
     this.clearLayout();
+  }
+
+  getVerifiedTypeIndexUris(): readonly string[] | null {
+    return this.verifiedTypeIndexUris;
   }
 
   ensureLayout(): RuntimeLayout {
@@ -269,12 +280,24 @@ export class SolidRuntimeService {
         fetch: this.runtime.auth.fetch(),
       });
       const profileThing = getThing(profileDataset, webId);
+      this.verifiedTypeIndexUris =
+        profileThing === null
+          ? []
+          : Array.from(
+              new Set(
+                [
+                  ...getUrlAll(profileThing, PUBLIC_TYPE_INDEX),
+                  ...getUrlAll(profileThing, PRIVATE_TYPE_INDEX),
+                ].filter(isHttpUri),
+              ),
+            );
       const storageRoots =
         profileThing === null ? [] : getUrlAll(profileThing, PIM_STORAGE);
       const storageRoot = storageRoots[0];
 
       return storageRoot === undefined ? null : normalizeContainerUrl(storageRoot);
     } catch (error) {
+      this.verifiedTypeIndexUris = null;
       Log.err('SolidRuntimeService: Failed to discover Solid storage root', {
         name: error instanceof Error ? error.name : 'UnknownError',
       });
@@ -285,6 +308,15 @@ export class SolidRuntimeService {
 
 const normalizeContainerUrl = (uri: string): string =>
   uri.endsWith('/') ? uri : `${uri}/`;
+
+const isHttpUri = (uri: string): boolean => {
+  try {
+    const parsed = new URL(uri);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 const collectContainerUris = (podUrl: string, appContainerUris: string[]): string[] => {
   const rootUrl = new URL(podUrl);

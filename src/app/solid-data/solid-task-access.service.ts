@@ -1,7 +1,9 @@
 import { inject, Injectable, signal } from '@angular/core';
 import type { Thing } from '@solid-intents/runtime';
-import { Log } from '../core/log';
+import { SolidContainerAccessService } from './solid-container-access.service';
 import { SolidRuntimeService } from './solid-runtime.service';
+
+const ACCESS_CHECK_BATCH_SIZE = 2;
 
 export type SolidTaskAccess = 'writable' | 'read-only' | 'unknown';
 export type SolidTaskOrigin = 'app' | 'external';
@@ -18,6 +20,7 @@ export interface SolidTaskCapability {
 @Injectable({ providedIn: 'root' })
 export class SolidTaskAccessService {
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly containerAccess = inject(SolidContainerAccessService);
   private readonly capabilitiesSignal = signal<ReadonlyMap<string, SolidTaskCapability>>(
     new Map(),
   );
@@ -100,40 +103,31 @@ export class SolidTaskAccessService {
           .map((capability) => capability.sourceUri),
       ),
     );
-    await Promise.allSettled(
-      sourceUris.map((sourceUri) => this.refreshSourcePermission(sourceUri, auth.webId)),
-    );
+    for (let index = 0; index < sourceUris.length; index += ACCESS_CHECK_BATCH_SIZE) {
+      await Promise.allSettled(
+        sourceUris
+          .slice(index, index + ACCESS_CHECK_BATCH_SIZE)
+          .map((sourceUri) => this.refreshSourcePermission(sourceUri)),
+      );
+    }
   }
 
-  private refreshSourcePermission(sourceUri: string, webId: string): Promise<void> {
+  private refreshSourcePermission(sourceUri: string): Promise<void> {
     const pending = this.pendingPermissionChecks.get(sourceUri);
     if (pending !== undefined) {
       return pending;
     }
 
-    const check = this.readSourcePermission(sourceUri, webId).finally(() => {
+    const check = this.readSourcePermission(sourceUri).finally(() => {
       this.pendingPermissionChecks.delete(sourceUri);
     });
     this.pendingPermissionChecks.set(sourceUri, check);
     return check;
   }
 
-  private async readSourcePermission(sourceUri: string, webId: string): Promise<void> {
-    let access: SolidTaskAccess = 'read-only';
-    try {
-      const permissions = await this.solidRuntime.client.share.permissions(sourceUri);
-      access = permissions.some(
-        (permission) => permission.agent === webId && permission.write === true,
-      )
-        ? 'writable'
-        : 'read-only';
-    } catch (error) {
-      Log.err('Solid native task permission check failed', {
-        operation: 'read-permissions',
-        errorName: error instanceof Error ? error.name : 'UnknownError',
-      });
-    }
-    this.setSourceAccess(sourceUri, access);
+  private async readSourcePermission(sourceUri: string): Promise<void> {
+    const readiness = await this.containerAccess.check(sourceUri);
+    this.setSourceAccess(sourceUri, readiness === 'writable' ? 'writable' : 'read-only');
   }
 
   private setSourceAccess(sourceUri: string, access: SolidTaskAccess): void {

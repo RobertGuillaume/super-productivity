@@ -6,11 +6,14 @@ import { SolidTaskAccessService } from './solid-task-access.service';
 describe('SolidTaskAccessService', () => {
   const webId = 'https://pod.example/profile/card#me';
   let authState: ReturnType<SolidRuntime['auth']['state']>;
+  let authenticatedFetch: jasmine.Spy;
   let permissions: jasmine.Spy;
   let service: SolidTaskAccessService;
 
   beforeEach(() => {
     authState = { status: 'authenticated', webId };
+    authenticatedFetch = jasmine.createSpy('authenticatedFetch');
+    authenticatedFetch.and.resolveTo(response(200));
     permissions = jasmine.createSpy('permissions');
     TestBed.configureTestingModule({
       providers: [
@@ -23,7 +26,10 @@ describe('SolidTaskAccessService', () => {
               },
             },
             client: {
-              auth: { state: () => authState },
+              auth: {
+                state: () => authState,
+                fetch: () => authenticatedFetch,
+              },
               share: { permissions },
             },
           },
@@ -56,6 +62,26 @@ describe('SolidTaskAccessService', () => {
     await service.refreshExternalPermissions();
 
     expect(service.isReadOnly('external-task')).toBe(false);
+  });
+
+  it('uses an effective WAC-Allow response for an external task resource', async () => {
+    authenticatedFetch.and.resolveTo(
+      response(200, new Headers([['WAC-Allow', 'user="read write"']])),
+    );
+    permissions.and.resolveTo([]);
+    service.registerThing(
+      'external-task',
+      thing('https://pod.example/calendar/tasks.ttl#todo-1'),
+    );
+
+    await service.refreshExternalPermissions();
+
+    expect(service.isReadOnly('external-task')).toBe(false);
+    expect(authenticatedFetch).toHaveBeenCalledOnceWith(
+      'https://pod.example/calendar/tasks.ttl',
+      { method: 'HEAD' },
+    );
+    expect(permissions).not.toHaveBeenCalled();
   });
 
   it('keeps explicit read-only, empty, and unrelated permissions read-only', async () => {
@@ -120,3 +146,6 @@ const thing = (uri: string): Thing => ({
   objects: (): readonly string[] => [],
   as: <View>(_view: ThingView<View>): View => ({}) as View,
 });
+
+const response = (status: number, headers?: HeadersInit): Response =>
+  new Response(null, { status, headers });

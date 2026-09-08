@@ -1,7 +1,6 @@
 import { DestroyRef, inject, Injectable } from '@angular/core';
 import type {
   ContainerListing,
-  DiscoveryStatus,
   RuntimeLayout,
   Unsubscribe,
 } from '@solid-intents/runtime';
@@ -10,20 +9,20 @@ import { isSolidDataLayerPrimaryEnabled } from './solid-data-layer-feature-flag'
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidMutationCoordinator } from './solid-mutation-coordinator.service';
 import { SolidContainerKey } from './solid-persistent-action-ownership';
-import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
 import { SolidContainerAccessService } from './solid-container-access.service';
+import { SolidNativeTaskIndexService } from './solid-native-task-index.service';
 import {
   SolidMutationIntentContext,
   SolidMutationIntentRegistry,
 } from './solid-mutation-intent-registry.service';
 
 const REFRESH_BATCH_SIZE = 10;
-const MAX_DISCOVERY_CONTINUATIONS = 100;
+const ACCESS_CHECK_BATCH_SIZE = 2;
 const OUT_OF_BAND_RECONCILIATION_DEBOUNCE_MS = 100;
 const PRIORITY_CONTAINER_KEYS = ['tasks', 'projects', 'tags', 'app', 'config'] as const;
 
@@ -39,6 +38,7 @@ export class SolidPodRefreshCoordinatorService {
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly identities = inject(SolidThingIdentityRegistry);
   private readonly containerAccess = inject(SolidContainerAccessService);
+  private readonly nativeTaskIndex = inject(SolidNativeTaskIndexService);
   private readonly mutationIntents = inject(SolidMutationIntentRegistry);
 
   private startPromise: Promise<void> | null = null;
@@ -266,6 +266,7 @@ export class SolidPodRefreshCoordinatorService {
     const containers = orderedContainers(this.solidRuntime.ensureLayout());
     let isDegraded = initiallyDegraded;
     let successfulContainerCount = 0;
+    const accessCandidates: Array<[SolidContainerKey, string]> = [];
     this.lastRefreshHadAuthoritativeData = false;
     this.canCheckNativeTaskAccess = false;
 
@@ -286,9 +287,7 @@ export class SolidPodRefreshCoordinatorService {
           await this.refreshListingResources(listing);
           successfulContainerCount++;
           this.dataLayerState.setContainerReadiness(containerKey, 'checking');
-          const readiness = await this.containerAccess.check(containerUri);
-          this.dataLayerState.setContainerReadiness(containerKey, readiness);
-          isDegraded = readiness !== 'writable' || isDegraded;
+          accessCandidates.push([containerKey, containerUri]);
         } else {
           isDegraded = true;
           this.dataLayerState.setContainerReadiness(containerKey, 'unavailable');
@@ -317,16 +316,51 @@ export class SolidPodRefreshCoordinatorService {
     }
 
     try {
-      await this.solidRuntime.client.discovery.discoverType(SOLID_PRODUCTIVITY_TASK_TYPE);
-      await this.enqueueReconciliation();
-      isDegraded = (await this.drainDiscoveryQueue()) || isDegraded;
+      const nativeTargets = await this.nativeTaskIndex.readTargets();
+      if (nativeTargets.diagnosticCount > 0) {
+        isDegraded = true;
+        this.dataLayerState.addDiagnostics();
+      }
+      const appContainerUris = containers.map(([, containerUri]) => containerUri);
+      await this.refreshNativeTaskResources(
+        nativeTargets.resourceUris.filter(
+          (resourceUri) =>
+            !appContainerUris.some((containerUri) =>
+              isWithinContainer(resourceUri, containerUri),
+            ),
+        ),
+      );
+      for (const containerUri of nativeTargets.containerUris) {
+        if (appContainerUris.includes(containerUri)) {
+          continue;
+        }
+        const listing =
+          await this.solidRuntime.client.storage.listContainer(containerUri);
+        if (listing.status !== 'ok' && listing.status !== 'not-modified') {
+          isDegraded = true;
+          this.dataLayerState.addDiagnostics();
+          Log.err('Solid native task container unavailable', {
+            operation: 'list-native-task-container',
+            status: listing.status,
+            httpStatus: listing.httpStatus,
+          });
+          continue;
+        }
+        await this.refreshListingResources(listing);
+      }
       this.canCheckNativeTaskAccess = true;
       await this.taskAccess.refreshExternalPermissions();
     } catch (error) {
       isDegraded = true;
       this.dataLayerState.addDiagnostics();
-      Log.err('Solid native task discovery failed', safeError('discover-type', error));
+      Log.err(
+        'Solid native task discovery failed',
+        safeError('refresh-indexed-native-tasks', error),
+      );
     }
+
+    isDegraded =
+      (await this.refreshContainerAccess(accessCandidates, generation)) || isDegraded;
 
     if (generation !== this.lifecycleGeneration) {
       return;
@@ -468,37 +502,53 @@ export class SolidPodRefreshCoordinatorService {
     }
   }
 
-  /** Returns true when discovery stopped before reaching a settled state. */
-  private async drainDiscoveryQueue(): Promise<boolean> {
-    const discovery = this.solidRuntime.client.discovery;
-
-    for (let run = 0; run < MAX_DISCOVERY_CONTINUATIONS; run++) {
-      const before = discovery.status();
-      if (isDiscoverySettled(before)) {
-        return false;
+  private async refreshNativeTaskResources(
+    resourceUris: readonly string[],
+  ): Promise<void> {
+    const uniqueUris = Array.from(new Set(resourceUris));
+    for (let index = 0; index < uniqueUris.length; index += REFRESH_BATCH_SIZE) {
+      const batch = uniqueUris.slice(index, index + REFRESH_BATCH_SIZE);
+      await this.solidRuntime.client.discovery.refresh({ uris: batch });
+      if (!this.firstRefreshedEntityLogged) {
+        this.firstRefreshedEntityLogged = true;
+        Log.normal('Solid Pod first catalog resource refreshed');
       }
-      if (before.state === 'paused' || before.state === 'cancelled') {
-        return true;
-      }
-
-      await discovery.refresh();
-      const after = discovery.status();
-      if (after.completedJobs > before.completedJobs) {
-        await this.enqueueReconciliation();
-      }
-      if (isDiscoverySettled(after)) {
-        return false;
-      }
-      if (
-        after.completedJobs === before.completedJobs &&
-        after.queuedJobs === before.queuedJobs &&
-        after.inFlightJobs === before.inFlightJobs
-      ) {
-        return true;
-      }
+      await this.enqueueReconciliation();
     }
+  }
 
-    return true;
+  private async refreshContainerAccess(
+    candidates: ReadonlyArray<readonly [SolidContainerKey, string]>,
+    generation: number,
+  ): Promise<boolean> {
+    let isDegraded = false;
+    for (let index = 0; index < candidates.length; index += ACCESS_CHECK_BATCH_SIZE) {
+      const batch = candidates.slice(index, index + ACCESS_CHECK_BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(async ([containerKey, containerUri]) => ({
+          containerKey,
+          readiness: await this.containerAccess.check(containerUri),
+        })),
+      );
+      if (generation !== this.lifecycleGeneration) {
+        return true;
+      }
+      results.forEach((result, resultIndex) => {
+        const containerKey = batch[resultIndex][0];
+        const readiness =
+          result.status === 'fulfilled' ? result.value.readiness : 'unavailable';
+        this.dataLayerState.setContainerReadiness(containerKey, readiness);
+        isDegraded = readiness !== 'writable' || isDegraded;
+        if (result.status === 'rejected') {
+          this.dataLayerState.addDiagnostics();
+          Log.err(
+            'Solid container access check failed',
+            safeError('check-container-access', result.reason),
+          );
+        }
+      });
+    }
+    return isDegraded;
   }
 
   private installSubscriptions(): void {
@@ -597,8 +647,20 @@ const containerKeysForPersistenceSource = (source: string): SolidContainerKey[] 
   return matches.find(([needle]) => normalized.includes(needle))?.[1] ?? [];
 };
 
-const isDiscoverySettled = (status: DiscoveryStatus): boolean =>
-  status.queuedJobs === 0 && status.inFlightJobs === 0;
+const isWithinContainer = (resourceUri: string, containerUri: string): boolean => {
+  try {
+    const resource = new URL(resourceUri);
+    const container = new URL(containerUri);
+    const containerPath = container.pathname.endsWith('/')
+      ? container.pathname
+      : `${container.pathname}/`;
+    return (
+      resource.origin === container.origin && resource.pathname.startsWith(containerPath)
+    );
+  } catch {
+    return false;
+  }
+};
 
 const safeError = (
   operation: string,

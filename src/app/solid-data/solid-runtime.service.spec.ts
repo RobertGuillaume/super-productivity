@@ -30,6 +30,7 @@ describe('SolidRuntimeService', () => {
   const authenticatedWebId = 'https://id.example/profile/card#me';
   const runtimeResolvedPodUrl = 'https://id.example/';
   const discoveredStorageRoot = 'https://pod.example/';
+  const publicTypeIndex = 'https://id.example/settings/publicTypeIndex.ttl';
 
   beforeEach(() => {
     localStorage.removeItem(SOLID_STORAGE_ROOT_CACHE_KEY);
@@ -84,6 +85,7 @@ describe('SolidRuntimeService', () => {
     expect(service.taskProfile.target?.containerUri).toBe(
       'https://pod.example/super-productivity/tasks/',
     );
+    expect(service.getVerifiedTypeIndexUris()).toBeNull();
   });
 
   it('discovers and activates the WebID storage root after session restore', async () => {
@@ -99,6 +101,7 @@ describe('SolidRuntimeService', () => {
     expect(service.taskProfile.target?.containerUri).toBe(
       'https://id.example/super-productivity/tasks/',
     );
+    expect(service.getVerifiedTypeIndexUris()).toBeNull();
     await expectAsync(service.resolveAuthenticatedStorageRoot()).toBeResolvedTo(
       'changed',
     );
@@ -106,6 +109,7 @@ describe('SolidRuntimeService', () => {
     expect(service.taskProfile.target?.containerUri).toBe(
       'https://pod.example/super-productivity/tasks/',
     );
+    expect(service.getVerifiedTypeIndexUris()).toEqual([publicTypeIndex]);
   });
 
   it('keeps the booted catalog available when the storage profile cannot be read', async () => {
@@ -119,6 +123,7 @@ describe('SolidRuntimeService', () => {
     expect(service.taskProfile.target?.containerUri).toBe(
       'https://id.example/super-productivity/tasks/',
     );
+    expect(service.getVerifiedTypeIndexUris()).toBeNull();
   });
 
   it('does not block boot restore on WebID profile discovery', async () => {
@@ -417,7 +422,9 @@ describe('SolidRuntimeService', () => {
 
     return new Response(
       `@prefix pim: <http://www.w3.org/ns/pim/space#> .
-<${authenticatedWebId}> pim:storage <${discoveredStorageRoot}> .`,
+@prefix solid: <http://www.w3.org/ns/solid/terms#> .
+<${authenticatedWebId}> pim:storage <${discoveredStorageRoot}>;
+  solid:publicTypeIndex <${publicTypeIndex}> .`,
       {
         headers: new Headers([['Content-Type', 'text/turtle']]),
       },

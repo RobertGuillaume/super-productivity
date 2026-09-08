@@ -11,7 +11,6 @@ import {
 } from './solid-data-layer-feature-flag';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidPodRefreshCoordinatorService } from './solid-pod-refresh-coordinator.service';
-import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidMutationCoordinator } from './solid-mutation-coordinator.service';
@@ -19,6 +18,7 @@ import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
 import { SolidContainerAccessService } from './solid-container-access.service';
+import { SolidNativeTaskIndexService } from './solid-native-task-index.service';
 import { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import { EntityType, OpType } from '../op-log/core/operation.types';
@@ -36,6 +36,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
   };
   let discovery: jasmine.SpyObj<SolidRuntime['discovery']>;
   let storage: jasmine.SpyObj<SolidRuntime['storage']>;
+  let nativeTaskIndex: jasmine.SpyObj<SolidNativeTaskIndexService>;
   let hydration: jasmine.SpyObj<SolidTaskHydrationService>;
   let runtimeService: jasmine.SpyObj<SolidRuntimeService>;
   let dataLayerState: jasmine.SpyObj<SolidDataLayerStateService>;
@@ -69,6 +70,15 @@ describe('SolidPodRefreshCoordinatorService', () => {
     discovery.discoverType.and.resolveTo();
     discovery.status.and.callFake(() => status);
     discovery.subscribe.and.returnValue(() => undefined);
+    nativeTaskIndex = jasmine.createSpyObj<SolidNativeTaskIndexService>(
+      'SolidNativeTaskIndexService',
+      ['readTargets'],
+    );
+    nativeTaskIndex.readTargets.and.resolveTo({
+      resourceUris: [],
+      containerUris: [],
+      diagnosticCount: 0,
+    });
     storage = jasmine.createSpyObj('storage', ['listContainer']);
     storage.listContainer.and.callFake(async (uri: string) => containerListing(uri));
     hydration = jasmine.createSpyObj<SolidTaskHydrationService>(
@@ -162,6 +172,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
         { provide: SolidCatalogAuthorityService, useValue: catalogAuthority },
         { provide: SolidThingIdentityRegistry, useValue: identities },
         { provide: SolidContainerAccessService, useValue: containerAccess },
+        { provide: SolidNativeTaskIndexService, useValue: nativeTaskIndex },
       ],
     });
   });
@@ -201,9 +212,9 @@ describe('SolidPodRefreshCoordinatorService', () => {
     expect(resourceRefreshes.length).toBe(26);
     expect(resourceRefreshes.every((uris) => uris.length <= 10)).toBe(true);
     expect(new Set(resourceRefreshes.flat()).size).toBe(251);
-    expect(discovery.discoverType).toHaveBeenCalledOnceWith(SOLID_PRODUCTIVITY_TASK_TYPE);
+    expect(discovery.discoverType).not.toHaveBeenCalled();
     expect(taskAccess.refreshExternalPermissions).toHaveBeenCalled();
-    expect(hydration.reconcileStore).toHaveBeenCalledTimes(32);
+    expect(hydration.reconcileStore).toHaveBeenCalledTimes(31);
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('ready');
   });
 
@@ -224,6 +235,40 @@ describe('SolidPodRefreshCoordinatorService', () => {
       'tasks',
       'read-only',
     );
+  });
+
+  it('publishes every app container before waiting for access checks', async () => {
+    let releaseAccess!: () => void;
+    const accessGate = new Promise<void>((resolve) => {
+      releaseAccess = resolve;
+    });
+    containerAccess.check.and.callFake(async () => {
+      await accessGate;
+      return 'writable';
+    });
+
+    const refresh = TestBed.inject(SolidPodRefreshCoordinatorService).start();
+    const containerCount = Object.keys(containers).length;
+    for (let turn = 0; turn < containerCount * 20; turn++) {
+      await Promise.resolve();
+    }
+    const listedBeforeAccessSettled = storage.listContainer.calls.count();
+    const reconciledBeforeAccessSettled = hydration.reconcileStore.calls.count();
+    const accessChecksBeforeSettled = containerAccess.check.calls.count();
+    releaseAccess();
+    await refresh;
+
+    expect(listedBeforeAccessSettled).toBe(containerCount);
+    expect(reconciledBeforeAccessSettled).toBeGreaterThanOrEqual(containerCount);
+    expect(accessChecksBeforeSettled).toBe(2);
+  });
+
+  it('does not start the runtime storage-root fallback without indexed VTODO targets', async () => {
+    await TestBed.inject(SolidPodRefreshCoordinatorService).start();
+
+    expect(nativeTaskIndex.readTargets).toHaveBeenCalledTimes(1);
+    expect(discovery.discoverType).not.toHaveBeenCalled();
+    expect(taskAccess.refreshExternalPermissions).toHaveBeenCalled();
   });
 
   it('creates a missing app container before refreshing it', async () => {
@@ -264,6 +309,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
     expect(storage.listContainer).not.toHaveBeenCalled();
     expect(runtimeService.ensureAppContainer).not.toHaveBeenCalled();
     expect(discovery.subscribe).not.toHaveBeenCalled();
+    expect(nativeTaskIndex.readTargets).not.toHaveBeenCalled();
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('degraded');
   });
 
