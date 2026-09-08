@@ -15,7 +15,6 @@ import {
 } from '../features/tasks/task.model';
 import {
   ICAL_TASK,
-  ICAL_VTODO_CATALOG_TYPE,
   SCHEMA_THING,
   SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
   SOLID_PRODUCTIVITY_TASKS_CONTAINER,
@@ -220,11 +219,7 @@ export const solidThingToTask = (thing: Thing): Task => {
 };
 
 export const solidTaskQuery = {
-  type: [
-    SOLID_PRODUCTIVITY_TASK_TYPE,
-    SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
-    ICAL_VTODO_CATALOG_TYPE,
-  ],
+  type: [SOLID_PRODUCTIVITY_TASK_TYPE, SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE],
 } as const;
 
 const nonEmptyString = (value: string | undefined): string | undefined =>

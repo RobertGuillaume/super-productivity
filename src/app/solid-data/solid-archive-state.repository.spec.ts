@@ -140,7 +140,7 @@ describe('SolidArchiveStateRepository', () => {
     };
     const updatedThing = createThing(updatedArchiveState);
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {

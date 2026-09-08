@@ -137,7 +137,7 @@ describe('SolidIssueProviderRepository', () => {
     const existingThing = createThing(issueProvider, 0);
     const updatedThing = createThing({ ...issueProvider, isEnabled: false }, 0);
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {

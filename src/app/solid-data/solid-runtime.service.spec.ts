@@ -337,6 +337,7 @@ describe('SolidRuntimeService', () => {
           typeIndexWrites: {
             recent: [],
           },
+          requestScheduling: [],
         }),
         typeIndexes: async () => ({
           available: false,

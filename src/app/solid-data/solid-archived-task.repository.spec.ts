@@ -124,7 +124,7 @@ describe('SolidArchivedTaskRepository', () => {
     const existingThing = createThing(task.title, 'young');
     const updatedThing = createThing('Updated archive title', 'young');
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {

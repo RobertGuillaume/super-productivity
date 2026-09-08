@@ -11,7 +11,6 @@ import { INBOX_PROJECT } from '../features/project/project.const';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import {
   ICAL_TASK,
-  ICAL_VTODO_CATALOG_TYPE,
   SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
   SOLID_PRODUCTIVITY_TASK_TYPE,
   SP_TASK,
@@ -97,7 +96,7 @@ describe('SolidTaskRepository', () => {
       properties: {
         [ICAL_TASK.summary]: [literal('Task from another Pod container')],
       },
-      types: [ICAL_VTODO_CATALOG_TYPE],
+      types: [SOLID_PRODUCTIVITY_TASK_TYPE],
     });
     things.query.and.resolveTo({ things: [externalThing] });
 
@@ -107,11 +106,7 @@ describe('SolidTaskRepository', () => {
     expect(discovery.refresh).not.toHaveBeenCalled();
     expect(things.query).toHaveBeenCalledOnceWith(
       {
-        type: [
-          SOLID_PRODUCTIVITY_TASK_TYPE,
-          SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
-          ICAL_VTODO_CATALOG_TYPE,
-        ],
+        type: [SOLID_PRODUCTIVITY_TASK_TYPE, SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE],
       },
       {
         scope: { kind: 'runtime-graph' },
@@ -144,7 +139,7 @@ describe('SolidTaskRepository', () => {
     const existingThing = createThing(task.title);
     const updatedThing = createThing('Updated title');
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -193,7 +188,7 @@ describe('SolidTaskRepository', () => {
       },
     });
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-complete',
       kind: 'thing.update',
       request: {
@@ -229,7 +224,7 @@ describe('SolidTaskRepository', () => {
   it('updates the deterministic app Thing URI without treating an incomplete query as absence', async () => {
     const updatedThing = createThing('Updated without a lookup');
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-direct-update',
       kind: 'thing.update',
       request: {
@@ -292,7 +287,7 @@ describe('SolidTaskRepository', () => {
       },
     });
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-overlap',
       kind: 'thing.update',
       request: {
@@ -350,7 +345,7 @@ describe('SolidTaskRepository', () => {
       types: ['Task'],
     });
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-external',
       kind: 'thing.update',
       request: {

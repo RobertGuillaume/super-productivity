@@ -5,10 +5,6 @@ export const SOLID_PRODUCTIVITY_TASK_TYPE = 'Task';
 export const SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE = 'SuperProductivityTask';
 export const SOLID_PRODUCTIVITY_LEGACY_TASK_CLASS = `${SOLID_PRODUCTIVITY_NS}Task`;
 export const ICAL_VTODO_CLASS = 'http://www.w3.org/2002/12/cal/ical#Vtodo';
-// The runtime currently catalogs RDF classes discovered outside a managed write
-// profile by their URI-local name. Keep this query alias until it applies the layout
-// vocabulary's runtime type to discovered RDF Things.
-export const ICAL_VTODO_CATALOG_TYPE = 'Vtodo';
 export const ICAL_TASK = {
   summary: 'http://www.w3.org/2002/12/cal/ical#summary',
   due: 'http://www.w3.org/2002/12/cal/ical#due',

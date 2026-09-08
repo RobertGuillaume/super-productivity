@@ -123,7 +123,7 @@ describe('SolidSectionRepository', () => {
     const existingThing = createThing(section.title);
     const updatedThing = createThing('Updated section title');
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {

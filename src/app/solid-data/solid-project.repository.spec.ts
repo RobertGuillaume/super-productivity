@@ -76,7 +76,7 @@ describe('SolidProjectRepository', () => {
     const existingThing = createThing(project.title);
     const updatedThing = createThing('Updated project title');
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -118,7 +118,7 @@ describe('SolidProjectRepository', () => {
     const createdThing = createThing(project.title);
     const updatedThing = createThing('Edited immediately');
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-overlap',
       kind: 'thing.update',
       request: {

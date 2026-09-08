@@ -136,7 +136,7 @@ describe('SolidTimeTrackingRepository', () => {
     };
     const updatedThing = createThing(updatedEntry);
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
@@ -185,7 +185,7 @@ describe('SolidTimeTrackingRepository', () => {
     const existingThing = createThing(entry);
     const staleThing = createThing(staleEntry);
     const plan = {
-      version: 1,
+      version: 2,
       id: 'write-plan-1',
       kind: 'thing.update',
       request: {
