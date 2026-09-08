@@ -47,8 +47,9 @@ describe('SolidDataLayerPanelComponent', () => {
     );
     refreshCoordinator = jasmine.createSpyObj<SolidPodRefreshCoordinatorService>(
       'SolidPodRefreshCoordinatorService',
-      ['refreshNow'],
+      ['refreshNow', 'restartAfterRuntimeBoot'],
     );
+    refreshCoordinator.restartAfterRuntimeBoot.and.resolveTo();
     refreshCoordinator.refreshNow.and.resolveTo();
 
     await TestBed.configureTestingModule({

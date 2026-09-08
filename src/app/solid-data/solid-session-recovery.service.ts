@@ -4,6 +4,7 @@ import { SnackService } from '../core/snack/snack.service';
 import { T } from '../t.const';
 import { SolidDataLayerSettingsService } from './solid-data-layer-settings.service';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidPodRefreshCoordinatorService } from './solid-pod-refresh-coordinator.service';
 
 const SESSION_EXPIRED_MESSAGE = 'Authentication session expired';
 
@@ -12,6 +13,7 @@ export class SolidSessionRecoveryService {
   private readonly settings = inject(SolidDataLayerSettingsService);
   private readonly snackService = inject(SnackService);
   private readonly solidRuntime = inject(SolidRuntimeService);
+  private readonly refreshCoordinator = inject(SolidPodRefreshCoordinatorService);
   private isLoginPromptOpen = false;
   private authRefreshInFlight: Promise<void> | null = null;
 
@@ -55,7 +57,10 @@ export class SolidSessionRecoveryService {
 
   private async restoreRuntimeAuthState(): Promise<void> {
     try {
-      await this.solidRuntime.restoreSession();
+      const state = await this.solidRuntime.restoreSession();
+      if (state.status === 'authenticated') {
+        await this.refreshCoordinator.restartAfterRuntimeBoot();
+      }
     } catch (error) {
       Log.err('SolidSessionRecoveryService: failed to refresh auth state', {
         name: error instanceof Error ? error.name : 'UnknownError',

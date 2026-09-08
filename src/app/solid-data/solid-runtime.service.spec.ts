@@ -17,6 +17,7 @@ import {
   SOLID_PRODUCTIVITY_LEGACY_TASK_CLASS,
   SOLID_PRODUCTIVITY_TASK_TYPE,
 } from './solid-productivity-vocab';
+import { SOLID_STORAGE_ROOT_CACHE_KEY } from './solid-storage-root-cache.service';
 
 describe('SolidRuntimeService', () => {
   let authState: AuthState;
@@ -31,6 +32,7 @@ describe('SolidRuntimeService', () => {
   const discoveredStorageRoot = 'https://pod.example/';
 
   beforeEach(() => {
+    localStorage.removeItem(SOLID_STORAGE_ROOT_CACHE_KEY);
     authState = { status: 'anonymous' };
     podUrl = mockPodUrl;
     existingContainerUris = new Set([mockPodUrl, discoveredStorageRoot]);
@@ -46,6 +48,8 @@ describe('SolidRuntimeService', () => {
       ],
     });
   });
+
+  afterEach(() => localStorage.removeItem(SOLID_STORAGE_ROOT_CACHE_KEY));
 
   it('defines the layout against the booted pod', async () => {
     const service = TestBed.inject(SolidRuntimeService);
@@ -130,6 +134,32 @@ describe('SolidRuntimeService', () => {
     expect(service.taskProfile.target?.containerUri).toBe(
       'https://id.example/super-productivity/tasks/',
     );
+  });
+
+  it('activates the remembered root before cached catalog hydration', async () => {
+    localStorage.setItem(
+      SOLID_STORAGE_ROOT_CACHE_KEY,
+      JSON.stringify({ [authenticatedWebId]: discoveredStorageRoot }),
+    );
+    const service = TestBed.inject(SolidRuntimeService);
+
+    await service.boot({ restoreSession: true });
+    await expectAsync(service.activateRememberedStorageRoot()).toBeResolvedTo('changed');
+
+    expect(service.taskProfile.target?.containerUri).toBe(
+      'https://pod.example/super-productivity/tasks/',
+    );
+  });
+
+  it('remembers a successfully discovered storage root', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+    await service.restoreSession();
+
+    await service.resolveAuthenticatedStorageRoot();
+
+    expect(
+      JSON.parse(localStorage.getItem(SOLID_STORAGE_ROOT_CACHE_KEY) ?? '{}'),
+    ).toEqual({ [authenticatedWebId]: discoveredStorageRoot });
   });
 
   it('rebuilds a cached layout if the runtime pod changes internally', () => {

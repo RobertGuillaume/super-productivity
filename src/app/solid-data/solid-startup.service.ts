@@ -26,6 +26,7 @@ export class SolidStartupService {
         redirectUrl: window.location.href,
       },
     });
+    await this.solidRuntime.activateRememberedStorageRoot();
 
     const state = this.solidRuntime.client.auth.state();
     Log.normal(

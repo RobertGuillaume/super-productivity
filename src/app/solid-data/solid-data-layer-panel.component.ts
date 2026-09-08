@@ -152,6 +152,9 @@ export class SolidDataLayerPanelComponent {
     await this.runBusy(async () => {
       this.settings.setEnabled(true);
       this.authState.set(await this.solidRuntime.restoreSession());
+      if (this.authState().status === 'authenticated') {
+        await this.refreshCoordinator.restartAfterRuntimeBoot();
+      }
     });
   }
 

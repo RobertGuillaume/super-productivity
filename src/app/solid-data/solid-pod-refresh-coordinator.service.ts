@@ -41,6 +41,7 @@ export class SolidPodRefreshCoordinatorService {
   private rootVerified = false;
   private lastRefreshHadAuthoritativeData = false;
   private canCheckNativeTaskAccess = false;
+  private lifecycleGeneration = 0;
 
   constructor() {
     this.dataLayerState.registerMutationRecoveryHandler(() =>
@@ -76,6 +77,9 @@ export class SolidPodRefreshCoordinatorService {
   }
 
   refreshNow(): Promise<void> {
+    if (!this.started) {
+      return this.start();
+    }
     if (this.refreshPromise !== null) {
       return this.refreshPromise;
     }
@@ -104,7 +108,22 @@ export class SolidPodRefreshCoordinatorService {
     }
   }
 
+  async restartAfterRuntimeBoot(): Promise<void> {
+    this.lifecycleGeneration++;
+    this.stopSubscriptions();
+    this.knownContainers.clear();
+    this.taskAccess.clear();
+    this.dataLayerState.clearWriteReadiness();
+    this.rootVerified = false;
+    this.started = false;
+    this.startPromise = null;
+    this.refreshPromise = null;
+    await this.hydration.reconcileStore();
+    await this.start();
+  }
+
   private async startInternal(): Promise<void> {
+    const generation = this.lifecycleGeneration;
     if (!isSolidDataLayerPrimaryEnabled()) {
       this.dataLayerState.setPhase('disabled');
       return;
@@ -133,9 +152,17 @@ export class SolidPodRefreshCoordinatorService {
       Log.err('Solid storage root activation failed', safeError('root-discovery', error));
     }
 
-    this.installSubscriptions();
     this.started = true;
-    this.refreshPromise = this.refreshCatalog(rootUnavailable).finally(() => {
+    if (generation !== this.lifecycleGeneration) {
+      return;
+    }
+    if (rootUnavailable) {
+      this.dataLayerState.setPhase('degraded');
+      return;
+    }
+
+    this.installSubscriptions();
+    this.refreshPromise = this.refreshCatalog(rootUnavailable, generation).finally(() => {
       this.refreshPromise = null;
     });
     await this.refreshPromise;
@@ -160,10 +187,20 @@ export class SolidPodRefreshCoordinatorService {
         Log.err('Solid storage root refresh failed', safeError('root-discovery', error));
       }
     }
-    await this.refreshCatalog(!this.rootVerified);
+    if (!this.rootVerified) {
+      this.dataLayerState.setPhase('degraded');
+      return;
+    }
+    if (this.subscriptions.length === 0) {
+      this.installSubscriptions();
+    }
+    await this.refreshCatalog(!this.rootVerified, this.lifecycleGeneration);
   }
 
-  private async refreshCatalog(initiallyDegraded: boolean): Promise<void> {
+  private async refreshCatalog(
+    initiallyDegraded: boolean,
+    generation: number,
+  ): Promise<void> {
     const startedAt = performance.now();
     const containers = orderedContainers(this.solidRuntime.ensureLayout());
     let isDegraded = initiallyDegraded;
@@ -177,6 +214,9 @@ export class SolidPodRefreshCoordinatorService {
     });
 
     for (const [index, [containerKey, containerUri]] of containers.entries()) {
+      if (generation !== this.lifecycleGeneration) {
+        return;
+      }
       try {
         const listing = await this.listProvisionedContainer(containerUri);
         if (listing.status === 'ok' || listing.status === 'not-modified') {
@@ -207,6 +247,10 @@ export class SolidPodRefreshCoordinatorService {
       });
     }
 
+    if (generation !== this.lifecycleGeneration) {
+      return;
+    }
+
     try {
       await this.solidRuntime.client.discovery.discoverType(SOLID_PRODUCTIVITY_TASK_TYPE);
       isDegraded = (await this.drainDiscoveryQueue()) || isDegraded;
@@ -217,6 +261,10 @@ export class SolidPodRefreshCoordinatorService {
       isDegraded = true;
       this.dataLayerState.addDiagnostics();
       Log.err('Solid native task discovery failed', safeError('discover-type', error));
+    }
+
+    if (generation !== this.lifecycleGeneration) {
+      return;
     }
 
     this.lastRefreshHadAuthoritativeData =

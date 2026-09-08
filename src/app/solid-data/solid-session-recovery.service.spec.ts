@@ -10,6 +10,7 @@ import {
   isSolidAuthenticationError,
   SolidSessionRecoveryService,
 } from './solid-session-recovery.service';
+import { SolidPodRefreshCoordinatorService } from './solid-pod-refresh-coordinator.service';
 
 describe('SolidSessionRecoveryService', () => {
   let runtime: jasmine.SpyObj<
@@ -19,6 +20,7 @@ describe('SolidSessionRecoveryService', () => {
   };
   let settings: jasmine.SpyObj<SolidDataLayerSettingsService>;
   let snackService: jasmine.SpyObj<SnackService>;
+  let refreshCoordinator: jasmine.SpyObj<SolidPodRefreshCoordinatorService>;
 
   beforeEach(() => {
     runtime = {
@@ -39,12 +41,18 @@ describe('SolidSessionRecoveryService', () => {
       { issuer: signal('https://issuer.example') },
     );
     snackService = jasmine.createSpyObj<SnackService>('SnackService', ['open']);
+    refreshCoordinator = jasmine.createSpyObj<SolidPodRefreshCoordinatorService>(
+      'SolidPodRefreshCoordinatorService',
+      ['restartAfterRuntimeBoot'],
+    );
+    refreshCoordinator.restartAfterRuntimeBoot.and.resolveTo();
 
     TestBed.configureTestingModule({
       providers: [
         { provide: SolidRuntimeService, useValue: runtime },
         { provide: SolidDataLayerSettingsService, useValue: settings },
         { provide: SnackService, useValue: snackService },
+        { provide: SolidPodRefreshCoordinatorService, useValue: refreshCoordinator },
       ],
     });
   });
@@ -98,6 +106,20 @@ describe('SolidSessionRecoveryService', () => {
     });
     await Promise.resolve();
     expect(runtime.restoreSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('restarts the coordinator after an authenticated session restore', async () => {
+    runtime.restoreSession.and.resolveTo({
+      status: 'authenticated',
+      webId: 'https://pod.example/#me',
+    });
+    const service = TestBed.inject(SolidSessionRecoveryService);
+
+    service.handleAuthenticationError(new Error('Authentication session expired'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(refreshCoordinator.restartAfterRuntimeBoot).toHaveBeenCalledTimes(1);
   });
 
   it('starts Solid login directly from the recovery action', async () => {

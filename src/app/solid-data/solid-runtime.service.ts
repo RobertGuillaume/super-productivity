@@ -32,6 +32,7 @@ import {
   SOLID_PRODUCTIVITY_TIME_TRACKING_TYPE,
 } from './solid-productivity-vocab';
 import { SOLID_RUNTIME } from './solid-runtime.token';
+import { SolidStorageRootCacheService } from './solid-storage-root-cache.service';
 
 const PIM_STORAGE = 'http://www.w3.org/ns/pim/space#storage';
 const LDP_BASIC_CONTAINER = 'http://www.w3.org/ns/ldp#BasicContainer';
@@ -41,6 +42,7 @@ export type SolidStorageRootResolution = 'unchanged' | 'changed' | 'unavailable'
 @Injectable({ providedIn: 'root' })
 export class SolidRuntimeService {
   private readonly runtime = inject(SOLID_RUNTIME);
+  private readonly storageRootCache = inject(SolidStorageRootCacheService);
   private layout: RuntimeLayout | null = null;
   private layoutPodUrl: string | null = null;
 
@@ -144,7 +146,22 @@ export class SolidRuntimeService {
     });
     this.clearLayout();
     this.ensureLayout();
+    await this.activateRememberedStorageRoot();
     return state;
+  }
+
+  async activateRememberedStorageRoot(): Promise<SolidStorageRootResolution> {
+    const state = this.runtime.auth.state();
+    if (state.status !== 'authenticated') {
+      return 'unchanged';
+    }
+
+    const rememberedRoot = this.storageRootCache.get(state.webId);
+    if (rememberedRoot === null) {
+      return 'unchanged';
+    }
+
+    return this.activateStorageRoot(rememberedRoot);
   }
 
   async login(issuer: string): Promise<void> {
@@ -211,14 +228,23 @@ export class SolidRuntimeService {
     }
 
     const currentPodUrl = this.runtime.diagnostics.status().podUrl;
+    this.storageRootCache.remember(state.webId, storageRoot);
     if (normalizeContainerUrl(currentPodUrl) === storageRoot) {
       return 'unchanged';
     }
 
-    await this.runtime.boot({
-      podUrl: storageRoot,
-      fetch: this.runtime.auth.fetch(),
-    });
+    return this.activateStorageRoot(storageRoot);
+  }
+
+  private async activateStorageRoot(
+    storageRoot: string,
+  ): Promise<SolidStorageRootResolution> {
+    const currentPodUrl = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
+    if (currentPodUrl === storageRoot) {
+      return 'unchanged';
+    }
+
+    await this.runtime.boot({ podUrl: storageRoot, fetch: this.runtime.auth.fetch() });
     this.clearLayout();
     this.ensureLayout();
     return 'changed';

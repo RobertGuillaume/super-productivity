@@ -17,7 +17,7 @@ describe('SolidStartupService', () => {
     authState = { status: 'anonymous' };
     solidRuntime = jasmine.createSpyObj<SolidRuntimeService>(
       'SolidRuntimeService',
-      ['boot'],
+      ['boot', 'activateRememberedStorageRoot'],
       {
         client: {
           auth: {
@@ -26,6 +26,7 @@ describe('SolidStartupService', () => {
         } as SolidRuntime,
       },
     );
+    solidRuntime.activateRememberedStorageRoot.and.resolveTo('unchanged');
     sessionRecovery = jasmine.createSpyObj<SolidSessionRecoveryService>(
       'SolidSessionRecoveryService',
       ['promptForLogin'],
@@ -75,5 +76,6 @@ describe('SolidStartupService', () => {
         redirectUrl: window.location.href,
       },
     });
+    expect(solidRuntime.activateRememberedStorageRoot).toHaveBeenCalledTimes(1);
   });
 });

@@ -182,6 +182,36 @@ describe('SolidPodRefreshCoordinatorService', () => {
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('degraded');
     expect(dataLayerState.addDiagnostics).toHaveBeenCalled();
   });
+
+  it('does not touch Pod containers while the storage root is unverified', async () => {
+    runtimeService.resolveAuthenticatedStorageRoot.and.resolveTo('unavailable');
+
+    await TestBed.inject(SolidPodRefreshCoordinatorService).start();
+
+    expect(storage.listContainer).not.toHaveBeenCalled();
+    expect(runtimeService.ensureAppContainer).not.toHaveBeenCalled();
+    expect(discovery.subscribe).not.toHaveBeenCalled();
+    expect(dataLayerState.setPhase).toHaveBeenCalledWith('degraded');
+  });
+
+  it('starts the complete lifecycle when refresh is called before start', async () => {
+    await TestBed.inject(SolidPodRefreshCoordinatorService).refreshNow();
+
+    expect(runtimeService.resolveAuthenticatedStorageRoot).toHaveBeenCalledTimes(1);
+    expect(storage.listContainer).toHaveBeenCalled();
+  });
+
+  it('rehydrates and reinstalls subscriptions after a runtime reboot', async () => {
+    const service = TestBed.inject(SolidPodRefreshCoordinatorService);
+    await service.start();
+    const subscriptionCount = discovery.subscribe.calls.count();
+
+    await service.restartAfterRuntimeBoot();
+
+    expect(hydration.reconcileStore).toHaveBeenCalled();
+    expect(discovery.subscribe.calls.count()).toBeGreaterThan(subscriptionCount);
+    expect(runtimeService.resolveAuthenticatedStorageRoot).toHaveBeenCalledTimes(2);
+  });
 });
 
 const discoveryStatus = (overrides: Partial<DiscoveryStatus> = {}): DiscoveryStatus => ({
