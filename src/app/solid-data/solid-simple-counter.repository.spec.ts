@@ -168,9 +168,9 @@ describe('SolidSimpleCounterRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidSimpleCounterRepository).saveSimpleCounter(
-      simpleCounter,
-    );
+    const repository = TestBed.inject(SolidSimpleCounterRepository);
+    await repository.loadSimpleCounters();
+    const saved = await repository.saveSimpleCounter(simpleCounter);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

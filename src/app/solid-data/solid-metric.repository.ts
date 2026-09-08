@@ -11,6 +11,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -23,6 +24,7 @@ export class SolidMetricRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadMetrics(): Promise<SolidRepositoryRead<Metric[]>> {
     const metricContainerScope = this.metricContainerScope();
@@ -35,7 +37,10 @@ export class SolidMetricRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(metricContainerScope.uri, result.things)
-        .map(solidThingToMetric)
+        .map((thing) => {
+          const metric = solidThingToMetric(thing);
+          return this.operations.remember('metric', metric.id, thing, metric);
+        })
         .sort((a, b) => a.id.localeCompare(b.id)),
       result.metadata,
     );
@@ -54,33 +59,25 @@ export class SolidMetricRepository {
   }
 
   private async saveMetricNow(metric: Metric): Promise<Metric> {
-    const existingThing = await this.findMetricThing(metric.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        metricToSolidCreateInput(metric, this.solidRuntime.metricProfile),
-      );
-      return solidThingToMetric(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      metricToSolidChanges(metric),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(`Expected Solid metric update commit, received ${commit.kind}`);
-    }
-
-    return solidThingToMetric(commit.result);
+    return this.operations.upsert({
+      model: 'metric',
+      id: metric.id,
+      value: metric,
+      resourceName: metric.id,
+      profile: this.solidRuntime.metricProfile,
+      createInput: metricToSolidCreateInput(metric, this.solidRuntime.metricProfile),
+      changes: metricToSolidChanges(metric),
+      map: solidThingToMetric,
+    });
   }
 
   private async deleteMetricNow(metricId: string): Promise<void> {
-    const existingThing = await this.findMetricThing(metricId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'metric',
+      metricId,
+      this.solidRuntime.metricProfile,
+      metricId,
+    );
   }
 
   subscribeMetrics(listener: (metrics: Metric[]) => void): Unsubscribe {

@@ -146,10 +146,9 @@ describe('SolidArchivedTaskRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidArchivedTaskRepository).saveArchivedTask(
-      task,
-      'young',
-    );
+    const repository = TestBed.inject(SolidArchivedTaskRepository);
+    await repository.loadArchivedTasks();
+    const saved = await repository.saveArchivedTask(task, 'young');
 
     expect(things.create).not.toHaveBeenCalled();
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(

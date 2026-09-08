@@ -172,9 +172,9 @@ describe('SolidPluginDataRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidPluginDataRepository).savePluginUserData(
-      pluginUserData,
-    );
+    const repository = TestBed.inject(SolidPluginDataRepository);
+    await repository.loadPluginUserData();
+    const saved = await repository.savePluginUserData(pluginUserData);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,
@@ -223,9 +223,9 @@ describe('SolidPluginDataRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidPluginDataRepository).savePluginMetadata(
-      pluginMetadata,
-    );
+    const repository = TestBed.inject(SolidPluginDataRepository);
+    await repository.loadPluginMetadata();
+    const saved = await repository.savePluginMetadata(pluginMetadata);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

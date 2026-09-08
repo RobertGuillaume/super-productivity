@@ -11,6 +11,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -23,6 +24,7 @@ export class SolidTaskRepeatCfgRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadTaskRepeatCfgs(): Promise<SolidRepositoryRead<TaskRepeatCfg[]>> {
     const taskRepeatCfgContainerScope = this.taskRepeatCfgContainerScope();
@@ -35,7 +37,10 @@ export class SolidTaskRepeatCfgRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(taskRepeatCfgContainerScope.uri, result.things)
-        .map(solidThingToTaskRepeatCfg),
+        .map((thing) => {
+          const config = solidThingToTaskRepeatCfg(thing);
+          return this.operations.remember('taskRepeatCfg', config.id, thing, config);
+        }),
       result.metadata,
     );
   }
@@ -57,38 +62,28 @@ export class SolidTaskRepeatCfgRepository {
   private async saveTaskRepeatCfgNow(
     taskRepeatCfg: TaskRepeatCfg,
   ): Promise<TaskRepeatCfg> {
-    const existingThing = await this.findTaskRepeatCfgThing(taskRepeatCfg.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        taskRepeatCfgToSolidCreateInput(
-          taskRepeatCfg,
-          this.solidRuntime.taskRepeatCfgProfile,
-        ),
-      );
-      return solidThingToTaskRepeatCfg(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      taskRepeatCfgToSolidChanges(taskRepeatCfg),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid task repeat config update commit, received ${commit.kind}`,
-      );
-    }
-
-    return solidThingToTaskRepeatCfg(commit.result);
+    return this.operations.upsert({
+      model: 'taskRepeatCfg',
+      id: taskRepeatCfg.id,
+      value: taskRepeatCfg,
+      resourceName: taskRepeatCfg.id,
+      profile: this.solidRuntime.taskRepeatCfgProfile,
+      createInput: taskRepeatCfgToSolidCreateInput(
+        taskRepeatCfg,
+        this.solidRuntime.taskRepeatCfgProfile,
+      ),
+      changes: taskRepeatCfgToSolidChanges(taskRepeatCfg),
+      map: solidThingToTaskRepeatCfg,
+    });
   }
 
   private async deleteTaskRepeatCfgNow(taskRepeatCfgId: string): Promise<void> {
-    const existingThing = await this.findTaskRepeatCfgThing(taskRepeatCfgId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'taskRepeatCfg',
+      taskRepeatCfgId,
+      this.solidRuntime.taskRepeatCfgProfile,
+      taskRepeatCfgId,
+    );
   }
 
   subscribeTaskRepeatCfgs(

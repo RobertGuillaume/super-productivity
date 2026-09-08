@@ -12,6 +12,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -24,6 +25,7 @@ export class SolidIssueProviderRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadIssueProviders(): Promise<SolidRepositoryRead<IssueProvider[]>> {
     const issueProviderContainerScope = this.issueProviderContainerScope();
@@ -36,7 +38,15 @@ export class SolidIssueProviderRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(issueProviderContainerScope.uri, result.things)
-        .map(solidThingToIssueProviderRecord)
+        .map((thing) => {
+          const record = solidThingToIssueProviderRecord(thing);
+          return this.operations.remember(
+            'issueProvider',
+            record.issueProvider.id,
+            thing,
+            record,
+          );
+        })
         .sort((a, b) => a.order - b.order)
         .map((record) => record.issueProvider),
       result.metadata,
@@ -61,39 +71,29 @@ export class SolidIssueProviderRepository {
     issueProvider: IssueProvider,
     order: number,
   ): Promise<IssueProvider> {
-    const existingThing = await this.findIssueProviderThing(issueProvider.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        issueProviderToSolidCreateInput(
-          issueProvider,
-          this.solidRuntime.issueProviderProfile,
-          order,
-        ),
-      );
-      return solidThingToIssueProvider(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      issueProviderToSolidChanges(issueProvider, order),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid issue provider update commit, received ${commit.kind}`,
-      );
-    }
-
-    return solidThingToIssueProvider(commit.result);
+    return this.operations.upsert({
+      model: 'issueProvider',
+      id: issueProvider.id,
+      value: issueProvider,
+      resourceName: issueProvider.id,
+      profile: this.solidRuntime.issueProviderProfile,
+      createInput: issueProviderToSolidCreateInput(
+        issueProvider,
+        this.solidRuntime.issueProviderProfile,
+        order,
+      ),
+      changes: issueProviderToSolidChanges(issueProvider, order),
+      map: solidThingToIssueProvider,
+    });
   }
 
   private async deleteIssueProviderNow(issueProviderId: string): Promise<void> {
-    const existingThing = await this.findIssueProviderThing(issueProviderId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'issueProvider',
+      issueProviderId,
+      this.solidRuntime.issueProviderProfile,
+      issueProviderId,
+    );
   }
 
   subscribeIssueProviders(

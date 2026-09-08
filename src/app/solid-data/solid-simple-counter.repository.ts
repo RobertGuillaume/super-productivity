@@ -12,6 +12,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   settleSolidMutations,
   SolidMutationCoordinator,
@@ -25,6 +26,7 @@ export class SolidSimpleCounterRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadSimpleCounters(): Promise<SolidRepositoryRead<SimpleCounter[]>> {
     const simpleCounterContainerScope = this.simpleCounterContainerScope();
@@ -37,7 +39,15 @@ export class SolidSimpleCounterRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(simpleCounterContainerScope.uri, result.things)
-        .map(solidThingToSimpleCounterRecord)
+        .map((thing) => {
+          const record = solidThingToSimpleCounterRecord(thing);
+          return this.operations.remember(
+            'simpleCounter',
+            record.simpleCounter.id,
+            thing,
+            record,
+          );
+        })
         .sort((a, b) => a.order - b.order)
         .map((record) => record.simpleCounter),
       result.metadata,
@@ -68,32 +78,20 @@ export class SolidSimpleCounterRepository {
     simpleCounter: SimpleCounter,
     order: number,
   ): Promise<SimpleCounter> {
-    const existingThing = await this.findSimpleCounterThing(simpleCounter.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        simpleCounterToSolidCreateInput(
-          simpleCounter,
-          this.solidRuntime.simpleCounterProfile,
-          order,
-        ),
-      );
-      return solidThingToSimpleCounter(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      simpleCounterToSolidChanges(simpleCounter, order),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid simple counter update commit, received ${commit.kind}`,
-      );
-    }
-
-    return solidThingToSimpleCounter(commit.result);
+    return this.operations.upsert({
+      model: 'simpleCounter',
+      id: simpleCounter.id,
+      value: simpleCounter,
+      resourceName: simpleCounter.id,
+      profile: this.solidRuntime.simpleCounterProfile,
+      createInput: simpleCounterToSolidCreateInput(
+        simpleCounter,
+        this.solidRuntime.simpleCounterProfile,
+        order,
+      ),
+      changes: simpleCounterToSolidChanges(simpleCounter, order),
+      map: solidThingToSimpleCounter,
+    });
   }
 
   private async replaceSimpleCountersNow(
@@ -117,10 +115,12 @@ export class SolidSimpleCounterRepository {
   }
 
   private async deleteSimpleCounterNow(simpleCounterId: string): Promise<void> {
-    const existingThing = await this.findSimpleCounterThing(simpleCounterId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'simpleCounter',
+      simpleCounterId,
+      this.solidRuntime.simpleCounterProfile,
+      simpleCounterId,
+    );
   }
 
   subscribeSimpleCounters(
@@ -169,7 +169,13 @@ export class SolidSimpleCounterRepository {
       autoDiscover: false,
     });
 
-    return [...result.things];
+    return this.catalogAuthority
+      .filterThings(this.simpleCounterContainerScope().uri, result.things)
+      .map((thing) => {
+        const simpleCounter = solidThingToSimpleCounter(thing);
+        this.operations.remember('simpleCounter', simpleCounter.id, thing, simpleCounter);
+        return thing;
+      });
   }
 
   private simpleCounterContainerScope(): SolidSimpleCounterContainerScope {

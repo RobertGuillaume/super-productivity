@@ -162,9 +162,9 @@ describe('SolidArchiveStateRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidArchiveStateRepository).saveArchiveState(
-      archiveState,
-    );
+    const repository = TestBed.inject(SolidArchiveStateRepository);
+    await repository.loadArchiveStates();
+    const saved = await repository.saveArchiveState(archiveState);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

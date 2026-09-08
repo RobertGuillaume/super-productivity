@@ -159,9 +159,9 @@ describe('SolidIssueProviderRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidIssueProviderRepository).saveIssueProvider(
-      issueProvider,
-    );
+    const repository = TestBed.inject(SolidIssueProviderRepository);
+    await repository.loadIssueProviders();
+    const saved = await repository.saveIssueProvider(issueProvider);
 
     expect(things.create).not.toHaveBeenCalled();
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(

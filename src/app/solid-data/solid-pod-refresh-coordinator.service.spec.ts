@@ -17,6 +17,7 @@ import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidMutationCoordinator } from './solid-mutation-coordinator.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
 
 describe('SolidPodRefreshCoordinatorService', () => {
   const podRoot = 'https://pod.example/';
@@ -36,6 +37,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
   let mutations: jasmine.SpyObj<SolidMutationCoordinator>;
   let taskAccess: jasmine.SpyObj<SolidTaskAccessService>;
   let catalogAuthority: jasmine.SpyObj<SolidCatalogAuthorityService>;
+  let identities: jasmine.SpyObj<SolidThingIdentityRegistry>;
   let authState: AuthState;
   let status: DiscoveryStatus;
   let thingSubscriber: (() => void) | null;
@@ -105,6 +107,10 @@ describe('SolidPodRefreshCoordinatorService', () => {
       'SolidCatalogAuthorityService',
       ['recordListing', 'clear'],
     );
+    identities = jasmine.createSpyObj<SolidThingIdentityRegistry>(
+      'SolidThingIdentityRegistry',
+      ['clear'],
+    );
     const runtime = {
       auth: { state: () => authState },
       discovery,
@@ -142,6 +148,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
         { provide: SolidMutationCoordinator, useValue: mutations },
         { provide: SolidTaskAccessService, useValue: taskAccess },
         { provide: SolidCatalogAuthorityService, useValue: catalogAuthority },
+        { provide: SolidThingIdentityRegistry, useValue: identities },
       ],
     });
   });

@@ -145,7 +145,9 @@ describe('SolidSectionRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidSectionRepository).saveSection(section);
+    const repository = TestBed.inject(SolidSectionRepository);
+    await repository.loadSections();
+    const saved = await repository.saveSection(section);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

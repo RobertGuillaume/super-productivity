@@ -166,24 +166,11 @@ describe('SolidTaskRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidTaskRepository).saveTask(task);
+    const repository = TestBed.inject(SolidTaskRepository);
+    await repository.loadTasks();
+    const saved = await repository.saveTask(task);
 
-    expect(things.query).toHaveBeenCalledOnceWith(
-      jasmine.objectContaining({
-        where: [
-          {
-            kind: 'property',
-            predicateUri: SP_TASK.id,
-            value: task.id,
-          },
-        ],
-      }),
-      {
-        limit: 1,
-        scope: { kind: 'runtime-graph' },
-        autoDiscover: false,
-      },
-    );
+    expect(things.query).toHaveBeenCalledTimes(1);
     expect(things.create).not.toHaveBeenCalled();
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,
@@ -376,7 +363,7 @@ describe('SolidTaskRepository', () => {
       preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
-    things.get.and.resolveTo(externalThing);
+    things.query.and.resolveTo({ things: [externalThing] });
     writes.planUpdate.and.returnValue(plan);
     writes.commit.and.resolveTo({
       planId: plan.id,
@@ -384,13 +371,15 @@ describe('SolidTaskRepository', () => {
       result: externalThing,
     });
 
-    await TestBed.inject(SolidTaskRepository).saveTask({
+    const repository = TestBed.inject(SolidTaskRepository);
+    await repository.loadTasks();
+    await repository.saveTask({
       ...task,
       id: externalUri,
     });
 
     expect(things.get).not.toHaveBeenCalled();
-    expect(things.query).not.toHaveBeenCalled();
+    expect(things.query).toHaveBeenCalledTimes(1);
     expect(things.create).not.toHaveBeenCalled();
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(externalUri, jasmine.any(Object));
   });

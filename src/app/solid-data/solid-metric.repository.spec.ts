@@ -151,7 +151,9 @@ describe('SolidMetricRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidMetricRepository).saveMetric(metric);
+    const repository = TestBed.inject(SolidMetricRepository);
+    await repository.loadMetrics();
+    const saved = await repository.saveMetric(metric);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

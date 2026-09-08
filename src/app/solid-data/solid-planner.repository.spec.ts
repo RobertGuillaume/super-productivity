@@ -151,7 +151,9 @@ describe('SolidPlannerRepository', () => {
       result: createPlannerDayThing('2026-08-04', ['task-2']),
     });
 
-    const saved = await TestBed.inject(SolidPlannerRepository).savePlannerDay({
+    const repository = TestBed.inject(SolidPlannerRepository);
+    await repository.loadPlannerDays();
+    const saved = await repository.savePlannerDay({
       day: '2026-08-04',
       taskIds: ['task-2'],
       updated: 1710000000000,

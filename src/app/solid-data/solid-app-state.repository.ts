@@ -6,6 +6,7 @@ import {
   appStateToSolidCreateInput,
   createEmptySolidAppState,
   SOLID_APP_STATE_ID,
+  SOLID_APP_STATE_RESOURCE_NAME,
   SolidAppState,
   solidAppStateQuery,
   solidThingToAppState,
@@ -13,6 +14,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -25,6 +27,8 @@ export class SolidAppStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
+  private lastAppState: SolidAppState | null = null;
 
   async loadAppState(): Promise<SolidRepositoryRead<SolidAppState | null>> {
     const result = await this.queryAppStateThing();
@@ -33,10 +37,16 @@ export class SolidAppStateRepository {
         this.appContainerScope().uri,
         result.things,
       )[0] ?? null;
-    return solidRepositoryRead(
-      existingThing === null ? null : solidThingToAppState(existingThing),
-      result.metadata,
-    );
+    this.lastAppState =
+      existingThing === null
+        ? null
+        : this.operations.remember(
+            'appState',
+            SOLID_APP_STATE_ID,
+            existingThing,
+            solidThingToAppState(existingThing),
+          );
+    return solidRepositoryRead(this.lastAppState, result.metadata);
   }
 
   saveAppStateOrder(
@@ -54,33 +64,27 @@ export class SolidAppStateRepository {
       Pick<SolidAppState, 'noteTodayOrder' | 'projectOrder' | 'sectionOrder' | 'tagOrder'>
     >,
   ): Promise<SolidAppState> {
-    const existingThing = await this.findAppStateThing();
-    const existing = existingThing === null ? null : solidThingToAppState(existingThing);
     const nextAppState: SolidAppState = {
-      ...(existing ?? createEmptySolidAppState()),
+      ...(this.lastAppState ?? createEmptySolidAppState()),
       ...changes,
       id: SOLID_APP_STATE_ID,
       updated: Date.now(),
     };
 
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        appStateToSolidCreateInput(nextAppState, this.solidRuntime.appStateProfile),
-      );
-      return solidThingToAppState(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      appStateToSolidChanges(nextAppState),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(`Expected Solid app state update commit, received ${commit.kind}`);
-    }
-
-    return solidThingToAppState(commit.result);
+    this.lastAppState = await this.operations.upsert({
+      model: 'appState',
+      id: SOLID_APP_STATE_ID,
+      value: nextAppState,
+      resourceName: SOLID_APP_STATE_RESOURCE_NAME,
+      profile: this.solidRuntime.appStateProfile,
+      createInput: appStateToSolidCreateInput(
+        nextAppState,
+        this.solidRuntime.appStateProfile,
+      ),
+      changes: appStateToSolidChanges(nextAppState),
+      map: solidThingToAppState,
+    });
+    return this.lastAppState;
   }
 
   private async findAppStateThing(): Promise<Thing | null> {

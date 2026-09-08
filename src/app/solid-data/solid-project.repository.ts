@@ -6,6 +6,10 @@ import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
+  SolidRepositoryMutation,
+  SolidRepositoryOperations,
+} from './solid-repository-operations.service';
+import {
   SolidMutationCoordinator,
   solidMutationKey,
 } from './solid-mutation-coordinator.service';
@@ -23,6 +27,7 @@ export class SolidProjectRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadProjects(): Promise<SolidRepositoryRead<Project[]>> {
     const projectContainerScope = this.projectContainerScope();
@@ -35,7 +40,14 @@ export class SolidProjectRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(projectContainerScope.uri, result.things)
-        .map(solidThingToProject),
+        .map((thing) =>
+          this.operations.remember(
+            'project',
+            solidThingToProject(thing).id,
+            thing,
+            solidThingToProject(thing),
+          ),
+        ),
       result.metadata,
     );
   }
@@ -53,33 +65,29 @@ export class SolidProjectRepository {
   }
 
   private async saveProjectNow(project: Project): Promise<Project> {
-    const existingThing = await this.findProjectThing(project.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        projectToSolidCreateInput(project, this.solidRuntime.projectProfile),
-      );
-      return solidThingToProject(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      projectToSolidChanges(project),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(`Expected Solid project update commit, received ${commit.kind}`);
-    }
-
-    return solidThingToProject(commit.result);
+    return this.operations.upsert(this.projectMutation(project));
   }
 
   private async deleteProjectNow(projectId: string): Promise<void> {
-    const existingThing = await this.findProjectThing(projectId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'project',
+      projectId,
+      this.solidRuntime.projectProfile,
+      projectId,
+    );
+  }
+
+  private projectMutation(project: Project): SolidRepositoryMutation<Project> {
+    return {
+      model: 'project',
+      id: project.id,
+      value: project,
+      resourceName: project.id,
+      profile: this.solidRuntime.projectProfile,
+      createInput: projectToSolidCreateInput(project, this.solidRuntime.projectProfile),
+      changes: projectToSolidChanges(project),
+      map: solidThingToProject,
+    };
   }
 
   subscribeProjects(listener: (projects: Project[]) => void): Unsubscribe {

@@ -99,7 +99,9 @@ describe('SolidNoteRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidNoteRepository).saveNote(note);
+    const repository = TestBed.inject(SolidNoteRepository);
+    await repository.loadNotes();
+    const saved = await repository.saveNote(note);
 
     expect(things.create).not.toHaveBeenCalled();
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(

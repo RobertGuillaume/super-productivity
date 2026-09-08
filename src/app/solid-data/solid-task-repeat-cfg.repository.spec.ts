@@ -152,9 +152,9 @@ describe('SolidTaskRepeatCfgRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidTaskRepeatCfgRepository).saveTaskRepeatCfg(
-      taskRepeatCfg,
-    );
+    const repository = TestBed.inject(SolidTaskRepeatCfgRepository);
+    await repository.loadTaskRepeatCfgs();
+    const saved = await repository.saveTaskRepeatCfg(taskRepeatCfg);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

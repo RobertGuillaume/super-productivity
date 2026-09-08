@@ -170,7 +170,9 @@ describe('SolidBoardRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidBoardRepository).saveBoard(board);
+    const repository = TestBed.inject(SolidBoardRepository);
+    await repository.loadBoards();
+    const saved = await repository.saveBoard(board);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

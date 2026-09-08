@@ -5,6 +5,7 @@ import { SP_SECTION } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -23,6 +24,7 @@ export class SolidSectionRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadSections(): Promise<SolidRepositoryRead<Section[]>> {
     const sectionContainerScope = this.sectionContainerScope();
@@ -35,7 +37,10 @@ export class SolidSectionRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(sectionContainerScope.uri, result.things)
-        .map(solidThingToSection),
+        .map((thing) => {
+          const section = solidThingToSection(thing);
+          return this.operations.remember('section', section.id, thing, section);
+        }),
       result.metadata,
     );
   }
@@ -53,33 +58,25 @@ export class SolidSectionRepository {
   }
 
   private async saveSectionNow(section: Section): Promise<Section> {
-    const existingThing = await this.findSectionThing(section.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        sectionToSolidCreateInput(section, this.solidRuntime.sectionProfile),
-      );
-      return solidThingToSection(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      sectionToSolidChanges(section),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(`Expected Solid section update commit, received ${commit.kind}`);
-    }
-
-    return solidThingToSection(commit.result);
+    return this.operations.upsert({
+      model: 'section',
+      id: section.id,
+      value: section,
+      resourceName: section.id,
+      profile: this.solidRuntime.sectionProfile,
+      createInput: sectionToSolidCreateInput(section, this.solidRuntime.sectionProfile),
+      changes: sectionToSolidChanges(section),
+      map: solidThingToSection,
+    });
   }
 
   private async deleteSectionNow(sectionId: string): Promise<void> {
-    const existingThing = await this.findSectionThing(sectionId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'section',
+      sectionId,
+      this.solidRuntime.sectionProfile,
+      sectionId,
+    );
   }
 
   subscribeSections(listener: (sections: Section[]) => void): Unsubscribe {

@@ -5,6 +5,7 @@ import { SP_NOTE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -23,6 +24,7 @@ export class SolidNoteRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadNotes(): Promise<SolidRepositoryRead<Note[]>> {
     const noteContainerScope = this.noteContainerScope();
@@ -35,7 +37,10 @@ export class SolidNoteRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(noteContainerScope.uri, result.things)
-        .map(solidThingToNote),
+        .map((thing) => {
+          const note = solidThingToNote(thing);
+          return this.operations.remember('note', note.id, thing, note);
+        }),
       result.metadata,
     );
   }
@@ -53,33 +58,20 @@ export class SolidNoteRepository {
   }
 
   private async saveNoteNow(note: Note): Promise<Note> {
-    const existingThing = await this.findNoteThing(note.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        noteToSolidCreateInput(note, this.solidRuntime.noteProfile),
-      );
-      return solidThingToNote(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      noteToSolidChanges(note),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(`Expected Solid note update commit, received ${commit.kind}`);
-    }
-
-    return solidThingToNote(commit.result);
+    return this.operations.upsert({
+      model: 'note',
+      id: note.id,
+      value: note,
+      resourceName: note.id,
+      profile: this.solidRuntime.noteProfile,
+      createInput: noteToSolidCreateInput(note, this.solidRuntime.noteProfile),
+      changes: noteToSolidChanges(note),
+      map: solidThingToNote,
+    });
   }
 
   private async deleteNoteNow(noteId: string): Promise<void> {
-    const existingThing = await this.findNoteThing(noteId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete('note', noteId, this.solidRuntime.noteProfile, noteId);
   }
 
   subscribeNotes(listener: (notes: Note[]) => void): Unsubscribe {

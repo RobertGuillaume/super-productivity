@@ -158,9 +158,9 @@ describe('SolidTimeTrackingRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidTimeTrackingRepository).saveTimeTrackingEntry(
-      entry,
-    );
+    const repository = TestBed.inject(SolidTimeTrackingRepository);
+    await repository.loadTimeTrackingState();
+    const saved = await repository.saveTimeTrackingEntry(entry);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

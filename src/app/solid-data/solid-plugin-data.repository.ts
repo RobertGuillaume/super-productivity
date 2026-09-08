@@ -1,10 +1,11 @@
 import { inject, Injectable } from '@angular/core';
-import type { RuntimeScope, Thing } from '@solid-intents/runtime';
+import type { RuntimeScope } from '@solid-intents/runtime';
 import { PluginMetadata, PluginUserData } from '../plugins/plugin-persistence.model';
-import { SP_PLUGIN_METADATA, SP_PLUGIN_USER_DATA } from './solid-productivity-vocab';
 import {
+  pluginMetadataResourceName,
   pluginMetadataToSolidChanges,
   pluginMetadataToSolidCreateInput,
+  pluginUserDataResourceName,
   pluginUserDataToSolidChanges,
   pluginUserDataToSolidCreateInput,
   solidPluginMetadataQuery,
@@ -19,6 +20,7 @@ import {
   SolidMutationCoordinator,
   solidMutationKey,
 } from './solid-mutation-coordinator.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 
 type SolidPluginContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
@@ -27,6 +29,7 @@ export class SolidPluginDataRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadPluginUserData(): Promise<SolidRepositoryRead<PluginUserData[]>> {
     const scope = this.pluginUserDataContainerScope();
@@ -39,7 +42,12 @@ export class SolidPluginDataRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(scope.uri, result.things)
-        .map((thing) => solidThingToPluginUserData(thing))
+        .map((thing) => {
+          const value = solidThingToPluginUserData(thing);
+          return value === null
+            ? null
+            : this.operations.remember('pluginUserData', value.id, thing, value);
+        })
         .filter(
           (pluginUserData): pluginUserData is PluginUserData => pluginUserData !== null,
         ),
@@ -58,7 +66,12 @@ export class SolidPluginDataRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(scope.uri, result.things)
-        .map((thing) => solidThingToPluginMetadata(thing))
+        .map((thing) => {
+          const value = solidThingToPluginMetadata(thing);
+          return value === null
+            ? null
+            : this.operations.remember('pluginMetadata', value.id, thing, value);
+        })
         .filter((metadata): metadata is PluginMetadata => metadata !== null),
       result.metadata,
     );
@@ -95,135 +108,67 @@ export class SolidPluginDataRepository {
   private async savePluginUserDataNow(
     pluginUserData: PluginUserData,
   ): Promise<PluginUserData> {
-    const existingThing = await this.findPluginUserDataThing(pluginUserData.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        pluginUserDataToSolidCreateInput(
-          pluginUserData,
-          this.solidRuntime.pluginUserDataProfile,
-        ),
-      );
-      const createdPluginUserData = solidThingToPluginUserData(created);
-      if (!createdPluginUserData) {
-        throw new Error('Expected Solid plugin user data create result');
-      }
-      return createdPluginUserData;
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      pluginUserDataToSolidChanges(pluginUserData),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid plugin user data update commit, received ${commit.kind}`,
-      );
-    }
-
-    const updatedPluginUserData = solidThingToPluginUserData(commit.result);
-    if (!updatedPluginUserData) {
-      throw new Error('Expected Solid plugin user data update result');
-    }
-    return updatedPluginUserData;
+    return this.operations.upsert({
+      model: 'pluginUserData',
+      id: pluginUserData.id,
+      value: pluginUserData,
+      resourceName: pluginUserDataResourceName(pluginUserData.id),
+      profile: this.solidRuntime.pluginUserDataProfile,
+      createInput: pluginUserDataToSolidCreateInput(
+        pluginUserData,
+        this.solidRuntime.pluginUserDataProfile,
+      ),
+      changes: pluginUserDataToSolidChanges(pluginUserData),
+      map: (thing) => {
+        const value = solidThingToPluginUserData(thing);
+        if (value === null) {
+          throw new Error('Expected Solid plugin user data mutation result');
+        }
+        return value;
+      },
+    });
   }
 
   private async savePluginMetadataNow(
     pluginMetadata: PluginMetadata,
   ): Promise<PluginMetadata> {
-    const existingThing = await this.findPluginMetadataThing(pluginMetadata.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        pluginMetadataToSolidCreateInput(
-          pluginMetadata,
-          this.solidRuntime.pluginMetadataProfile,
-        ),
-      );
-      const createdPluginMetadata = solidThingToPluginMetadata(created);
-      if (!createdPluginMetadata) {
-        throw new Error('Expected Solid plugin metadata create result');
-      }
-      return createdPluginMetadata;
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      pluginMetadataToSolidChanges(pluginMetadata),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid plugin metadata update commit, received ${commit.kind}`,
-      );
-    }
-
-    const updatedPluginMetadata = solidThingToPluginMetadata(commit.result);
-    if (!updatedPluginMetadata) {
-      throw new Error('Expected Solid plugin metadata update result');
-    }
-    return updatedPluginMetadata;
+    return this.operations.upsert({
+      model: 'pluginMetadata',
+      id: pluginMetadata.id,
+      value: pluginMetadata,
+      resourceName: pluginMetadataResourceName(pluginMetadata.id),
+      profile: this.solidRuntime.pluginMetadataProfile,
+      createInput: pluginMetadataToSolidCreateInput(
+        pluginMetadata,
+        this.solidRuntime.pluginMetadataProfile,
+      ),
+      changes: pluginMetadataToSolidChanges(pluginMetadata),
+      map: (thing) => {
+        const value = solidThingToPluginMetadata(thing);
+        if (value === null) {
+          throw new Error('Expected Solid plugin metadata mutation result');
+        }
+        return value;
+      },
+    });
   }
 
   private async deletePluginUserDataNow(pluginId: string): Promise<void> {
-    const existingThing = await this.findPluginUserDataThing(pluginId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'pluginUserData',
+      pluginId,
+      this.solidRuntime.pluginUserDataProfile,
+      pluginUserDataResourceName(pluginId),
+    );
   }
 
   private async deletePluginMetadataNow(pluginId: string): Promise<void> {
-    const existingThing = await this.findPluginMetadataThing(pluginId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
-  }
-
-  private async findPluginUserDataThing(pluginId: string): Promise<Thing | null> {
-    const result = await this.solidRuntime.client.things.query(
-      {
-        ...solidPluginUserDataQuery,
-        where: [
-          {
-            kind: 'property',
-            predicateUri: SP_PLUGIN_USER_DATA.id,
-            value: pluginId,
-          },
-        ],
-      },
-      {
-        limit: 1,
-        scope: this.pluginUserDataContainerScope(),
-        autoDiscover: false,
-      },
+    await this.operations.delete(
+      'pluginMetadata',
+      pluginId,
+      this.solidRuntime.pluginMetadataProfile,
+      pluginMetadataResourceName(pluginId),
     );
-
-    return result.things[0] ?? null;
-  }
-
-  private async findPluginMetadataThing(pluginId: string): Promise<Thing | null> {
-    const result = await this.solidRuntime.client.things.query(
-      {
-        ...solidPluginMetadataQuery,
-        where: [
-          {
-            kind: 'property',
-            predicateUri: SP_PLUGIN_METADATA.id,
-            value: pluginId,
-          },
-        ],
-      },
-      {
-        limit: 1,
-        scope: this.pluginMetadataContainerScope(),
-        autoDiscover: false,
-      },
-    );
-
-    return result.things[0] ?? null;
   }
 
   private pluginUserDataContainerScope(): SolidPluginContainerScope {

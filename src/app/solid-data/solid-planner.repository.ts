@@ -14,13 +14,14 @@ import {
   plannerStateToSolidChanges,
   plannerStateToSolidCreateInput,
   SOLID_PLANNER_STATE_ID,
+  SOLID_PLANNER_STATE_RESOURCE_NAME,
   SolidPlannerDay,
   solidPlannerDayQuery,
   solidPlannerStateQuery,
   solidThingToPlannerDay,
   solidThingToPlannerState,
 } from './solid-planner.mapper';
-import { SP_PLANNER_DAY, SP_PLANNER_STATE } from './solid-productivity-vocab';
+import { SP_PLANNER_STATE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
@@ -29,6 +30,7 @@ import {
   SolidMutationCoordinator,
   solidMutationKey,
 } from './solid-mutation-coordinator.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 
 type SolidPlannerContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
@@ -37,6 +39,7 @@ export class SolidPlannerRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadPlannerState(): Promise<SolidRepositoryRead<PlannerState>> {
     const plannerContainerScope = this.plannerContainerScope();
@@ -58,11 +61,22 @@ export class SolidPlannerRepository {
         stateResult.things,
       )[0] ?? null;
 
+    const days = dayThings.map((thing) => {
+      const day = solidThingToPlannerDay(thing);
+      return this.operations.remember('plannerDay', day.day, thing, day);
+    });
+    const plannerState =
+      stateThing === null
+        ? null
+        : this.operations.remember(
+            'plannerState',
+            SOLID_PLANNER_STATE_ID,
+            stateThing,
+            solidThingToPlannerState(stateThing),
+          );
+
     return solidRepositoryRead(
-      createPlannerStateFromSolid(
-        dayThings.map(solidThingToPlannerDay),
-        stateThing === null ? null : solidThingToPlannerState(stateThing),
-      ),
+      createPlannerStateFromSolid(days, plannerState),
       daysResult.metadata,
       stateResult.metadata,
     );
@@ -131,21 +145,26 @@ export class SolidPlannerRepository {
       scope: this.plannerContainerScope(),
       autoDiscover: false,
     });
+    const things = this.catalogAuthority.filterThings(
+      this.plannerContainerScope().uri,
+      result.things,
+    );
     const existingByDay = new Map(
-      result.things.map((thing) => [solidThingToPlannerDay(thing).day, thing]),
+      things.map((thing) => [solidThingToPlannerDay(thing).day, thing]),
     );
 
     const operations: Promise<unknown>[] = [];
 
-    for (const thing of result.things) {
+    for (const thing of things) {
       const existingDay = solidThingToPlannerDay(thing);
+      this.operations.remember('plannerDay', existingDay.day, thing, existingDay);
       const nextTaskIds = plannerState.days[existingDay.day];
 
       if (nextTaskIds === undefined) {
-        operations.push(this.solidRuntime.client.things.delete(thing.uri));
+        operations.push(this.deletePlannerDayNow(existingDay.day));
       } else if (!arraysEqual(existingDay.taskIds, nextTaskIds)) {
         operations.push(
-          this.updatePlannerDayThing(thing, {
+          this.savePlannerDayNow({
             day: existingDay.day,
             taskIds: nextTaskIds,
             updated: Date.now(),
@@ -156,7 +175,7 @@ export class SolidPlannerRepository {
 
     for (const [day, taskIds] of Object.entries(plannerState.days)) {
       if (!existingByDay.has(day)) {
-        operations.push(this.createPlannerDay({ day, taskIds, updated: Date.now() }));
+        operations.push(this.savePlannerDayNow({ day, taskIds, updated: Date.now() }));
       }
     }
 
@@ -171,76 +190,56 @@ export class SolidPlannerRepository {
       autoDiscover: false,
     });
 
-    return result.things.map(solidThingToPlannerDay);
+    return this.catalogAuthority
+      .filterThings(this.plannerContainerScope().uri, result.things)
+      .map((thing) => {
+        const day = solidThingToPlannerDay(thing);
+        return this.operations.remember('plannerDay', day.day, thing, day);
+      });
   }
 
   private async savePlannerDayNow(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
-    const existingThing = await this.findPlannerDayThing(plannerDay.day);
-
-    if (existingThing === null) {
-      return this.createPlannerDay(plannerDay);
-    }
-
-    return this.updatePlannerDayThing(existingThing, plannerDay);
-  }
-
-  private async createPlannerDay(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
-    const created = await this.solidRuntime.client.things.create(
-      plannerDayToSolidCreateInput(plannerDay, this.solidRuntime.plannerDayProfile),
-    );
-    return solidThingToPlannerDay(created);
-  }
-
-  private async updatePlannerDayThing(
-    existingThing: Thing,
-    plannerDay: SolidPlannerDay,
-  ): Promise<SolidPlannerDay> {
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      plannerDayToSolidChanges(plannerDay),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid planner day update commit, received ${commit.kind}`,
-      );
-    }
-
-    return solidThingToPlannerDay(commit.result);
+    return this.operations.upsert({
+      model: 'plannerDay',
+      id: plannerDay.day,
+      value: plannerDay,
+      resourceName: plannerDay.day,
+      profile: this.solidRuntime.plannerDayProfile,
+      createInput: plannerDayToSolidCreateInput(
+        plannerDay,
+        this.solidRuntime.plannerDayProfile,
+      ),
+      changes: plannerDayToSolidChanges(plannerDay),
+      map: solidThingToPlannerDay,
+    });
   }
 
   private async deletePlannerDayNow(day: string): Promise<void> {
-    const existingThing = await this.findPlannerDayThing(day);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'plannerDay',
+      day,
+      this.solidRuntime.plannerDayProfile,
+      day,
+    );
   }
 
   private async savePlannerDialogStateNow(
     addPlannedTasksDialogLastShown: string | undefined,
   ): Promise<void> {
-    const existingThing = await this.findPlannerStateThing();
     const nextState = createSolidPlannerState(addPlannedTasksDialogLastShown);
-
-    if (existingThing === null) {
-      await this.solidRuntime.client.things.create(
-        plannerStateToSolidCreateInput(nextState, this.solidRuntime.plannerStateProfile),
-      );
-      return;
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      plannerStateToSolidChanges(nextState),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid planner state update commit, received ${commit.kind}`,
-      );
-    }
+    await this.operations.upsert({
+      model: 'plannerState',
+      id: SOLID_PLANNER_STATE_ID,
+      value: nextState,
+      resourceName: SOLID_PLANNER_STATE_RESOURCE_NAME,
+      profile: this.solidRuntime.plannerStateProfile,
+      createInput: plannerStateToSolidCreateInput(
+        nextState,
+        this.solidRuntime.plannerStateProfile,
+      ),
+      changes: plannerStateToSolidChanges(nextState),
+      map: solidThingToPlannerState,
+    });
   }
 
   subscribePlannerState(listener: (plannerState: PlannerState) => void): Unsubscribe {
@@ -259,28 +258,6 @@ export class SolidPlannerRepository {
         emitInitial: true,
       },
     );
-  }
-
-  private async findPlannerDayThing(day: string): Promise<Thing | null> {
-    const result = await this.solidRuntime.client.things.query(
-      {
-        ...solidPlannerDayQuery,
-        where: [
-          {
-            kind: 'property',
-            predicateUri: SP_PLANNER_DAY.day,
-            value: day,
-          },
-        ],
-      },
-      {
-        limit: 1,
-        scope: this.plannerContainerScope(),
-        autoDiscover: false,
-      },
-    );
-
-    return result.things[0] ?? null;
   }
 
   private async findPlannerStateThing(): Promise<Thing | null> {

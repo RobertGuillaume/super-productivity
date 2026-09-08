@@ -170,7 +170,9 @@ describe('SolidMenuTreeRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidMenuTreeRepository).saveMenuTree(menuTree);
+    const repository = TestBed.inject(SolidMenuTreeRepository);
+    await repository.loadMenuTree();
+    const saved = await repository.saveMenuTree(menuTree);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

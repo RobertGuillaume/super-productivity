@@ -99,7 +99,9 @@ describe('SolidTagRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidTagRepository).saveTag(tag);
+    const repository = TestBed.inject(SolidTagRepository);
+    await repository.loadTags();
+    const saved = await repository.saveTag(tag);
 
     expect(things.create).not.toHaveBeenCalled();
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(

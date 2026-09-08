@@ -17,6 +17,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -29,6 +30,7 @@ export class SolidGlobalConfigRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadGlobalConfig(): Promise<SolidRepositoryRead<GlobalConfigState | null>> {
     const result = await this.queryGlobalConfigThing();
@@ -37,12 +39,8 @@ export class SolidGlobalConfigRepository {
         this.globalConfigContainerScope().uri,
         result.things,
       )[0] ?? null;
-    return solidRepositoryRead(
-      existingThing === null
-        ? null
-        : (solidThingToGlobalConfig(existingThing)?.config ?? null),
-      result.metadata,
-    );
+    const config = existingThing === null ? null : this.mapGlobalConfig(existingThing);
+    return solidRepositoryRead(config, result.metadata);
   }
 
   saveGlobalConfig(config: GlobalConfigState): Promise<GlobalConfigState> {
@@ -54,36 +52,27 @@ export class SolidGlobalConfigRepository {
   private async saveGlobalConfigNow(
     config: GlobalConfigState,
   ): Promise<GlobalConfigState> {
-    const existingThing = await this.findGlobalConfigThing();
+    return this.operations.upsert({
+      model: 'globalConfig',
+      id: 'root',
+      value: config,
+      resourceName: SOLID_GLOBAL_CONFIG_ID,
+      profile: this.solidRuntime.globalConfigProfile,
+      createInput: globalConfigToSolidCreateInput(
+        config,
+        this.solidRuntime.globalConfigProfile,
+      ),
+      changes: globalConfigToSolidChanges(config),
+      map: (thing) => this.mapGlobalConfig(thing),
+    });
+  }
 
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        globalConfigToSolidCreateInput(config, this.solidRuntime.globalConfigProfile),
-      );
-      const createdConfig = solidThingToGlobalConfig(created)?.config;
-      if (!createdConfig) {
-        throw new Error('Expected Solid global config create result');
-      }
-      return createdConfig;
+  private mapGlobalConfig(thing: Thing): GlobalConfigState {
+    const config = solidThingToGlobalConfig(thing)?.config;
+    if (config === undefined) {
+      throw new Error('Expected Solid global config result');
     }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      globalConfigToSolidChanges(config),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid global config update commit, received ${commit.kind}`,
-      );
-    }
-
-    const updatedConfig = solidThingToGlobalConfig(commit.result)?.config;
-    if (!updatedConfig) {
-      throw new Error('Expected Solid global config update result');
-    }
-    return updatedConfig;
+    return this.operations.remember('globalConfig', 'root', thing, config);
   }
 
   subscribeGlobalConfig(

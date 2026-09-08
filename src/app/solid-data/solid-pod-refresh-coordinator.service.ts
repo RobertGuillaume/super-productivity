@@ -15,6 +15,7 @@ import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
 
 const REFRESH_BATCH_SIZE = 10;
 const MAX_DISCOVERY_CONTINUATIONS = 100;
@@ -31,6 +32,7 @@ export class SolidPodRefreshCoordinatorService {
   private readonly mutations = inject(SolidMutationCoordinator);
   private readonly taskAccess = inject(SolidTaskAccessService);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly identities = inject(SolidThingIdentityRegistry);
 
   private startPromise: Promise<void> | null = null;
   private refreshPromise: Promise<void> | null = null;
@@ -117,6 +119,7 @@ export class SolidPodRefreshCoordinatorService {
     this.stopSubscriptions();
     this.knownContainers.clear();
     this.catalogAuthority.clear();
+    this.identities.clear();
     this.hydration.resetCatalogBaseline();
     this.taskAccess.clear();
     this.dataLayerState.clearWriteReadiness();
@@ -149,6 +152,7 @@ export class SolidPodRefreshCoordinatorService {
         this.stopSubscriptions();
         this.knownContainers.clear();
         this.catalogAuthority.clear();
+        this.identities.clear();
         this.hydration.resetCatalogBaseline();
         this.taskAccess.clear();
         await this.hydration.reconcileStore();
@@ -185,6 +189,7 @@ export class SolidPodRefreshCoordinatorService {
           this.stopSubscriptions();
           this.knownContainers.clear();
           this.catalogAuthority.clear();
+          this.identities.clear();
           this.hydration.resetCatalogBaseline();
           this.taskAccess.clear();
           this.dataLayerState.clearWriteReadiness();

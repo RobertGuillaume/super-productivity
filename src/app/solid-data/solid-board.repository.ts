@@ -12,6 +12,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -24,6 +25,7 @@ export class SolidBoardRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadBoards(): Promise<SolidRepositoryRead<BoardCfg[]>> {
     const boardContainerScope = this.boardContainerScope();
@@ -36,7 +38,10 @@ export class SolidBoardRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(boardContainerScope.uri, result.things)
-        .map(solidThingToBoardRecord)
+        .map((thing) => {
+          const record = solidThingToBoardRecord(thing);
+          return this.operations.remember('board', record.board.id, thing, record);
+        })
         .sort((a, b) => a.order - b.order)
         .map((record) => record.board),
       result.metadata,
@@ -56,33 +61,25 @@ export class SolidBoardRepository {
   }
 
   private async saveBoardNow(board: BoardCfg, order: number): Promise<BoardCfg> {
-    const existingThing = await this.findBoardThing(board.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        boardToSolidCreateInput(board, this.solidRuntime.boardProfile, order),
-      );
-      return solidThingToBoard(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      boardToSolidChanges(board, order),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(`Expected Solid board update commit, received ${commit.kind}`);
-    }
-
-    return solidThingToBoard(commit.result);
+    return this.operations.upsert({
+      model: 'board',
+      id: board.id,
+      value: board,
+      resourceName: board.id,
+      profile: this.solidRuntime.boardProfile,
+      createInput: boardToSolidCreateInput(board, this.solidRuntime.boardProfile, order),
+      changes: boardToSolidChanges(board, order),
+      map: solidThingToBoard,
+    });
   }
 
   private async deleteBoardNow(boardId: string): Promise<void> {
-    const existingThing = await this.findBoardThing(boardId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete(
+      'board',
+      boardId,
+      this.solidRuntime.boardProfile,
+      boardId,
+    );
   }
 
   subscribeBoards(listener: (boards: BoardCfg[]) => void): Unsubscribe {

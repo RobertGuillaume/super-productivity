@@ -6,6 +6,7 @@ import { SP_ARCHIVE_STATE } from './solid-productivity-vocab';
 import {
   archiveStateToSolidChanges,
   archiveStateToSolidCreateInput,
+  archiveStateResourceName,
   createDefaultSolidArchiveState,
   SolidArchiveState,
   SolidArchiveStateBucket,
@@ -15,6 +16,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -27,6 +29,7 @@ export class SolidArchiveStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadArchiveStates(): Promise<
     SolidRepositoryRead<{
@@ -42,7 +45,12 @@ export class SolidArchiveStateRepository {
     });
     const states = this.catalogAuthority
       .filterThings(archiveStateContainerScope.uri, result.things)
-      .map((thing) => solidThingToArchiveState(thing))
+      .map((thing) => {
+        const state = solidThingToArchiveState(thing);
+        return state === null
+          ? null
+          : this.operations.remember('archiveState', state.bucket, thing, state);
+      })
       .filter((state): state is SolidArchiveState => state !== null);
 
     return solidRepositoryRead(
@@ -68,39 +76,25 @@ export class SolidArchiveStateRepository {
   private async saveArchiveStateNow(
     archiveState: SolidArchiveState,
   ): Promise<SolidArchiveState> {
-    const existingThing = await this.findArchiveStateThing(archiveState.bucket);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        archiveStateToSolidCreateInput(
-          archiveState,
-          this.solidRuntime.archiveStateProfile,
-        ),
-      );
-      const createdArchiveState = solidThingToArchiveState(created);
-      if (!createdArchiveState) {
-        throw new Error('Expected Solid archive state create result');
-      }
-      return createdArchiveState;
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      archiveStateToSolidChanges(archiveState),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid archive state update commit, received ${commit.kind}`,
-      );
-    }
-
-    const updatedArchiveState = solidThingToArchiveState(commit.result);
-    if (!updatedArchiveState) {
-      throw new Error('Expected Solid archive state update result');
-    }
-    return updatedArchiveState;
+    return this.operations.upsert({
+      model: 'archiveState',
+      id: archiveState.bucket,
+      value: archiveState,
+      resourceName: archiveStateResourceName(archiveState.bucket),
+      profile: this.solidRuntime.archiveStateProfile,
+      createInput: archiveStateToSolidCreateInput(
+        archiveState,
+        this.solidRuntime.archiveStateProfile,
+      ),
+      changes: archiveStateToSolidChanges(archiveState),
+      map: (thing) => {
+        const mapped = solidThingToArchiveState(thing);
+        if (mapped === null) {
+          throw new Error('Expected Solid archive state result');
+        }
+        return mapped;
+      },
+    });
   }
 
   archiveModelToSolidArchiveState(

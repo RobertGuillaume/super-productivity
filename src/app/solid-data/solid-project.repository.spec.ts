@@ -98,7 +98,9 @@ describe('SolidProjectRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidProjectRepository).saveProject(project);
+    const repository = TestBed.inject(SolidProjectRepository);
+    await repository.loadProjects();
+    const saved = await repository.saveProject(project);
 
     expect(things.create).not.toHaveBeenCalled();
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
@@ -162,7 +164,7 @@ describe('SolidProjectRepository', () => {
       title: 'Edited immediately',
     });
 
-    expect(things.query).toHaveBeenCalledTimes(1);
+    expect(things.query).not.toHaveBeenCalled();
     releaseCreate?.();
     await Promise.all([create, edit]);
     expect(things.create).toHaveBeenCalledTimes(1);

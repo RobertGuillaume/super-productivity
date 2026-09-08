@@ -5,6 +5,7 @@ import { SP_ARCHIVED_TASK } from './solid-productivity-vocab';
 import {
   archivedTaskToSolidChanges,
   archivedTaskToSolidCreateInput,
+  archivedTaskResourceName,
   SolidArchiveBucket,
   SolidArchivedTask,
   solidArchivedTaskQuery,
@@ -13,6 +14,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   settleSolidMutations,
   SolidMutationCoordinator,
@@ -26,6 +28,7 @@ export class SolidArchivedTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadArchivedTasks(): Promise<SolidRepositoryRead<SolidArchivedTask[]>> {
     const archivedTaskContainerScope = this.archivedTaskContainerScope();
@@ -38,7 +41,15 @@ export class SolidArchivedTaskRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(archivedTaskContainerScope.uri, result.things)
-        .map(solidThingToArchivedTask),
+        .map((thing) => {
+          const archivedTask = solidThingToArchivedTask(thing);
+          return this.operations.remember(
+            'archivedTask',
+            archivedTaskKey(archivedTask),
+            thing,
+            archivedTask,
+          );
+        }),
       result.metadata,
     );
   }
@@ -73,37 +84,32 @@ export class SolidArchivedTaskRepository {
     bucket: SolidArchiveBucket,
   ): Promise<Task> {
     const archivedTask: SolidArchivedTask = { task, bucket };
-    const existingThing = await this.findArchivedTaskThing(task.id, bucket);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        archivedTaskToSolidCreateInput(
-          archivedTask,
-          this.solidRuntime.archivedTaskProfile,
-        ),
-      );
-      return solidThingToArchivedTask(created).task;
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      archivedTaskToSolidChanges(archivedTask),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid archived task update commit, received ${commit.kind}`,
-      );
-    }
-
-    return solidThingToArchivedTask(commit.result).task;
+    const saved = await this.operations.upsert({
+      model: 'archivedTask',
+      id: archivedTaskKey(archivedTask),
+      value: archivedTask,
+      resourceName: archivedTaskResourceName(task.id, bucket),
+      profile: this.solidRuntime.archivedTaskProfile,
+      createInput: archivedTaskToSolidCreateInput(
+        archivedTask,
+        this.solidRuntime.archivedTaskProfile,
+      ),
+      changes: archivedTaskToSolidChanges(archivedTask),
+      map: solidThingToArchivedTask,
+    });
+    return saved.task;
   }
 
   private async deleteArchivedTaskNow(taskId: string): Promise<void> {
-    const existingThings = await this.findArchivedTaskThings(taskId);
     await settleSolidMutations(
-      existingThings.map((thing) => this.solidRuntime.client.things.delete(thing.uri)),
+      (['young', 'old'] as const).map((bucket) =>
+        this.operations.delete(
+          'archivedTask',
+          `${bucket}:${taskId}`,
+          this.solidRuntime.archivedTaskProfile,
+          archivedTaskResourceName(taskId, bucket),
+        ),
+      ),
     );
   }
 

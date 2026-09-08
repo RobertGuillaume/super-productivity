@@ -17,6 +17,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -29,6 +30,7 @@ export class SolidMenuTreeRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadMenuTree(): Promise<SolidRepositoryRead<MenuTreeState | null>> {
     const result = await this.queryMenuTreeThing();
@@ -37,12 +39,8 @@ export class SolidMenuTreeRepository {
         this.menuTreeContainerScope().uri,
         result.things,
       )[0] ?? null;
-    return solidRepositoryRead(
-      existingThing === null
-        ? null
-        : (solidThingToMenuTree(existingThing)?.menuTree ?? null),
-      result.metadata,
-    );
+    const menuTree = existingThing === null ? null : this.mapMenuTree(existingThing);
+    return solidRepositoryRead(menuTree, result.metadata);
   }
 
   saveMenuTree(menuTree: MenuTreeState): Promise<MenuTreeState> {
@@ -52,34 +50,27 @@ export class SolidMenuTreeRepository {
   }
 
   private async saveMenuTreeNow(menuTree: MenuTreeState): Promise<MenuTreeState> {
-    const existingThing = await this.findMenuTreeThing();
+    return this.operations.upsert({
+      model: 'menuTree',
+      id: 'root',
+      value: menuTree,
+      resourceName: SOLID_MENU_TREE_ID,
+      profile: this.solidRuntime.menuTreeProfile,
+      createInput: menuTreeToSolidCreateInput(
+        menuTree,
+        this.solidRuntime.menuTreeProfile,
+      ),
+      changes: menuTreeToSolidChanges(menuTree),
+      map: (thing) => this.mapMenuTree(thing),
+    });
+  }
 
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        menuTreeToSolidCreateInput(menuTree, this.solidRuntime.menuTreeProfile),
-      );
-      const createdMenuTree = solidThingToMenuTree(created)?.menuTree;
-      if (!createdMenuTree) {
-        throw new Error('Expected Solid menu tree create result');
-      }
-      return createdMenuTree;
+  private mapMenuTree(thing: Thing): MenuTreeState {
+    const menuTree = solidThingToMenuTree(thing)?.menuTree;
+    if (menuTree === undefined) {
+      throw new Error('Expected Solid menu tree result');
     }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      menuTreeToSolidChanges(menuTree),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(`Expected Solid menu tree update commit, received ${commit.kind}`);
-    }
-
-    const updatedMenuTree = solidThingToMenuTree(commit.result)?.menuTree;
-    if (!updatedMenuTree) {
-      throw new Error('Expected Solid menu tree update result');
-    }
-    return updatedMenuTree;
+    return this.operations.remember('menuTree', 'root', thing, menuTree);
   }
 
   subscribeMenuTree(listener: (menuTree: MenuTreeState | null) => void): Unsubscribe {

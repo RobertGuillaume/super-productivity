@@ -161,7 +161,9 @@ describe('SolidAppStateRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidAppStateRepository).saveAppStateOrder({
+    const repository = TestBed.inject(SolidAppStateRepository);
+    await repository.loadAppState();
+    const saved = await repository.saveAppStateOrder({
       sectionOrder: ['section-2', 'section-1'],
     });
 

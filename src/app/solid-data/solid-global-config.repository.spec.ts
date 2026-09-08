@@ -151,9 +151,9 @@ describe('SolidGlobalConfigRepository', () => {
       result: updatedThing,
     });
 
-    const saved = await TestBed.inject(SolidGlobalConfigRepository).saveGlobalConfig(
-      globalConfig,
-    );
+    const repository = TestBed.inject(SolidGlobalConfigRepository);
+    await repository.loadGlobalConfig();
+    const saved = await repository.saveGlobalConfig(globalConfig);
 
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,

@@ -1,14 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import type { RuntimeScope, Thing } from '@solid-intents/runtime';
 import { TimeTrackingState } from '../features/time-tracking/time-tracking.model';
-import { SP_TIME_TRACKING } from './solid-productivity-vocab';
 import {
   solidThingToTimeTrackingEntry,
   solidTimeTrackingQuery,
-  SolidTimeTrackingContextType,
   SolidTimeTrackingEntry,
   timeTrackingEntriesToState,
-  timeTrackingEntryId,
+  timeTrackingEntryResourceName,
   timeTrackingEntryToSolidChanges,
   timeTrackingEntryToSolidCreateInput,
   timeTrackingStateToEntries,
@@ -21,6 +19,7 @@ import {
   SolidMutationCoordinator,
   solidMutationKey,
 } from './solid-mutation-coordinator.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 
 type SolidTimeTrackingContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 
@@ -29,6 +28,7 @@ export class SolidTimeTrackingRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadTimeTrackingState(): Promise<SolidRepositoryRead<TimeTrackingState>> {
     const timeTrackingContainerScope = this.timeTrackingContainerScope();
@@ -39,7 +39,12 @@ export class SolidTimeTrackingRepository {
     });
     const entries = this.catalogAuthority
       .filterThings(timeTrackingContainerScope.uri, result.things)
-      .map((thing) => solidThingToTimeTrackingEntry(thing))
+      .map((thing) => {
+        const entry = solidThingToTimeTrackingEntry(thing);
+        return entry === null
+          ? null
+          : this.operations.remember('timeTracking', entry.id, thing, entry);
+      })
       .filter((entry): entry is SolidTimeTrackingEntry => entry !== null);
 
     return solidRepositoryRead(timeTrackingEntriesToState(entries), result.metadata);
@@ -60,40 +65,29 @@ export class SolidTimeTrackingRepository {
   private async saveTimeTrackingEntryNow(
     entry: SolidTimeTrackingEntry,
   ): Promise<SolidTimeTrackingEntry> {
-    const existingThing = await this.findTimeTrackingThing(
-      entry.contextType,
-      entry.contextId,
-      entry.date,
-    );
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        timeTrackingEntryToSolidCreateInput(entry, this.solidRuntime.timeTrackingProfile),
-      );
-      const createdEntry = solidThingToTimeTrackingEntry(created);
-      if (!createdEntry) {
-        throw new Error('Expected Solid time tracking create result');
-      }
-      return createdEntry;
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      timeTrackingEntryToSolidChanges(entry),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(
-        `Expected Solid time tracking update commit, received ${commit.kind}`,
-      );
-    }
-
-    const updatedEntry = solidThingToTimeTrackingEntry(commit.result);
-    if (!updatedEntry) {
-      throw new Error('Expected Solid time tracking update result');
-    }
-    return updatedEntry;
+    return this.operations.upsert({
+      model: 'timeTracking',
+      id: entry.id,
+      value: entry,
+      resourceName: timeTrackingEntryResourceName(
+        entry.contextType,
+        entry.contextId,
+        entry.date,
+      ),
+      profile: this.solidRuntime.timeTrackingProfile,
+      createInput: timeTrackingEntryToSolidCreateInput(
+        entry,
+        this.solidRuntime.timeTrackingProfile,
+      ),
+      changes: timeTrackingEntryToSolidChanges(entry),
+      map: (thing) => {
+        const value = solidThingToTimeTrackingEntry(thing);
+        if (value === null) {
+          throw new Error('Expected Solid time tracking mutation result');
+        }
+        return value;
+      },
+    });
   }
 
   private async replaceTimeTrackingStateNow(state: TimeTrackingState): Promise<void> {
@@ -112,34 +106,19 @@ export class SolidTimeTrackingRepository {
           entry: solidThingToTimeTrackingEntry(thing),
         }))
         .filter(({ entry }) => entry !== null && !desiredIds.has(entry.id))
-        .map(({ thing }) => this.solidRuntime.client.things.delete(thing.uri)),
+        .map(({ entry }) =>
+          this.operations.delete(
+            'timeTracking',
+            entry!.id,
+            this.solidRuntime.timeTrackingProfile,
+            timeTrackingEntryResourceName(
+              entry!.contextType,
+              entry!.contextId,
+              entry!.date,
+            ),
+          ),
+        ),
     );
-  }
-
-  private async findTimeTrackingThing(
-    contextType: SolidTimeTrackingContextType,
-    contextId: string,
-    date: string,
-  ): Promise<Thing | null> {
-    const result = await this.solidRuntime.client.things.query(
-      {
-        ...solidTimeTrackingQuery,
-        where: [
-          {
-            kind: 'property',
-            predicateUri: SP_TIME_TRACKING.id,
-            value: timeTrackingEntryId(contextType, contextId, date),
-          },
-        ],
-      },
-      {
-        limit: 1,
-        scope: this.timeTrackingContainerScope(),
-        autoDiscover: false,
-      },
-    );
-
-    return result.things[0] ?? null;
   }
 
   private async findAllTimeTrackingThings(): Promise<Thing[]> {
@@ -148,7 +127,17 @@ export class SolidTimeTrackingRepository {
       autoDiscover: false,
     });
 
-    return result.things;
+    const things = this.catalogAuthority.filterThings(
+      this.timeTrackingContainerScope().uri,
+      result.things,
+    );
+    for (const thing of things) {
+      const entry = solidThingToTimeTrackingEntry(thing);
+      if (entry !== null) {
+        this.operations.remember('timeTracking', entry.id, thing, entry);
+      }
+    }
+    return things;
   }
 
   private timeTrackingContainerScope(): SolidTimeTrackingContainerScope {

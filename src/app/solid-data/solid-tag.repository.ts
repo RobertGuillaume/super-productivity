@@ -5,6 +5,7 @@ import { SP_TAG } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -23,6 +24,7 @@ export class SolidTagRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
   private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly operations = inject(SolidRepositoryOperations);
 
   async loadTags(): Promise<SolidRepositoryRead<Tag[]>> {
     const tagContainerScope = this.tagContainerScope();
@@ -35,7 +37,10 @@ export class SolidTagRepository {
     return solidRepositoryRead(
       this.catalogAuthority
         .filterThings(tagContainerScope.uri, result.things)
-        .map(solidThingToTag),
+        .map((thing) => {
+          const tag = solidThingToTag(thing);
+          return this.operations.remember('tag', tag.id, thing, tag);
+        }),
       result.metadata,
     );
   }
@@ -53,33 +58,20 @@ export class SolidTagRepository {
   }
 
   private async saveTagNow(tag: Tag): Promise<Tag> {
-    const existingThing = await this.findTagThing(tag.id);
-
-    if (existingThing === null) {
-      const created = await this.solidRuntime.client.things.create(
-        tagToSolidCreateInput(tag, this.solidRuntime.tagProfile),
-      );
-      return solidThingToTag(created);
-    }
-
-    const plan = this.solidRuntime.client.writes.planUpdate(
-      existingThing.uri,
-      tagToSolidChanges(tag),
-    );
-    const commit = await this.solidRuntime.client.writes.commit(plan);
-
-    if (commit.kind !== 'thing.update') {
-      throw new Error(`Expected Solid tag update commit, received ${commit.kind}`);
-    }
-
-    return solidThingToTag(commit.result);
+    return this.operations.upsert({
+      model: 'tag',
+      id: tag.id,
+      value: tag,
+      resourceName: tag.id,
+      profile: this.solidRuntime.tagProfile,
+      createInput: tagToSolidCreateInput(tag, this.solidRuntime.tagProfile),
+      changes: tagToSolidChanges(tag),
+      map: solidThingToTag,
+    });
   }
 
   private async deleteTagNow(tagId: string): Promise<void> {
-    const existingThing = await this.findTagThing(tagId);
-    if (existingThing !== null) {
-      await this.solidRuntime.client.things.delete(existingThing.uri);
-    }
+    await this.operations.delete('tag', tagId, this.solidRuntime.tagProfile, tagId);
   }
 
   subscribeTags(listener: (tags: Tag[]) => void): Unsubscribe {
