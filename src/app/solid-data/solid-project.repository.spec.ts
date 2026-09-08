@@ -130,6 +130,10 @@ describe('SolidProjectRepository', () => {
       diagnostics: [],
     } as RuntimeWritePlan;
     let created = false;
+    let signalCreateStarted: (() => void) | undefined;
+    const createStarted = new Promise<void>((resolve) => {
+      signalCreateStarted = resolve;
+    });
     let releaseCreate: (() => void) | undefined;
     const createGate = new Promise<void>((resolve) => {
       releaseCreate = resolve;
@@ -138,6 +142,7 @@ describe('SolidProjectRepository', () => {
       things: created ? [createdThing] : [],
     }));
     things.create.and.callFake(async () => {
+      signalCreateStarted?.();
       await createGate;
       created = true;
       return createdThing;
@@ -151,13 +156,11 @@ describe('SolidProjectRepository', () => {
     const repository = TestBed.inject(SolidProjectRepository);
 
     const create = repository.saveProject(project);
-    await Promise.resolve();
-    await Promise.resolve();
+    await createStarted;
     const edit = repository.saveProject({
       ...project,
       title: 'Edited immediately',
     });
-    await Promise.resolve();
 
     expect(things.query).toHaveBeenCalledTimes(1);
     releaseCreate?.();

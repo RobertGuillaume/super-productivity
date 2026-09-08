@@ -318,12 +318,17 @@ describe('SolidTaskRepository', () => {
       preconditions: [],
       diagnostics: [],
     } as RuntimeWritePlan;
+    let signalCreateStarted: (() => void) | undefined;
+    const createStarted = new Promise<void>((resolve) => {
+      signalCreateStarted = resolve;
+    });
     let releaseCreate: (() => void) | undefined;
     const createGate = new Promise<void>((resolve) => {
       releaseCreate = resolve;
     });
     things.query.and.resolveTo({ things: [] });
     things.create.and.callFake(async () => {
+      signalCreateStarted?.();
       await createGate;
       return createdThing;
     });
@@ -336,8 +341,7 @@ describe('SolidTaskRepository', () => {
     const repository = TestBed.inject(SolidTaskRepository);
 
     const create = repository.saveTask(task);
-    await Promise.resolve();
-    await Promise.resolve();
+    await createStarted;
     const complete = repository.saveTask({ ...task, isDone: true });
     releaseCreate?.();
     await Promise.all([create, complete]);

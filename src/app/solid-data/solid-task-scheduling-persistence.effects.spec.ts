@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Action, Store } from '@ngrx/store';
-import { of, Subject } from 'rxjs';
+import { lastValueFrom, of, Subject } from 'rxjs';
+import { take } from 'rxjs/operators';
 import { SnackService } from '../core/snack/snack.service';
 import { TODAY_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
@@ -83,7 +84,9 @@ describe('SolidTaskSchedulingPersistenceEffects', () => {
       return of([]);
     });
     const effects = TestBed.inject(SolidTaskSchedulingPersistenceEffects);
-    const subscription = effects.persistTaskScheduling$.subscribe();
+    const persistenceComplete = lastValueFrom(
+      effects.persistTaskScheduling$.pipe(take(1)),
+    );
 
     actions$.next(
       TaskSharedActions.scheduleTaskWithTime({
@@ -97,7 +100,7 @@ describe('SolidTaskSchedulingPersistenceEffects', () => {
         isMoveToBacklog: false,
       }),
     );
-    await Promise.resolve();
+    await persistenceComplete;
 
     expect(store.select.calls.allArgs() as unknown as unknown[][]).toEqual([
       [
@@ -115,7 +118,6 @@ describe('SolidTaskSchedulingPersistenceEffects', () => {
     ]);
     expect(solidTaskRepository.saveTask).toHaveBeenCalledOnceWith(task);
     expect(solidTagRepository.saveTag).toHaveBeenCalledOnceWith(todayTag);
-    subscription.unsubscribe();
   });
 
   it('uses the action id for unschedule and dismiss reminder actions', async () => {
@@ -126,12 +128,13 @@ describe('SolidTaskSchedulingPersistenceEffects', () => {
       selector === selectTasksById ? of([task]) : of(todayTag),
     );
     const effects = TestBed.inject(SolidTaskSchedulingPersistenceEffects);
-    const subscription = effects.persistTaskScheduling$.subscribe();
+    const persistenceComplete = lastValueFrom(
+      effects.persistTaskScheduling$.pipe(take(2)),
+    );
 
     actions$.next(TaskSharedActions.unscheduleTask({ id: 'task-1' }));
-    await Promise.resolve();
     actions$.next(TaskSharedActions.dismissReminderOnly({ id: 'task-1' }));
-    await Promise.resolve();
+    await persistenceComplete;
 
     expect(store.select.calls.allArgs()[0] as unknown[]).toEqual([
       selectTasksById,
@@ -147,7 +150,6 @@ describe('SolidTaskSchedulingPersistenceEffects', () => {
     ]);
     expect(solidTaskRepository.saveTask).toHaveBeenCalledTimes(2);
     expect(solidTagRepository.saveTag).toHaveBeenCalledTimes(2);
-    subscription.unsubscribe();
   });
 
   it('ignores scheduling actions when Solid does not own them', async () => {
