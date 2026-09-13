@@ -46,8 +46,14 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 - Start with an absent or empty menu-tree resource. Confirm the sidebar appears
   after data initialization and progressively adds discovered projects/tags.
 - Seed more than 250 app resources. Confirm tasks become visible during the
-  scan, every listed resource eventually appears, and one reload does not start
-  competing scans.
+  scan, every listed resource eventually appears, and the runtime resumes the
+  same named session after a browser restart instead of starting a blind crawl.
+- Interrupt a scan, close the profile, and reopen it. Confirm the retained pass
+  completes before a fresh pass begins and no already acknowledged output is
+  published twice.
+- Open the same Pod in both browser profiles during an unfinished scan. Confirm
+  one tab reports healthy runtime ownership, the other keeps cached data, and
+  takeover occurs after the 30-second lease window when the owner closes.
 - Confirm top-level app and native tasks appear in Inbox as soon as their task
   entities arrive. Native tasks with iCalendar or schema.org due dates should
   also appear in Today.
@@ -60,6 +66,12 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 - Edit titles and details for each model.
 - Mark a newly created task complete and confirm its original resource is updated
   in place with `ical:status` set to `COMPLETED` and `sp:isDone` set to `true`.
+- Inspect a newly created task and confirm its primary RDF class is
+  `ical:Vtodo`, its existing Super Productivity predicates are unchanged, and
+  the runtime compatibility hint is present.
+- Add an unrelated triple and a JSON literal to a multi-Thing RDF document,
+  update one task, and confirm the source document, unrelated subject/triple,
+  JSON datatype, and resource URI are preserved.
 - Reorder projects, tags, notes pinned to Today, sections, tasks, and subtasks.
 - Reload the same profile and confirm all edits and ordering return from Solid.
 - Open the second profile, log in to the same pod, and confirm the same state hydrates without import.
@@ -132,8 +144,20 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
   native task. Explicit denial shows **Read-only Pod task**; unknown,
   unavailable, and rate-limited access blocks editing without being labelled
   as an explicit denial.
-- Confirm **Reload from Pod** refreshes in process and does not reload the
-  browser window.
+- Confirm **Reload from Pod** refreshes the durable sessions in process without
+  reloading the browser page or discarding retained work.
+- Force 409 and 412 validator conflicts, a lost response (`unknown`), and a
+  registration-only reconciliation failure. Confirm the app refreshes the exact
+  source, projects Pod state, never replays an old plan, and accepts recoverable
+  success only after the resulting Thing is visible in the catalog.
+- Force a deferred/rate-limited write outcome and confirm recovery does not run
+  before `retryAt`. Authentication failures should recover immediately.
+- Test a Pod that rejects container `HEAD` but supports listing. Confirm nested
+  parents are created shortest-path first, a concurrent create is accepted only
+  after re-listing, and a target outside the verified storage root is rejected.
+- Upgrade a profile containing the runtime IndexedDB schema-2 catalog. Confirm
+  schema-3 session state and existing cached Things remain readable without a
+  destructive startup rewrite.
 - Revoke or expire the active Solid session, attempt a task edit, and confirm a
   single persistent **Sign in again** prompt appears. Complete login and confirm
   the Pod remains the primary data source.

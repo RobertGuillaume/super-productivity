@@ -1,115 +1,77 @@
-# Solid Runtime Integration Notes
+# Solid Runtime 2.0 Integration Notes
 
-Super Productivity consumes the immutable `@solid-intents/runtime` 1.1.1
-archive in `vendor/`. The runtime is the Solid protocol boundary; the app does
-not import or build against a runtime source checkout.
+Super Productivity is integrated against the commit-qualified development
+artifact for runtime commit `27eb32547b72e6c5c1f14986ee1338663787990f`.
+The archive and SHA-256 checksum in `vendor/` are immutable inputs built from
+that commit, not from a runtime working tree. Production merge remains blocked
+until the runtime publishes an immutable, correctly versioned 2.0 artifact.
 
-## Integration Boundary
+## Ownership Boundary
 
-The runtime owns authenticated HTTP scheduling, retries, catalog persistence,
-RDF normalization, discovery, Solid write execution, and effective WAC
-resolution. Super Productivity owns application-model mapping, container
-priority, progressive publication, Pod-authoritative reconciliation, and the
-policy that a write is blocked until access is proven.
+The runtime owns RDF parsing and semantic profiles, authenticated protocol
+access, durable discovery state, catalog membership and authority, request
+scheduling, write planning, conditional execution, and outcome evidence. The
+application does not parse WebID profiles, type indexes, ACL responses, or
+container RDF directly.
 
-Repository reads are catalog-only (`autoDiscover: false`). Startup hydrates the
-catalog for the remembered storage root before profile or Pod requests. Once
-the root is verified for the current session, one coordinator explicitly lists
-app containers in priority order and refreshes their resources in batches of
-ten. A successful listing is authoritative for that app container; failed or
-inaccessible listings preserve the cached slice.
+Super Productivity owns projection into its application models, foreground and
+background target priority, and the conservative policy that editing requires
+a proven write grant for the authenticated WebID. Unknown, deferred, and
+inaccessible permissions stay blocked.
 
-The app deliberately does not use `discovery.reconcileContainer()` on the
-startup critical path yet. The runtime API atomically records membership and
-queues every listed child, while the app needs to publish the first ten
-resources before the rest of a large listing is queued. The app therefore
-retains its authority registry and explicit batching while benefiting from the
-runtime scheduler, catalog deltas, active-record filtering, and normalized
-types underneath those calls.
+Repository reads remain catalog-only. Startup publishes the existing IndexedDB
+catalog before network work. The coordinator then provisions the unchanged
+container layout and resumes stable named runtime sessions: one direct,
+non-recursive session per application container and one cross-origin `Task`
+type-index session with storage-root fallback disabled. Complete session
+coverage can remove absent records; partial or failed coverage preserves the
+previously published model slice.
 
-Native task permission checks run in a source-deduplicated background queue.
-The runtime resolves permission provenance and reports rate limiting; the app
-turns those results into task/container readiness and keeps every ambiguous
-state blocked.
+All semantic mutations use awaited version-4 plans. Plans are never replayed:
+any future retry must read and plan again. A completed content mutation followed
+only by registration or reconciliation failure is accepted only after targeted
+catalog refresh confirms the Thing. Conflict, rejection, and unknown outcomes
+project authoritative Pod state instead of assuming success. Deferred outcomes
+wait until the runtime-provided retry deadline.
 
-## Open Runtime Gaps
+## Compatibility
 
-### Missing Container Provisioning API
+- Pod paths and Super Productivity predicates are unchanged.
+- Existing schema-Thing, legacy class, and additional-type records remain
+  readable and are updated in place.
+- New tasks use iCalendar `Vtodo` as the primary class plus the runtime
+  compatibility hint.
+- Typed semantic views are preferred; raw RDF readers remain as a lossless
+  fallback for old or unsupported encodings. Such fallback is reported as the
+  quiet `semantic-projection-degraded` diagnostic.
+- JSON literals remain explicit RDF operations so their datatype and unknown
+  neighboring triples are preserved.
+- No application schema bump or Pod migration is performed.
 
-The public storage API exposes roots, listing, and subscriptions, but no
-idempotent operation for creating a missing container tree. Thing creation
-assumes its target container exists.
+## Genuine Remaining Limitations and Release Gates
 
-Current app approach: after root verification, lazily create only missing
-parent/app containers with authenticated HTTP `PUT` requests and remember
-successful listings/provisioning for the refresh. The runtime should eventually
-provide `ensureContainer()` or layout provisioning with structured outcomes.
+- There is no offline Solid write outbox. Cached catalog data remains readable,
+  while writes wait for connectivity and verified access.
+- Explicit headless execution, Pod checkpoint maintenance, raw publication,
+  archive workflows, and application consumption of acknowledged discovery
+  observations remain intentionally out of scope.
+- Replace the development archive with the qualified 2.0 release before merge.
+  That release must clear the upstream production audit and qualification suite,
+  including the 100,000-resource archive run.
+- With the same npm 11.18 advisory snapshot, the development artifact adds five
+  moderate runtime-chain audit nodes compared with the pre-integration lockfile:
+  `@solid-intents/runtime`, `soukai-solid`, `@noeldemartin/solid-utils`, `jsonld`,
+  and `@digitalbazaar/http-client`. This is an external release blocker, not an
+  accepted production baseline.
+- The packed consumer and Super Productivity production build must pass on Node
+  22.18/npm 11.18 without downgrading npm and without a new audit regression.
+  The development archive does not yet clear that gate: a package-lock-only
+  npm 11.18 audit on 2026-09-13 reports five additional moderate affected
+  dependency nodes (`@digitalbazaar/http-client`,
+  `@noeldemartin/solid-utils`, `@solid-intents/runtime`, `jsonld`, and
+  `soukai-solid`) compared with the unchanged application lockfile. They are
+  runtime internals and must be resolved by the qualified release rather than
+  application-level overrides.
 
-### Standalone Node 22 Packaging Override
-
-The 1.1.1 archive documents a transitive JSON-LD loader incompatibility for a
-fresh standalone Node 22 consumer unless the consumer applies the runtime
-workspace's `@digitalbazaar/http-client: 4.3.0` override. This is a packaging
-limitation rather than a request-scheduling issue. Super Productivity consumes
-the checked vendored archive through its locked Angular workspace; any future
-dependency refresh must repeat the archive import/build check.
-
-## Capabilities Resolved In Runtime 1.1.x
-
-### Adaptive Per-Origin Request Scheduling
-
-Authenticated requests no longer wait on one global completion chain. Exact
-origins have independent start intervals and concurrency. A 429 episode pauses
-queued starts, reduces effective concurrency, increases spacing, honors both
-HTTP-date and delta-seconds `Retry-After`, and recovers gradually after
-successful responses. A final 429 still establishes cooldown protection.
-
-The app does not add HTTP retries or Pod-specific tuning. It subscribes once to
-the runtime's content-safe rate-limit event and presents a quiet transient
-status. Semantic permission work remains capped at two concurrent source
-checks, while all actual HTTP scheduling stays inside the runtime.
-
-### Transactional Catalog Deltas And Version-1 Migration
-
-Catalog persistence now writes affected records and membership as one bounded
-delta instead of clearing and rewriting both IndexedDB stores per resource.
-Catalog schema version 2 migrates the existing version-1 data during startup,
-so no application-model migration is required.
-
-### Active-Record Query Filtering
-
-Records confirmed missing are excluded from `things.get()`, queries,
-subscriptions, and contexts. Stale, refreshing, inaccessible, and invalid
-cached knowledge remains available for degraded/offline reads. Super
-Productivity still filters app-owned Things through successful listing
-authority because that is its replacement boundary.
-
-### Discovery Reconciliation And Lifecycle Control
-
-The runtime provides authoritative container reconciliation, bounded
-`discovery.settle()`, and cancellation. Successful changed listings replace
-direct membership and tombstone absent children; failed and inaccessible
-listings preserve prior knowledge. The app retains explicit ten-resource
-startup batching for first-item latency, as described above.
-
-### Normalized Native Task Types And Dates
-
-Discovered iCalendar `Vtodo` Things normalize to the runtime `Task` type, and
-the runtime Task view normalizes supported native due-date predicates. The app
-therefore queries `Task` without the old `Vtodo` alias and maps generic due
-dates through `thing.as(views.Task)`.
-
-### Effective Permission Resolution
-
-`share.resolvePermissions()` distinguishes known resource ACLs, known inherited
-fallback ACLs, unsupported/absent/unavailable access, and final rate limiting.
-Rate-limited results include an optional retry deadline and do not imply
-denial. Super Productivity accepts only an exact authenticated-WebID write
-grant, labels only an explicit matching denial as read-only, and blocks all
-unknown/transient states until a later check succeeds.
-
-### Write Plan Version 2
-
-Runtime write plans use version 2 and include subject-safe RDF deletion. The
-app's create/update/delete semantics are unchanged; fixtures and validation use
-the current plan version.
+Qualification steps are recorded in
+[`solid-smoke-checklist.md`](solid-smoke-checklist.md).

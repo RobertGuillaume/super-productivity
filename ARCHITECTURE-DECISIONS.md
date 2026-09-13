@@ -539,6 +539,55 @@ The server prunes after conflict detection, before storage.
 
 ---
 
+### 11. Solid Runtime Owns Protocol, Semantics, Discovery Authority, and Writes
+
+**Status**: ✅ Active
+
+**Decision**: The browser Solid backend treats `@solid-intents/runtime` as the
+exclusive Solid protocol and RDF-semantics boundary. Super Productivity owns
+only application-model projection, discovery target priority, and conservative
+write-readiness policy.
+
+**Rationale**:
+
+- Parallel app implementations of WebID/type-index parsing, container
+  membership, request batching, ACL interpretation, or write recovery can
+  disagree with the runtime and silently publish stale or unsafe state.
+- Durable named sessions give each model an explicit coverage boundary, preserve
+  cached data under partial failure, and coordinate fairly across tabs.
+- Runtime-bound version-4 plans bind identity, semantic profile, source
+  validators, and exact HTTP intent. The app must never fabricate or replay
+  those bindings.
+- Keeping Pod paths and predicates stable preserves existing data without an
+  application schema bump or migration.
+
+**Implementation**:
+
+- Register all application semantic profiles after every boot/layout definition.
+- Stream profile RDF with `resources.readRdf()`, provision via planned container
+  creates, resolve access through `share.resolvePermissions()`, and mutate via
+  awaited version-4 plan/commit calls.
+- Use one non-recursive named session per application container and one
+  cross-origin `Task` type session. Only complete session coverage authorizes
+  replacement of an already published model slice.
+- Retain raw RDF projection only as a compatibility fallback and surface
+  `semantic-projection-degraded` without hiding readable Things.
+
+**Documentation**:
+[`docs/solid-runtime-gaps.md`](docs/solid-runtime-gaps.md) and
+[`docs/solid-smoke-checklist.md`](docs/solid-smoke-checklist.md)
+
+**Key Files**: `src/app/solid-data/solid-runtime.service.ts`,
+`src/app/solid-data/solid-semantic-profiles.ts`,
+`src/app/solid-data/solid-discovery-session-registry.service.ts`, and
+`src/app/solid-data/solid-repository-operations.service.ts`
+
+**When to Update This Pattern**: Revisit only when a qualified runtime contract
+removes one of these capabilities or a reproducible end-to-end failure proves
+that the ownership boundary cannot preserve data correctly.
+
+---
+
 ## Decisions Recorded Elsewhere
 
 These carry the same authority as the numbered records above. They live outside this file because they are long enough to stand alone, or because they are enforced as contributor/agent rules that must be read before touching the subsystem. Keep this table complete — if you record a decision somewhere else, add a row here.
