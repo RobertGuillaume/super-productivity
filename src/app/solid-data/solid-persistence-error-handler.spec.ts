@@ -70,7 +70,7 @@ describe('handleSolidPersistenceError', () => {
 
     expect(result).toBe(EMPTY);
     expect(sessionRecovery.handleAuthenticationError).toHaveBeenCalledOnceWith(error);
-    expect(sessionRecovery.recoverRejectedMutation).toHaveBeenCalledTimes(1);
+    expect(sessionRecovery.recoverRejectedMutation).not.toHaveBeenCalled();
     expect(snackService.open).not.toHaveBeenCalled();
   });
 
@@ -97,5 +97,37 @@ describe('handleSolidPersistenceError', () => {
     await Promise.resolve();
     handleSolidPersistenceError(input);
     expect(snackService.open).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reconcile a deferred failure before the runtime retry deadline', async () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date('2026-09-13T10:00:00.000Z'));
+    const retryAt = new Date(Date.now() + 1_000);
+    const error = {
+      outcomes: [
+        {
+          status: 'failed',
+          operation: { kind: 'rdf.patch' },
+          failure: { kind: 'deferred', phase: 'queued', retryAt },
+        },
+      ],
+    };
+
+    handleSolidPersistenceError({
+      error,
+      snackService,
+      sessionRecovery,
+      source: 'SolidTestPersistenceEffects: failed to persist test data',
+    });
+    expect(sessionRecovery.recoverRejectedMutation).not.toHaveBeenCalled();
+
+    jasmine.clock().tick(999);
+    await Promise.resolve();
+    expect(sessionRecovery.recoverRejectedMutation).not.toHaveBeenCalled();
+
+    jasmine.clock().tick(1);
+    await Promise.resolve();
+    expect(sessionRecovery.recoverRejectedMutation).toHaveBeenCalledTimes(1);
+    jasmine.clock().uninstall();
   });
 });

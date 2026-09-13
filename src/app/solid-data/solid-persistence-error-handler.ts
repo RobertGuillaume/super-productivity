@@ -2,6 +2,7 @@ import { EMPTY } from 'rxjs';
 import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
 import { T } from '../t.const';
+import { classifySolidRuntimeOutcomes, outcomesFromError } from './solid-runtime-outcome';
 
 interface SolidAuthenticationErrorHandler {
   handleAuthenticationError?(error: unknown): boolean;
@@ -29,12 +30,20 @@ export const handleSolidPersistenceError = ({
   sessionRecovery?.demoteWriteAccessAfterFailure?.(error);
   const authenticationHandled =
     sessionRecovery?.handleAuthenticationError?.(error) === true;
-  const recoveryResult = sessionRecovery?.recoverRejectedMutation?.(error, source);
-  const recovery = recoveryResult instanceof Promise ? recoveryResult : Promise.resolve();
+  const classification = classifySolidRuntimeOutcomes(outcomesFromError(error));
+  const recover = (): Promise<void> => {
+    const result = sessionRecovery?.recoverRejectedMutation?.(error, source);
+    return result instanceof Promise ? result : Promise.resolve();
+  };
   if (authenticationHandled) {
     return EMPTY;
   }
-
+  const recovery =
+    classification.state === 'deferred' &&
+    classification.retryAt !== undefined &&
+    classification.retryAt.getTime() > Date.now()
+      ? waitUntil(classification.retryAt).then(recover)
+      : recover();
   if (!noticedRecoveries.has(recovery)) {
     noticedRecoveries.add(recovery);
     snackService.open({
@@ -42,15 +51,20 @@ export const handleSolidPersistenceError = ({
       msg: T.PS.SOLID.WRITE_RESTORED,
     });
     void recovery
-      .catch((recoveryError) => {
-        Log.err('Solid rejected mutation recovery failed', {
-          operation: source,
-          errorName: recoveryError instanceof Error ? recoveryError.name : 'UnknownError',
-        });
-      })
+      .catch((recoveryError) => logRecoveryFailure(recoveryError, source))
       .finally(() => noticedRecoveries.delete(recovery));
   }
   return EMPTY;
+};
+
+const waitUntil = (retryAt: Date): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, retryAt.getTime() - Date.now()));
+
+const logRecoveryFailure = (error: unknown, operation: string): void => {
+  Log.err('Solid rejected mutation recovery failed', {
+    operation,
+    errorName: error instanceof Error ? error.name : 'UnknownError',
+  });
 };
 
 const structuredErrorFields = (
