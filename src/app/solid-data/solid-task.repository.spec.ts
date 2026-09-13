@@ -1,24 +1,26 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { RuntimeError, SolidGraphRuntime } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { INBOX_PROJECT } from '../features/project/project.const';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import {
   ICAL_TASK,
+  ICAL_VTODO_CLASS,
   SOLID_PRODUCTIVITY_LEGACY_TASK_TYPE,
   SOLID_PRODUCTIVITY_TASK_TYPE,
   SP_TASK,
 } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SOLID_SEMANTIC_PROFILES } from './solid-semantic-profiles';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 import { SolidTaskRepository } from './solid-task.repository';
 
 describe('SolidTaskRepository', () => {
+  const rdfType = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+  const runtimeType = 'https://schema.org/additionalType';
   const task: Task = {
     ...DEFAULT_TASK,
     id: 'task-1',
@@ -55,6 +57,7 @@ describe('SolidTaskRepository', () => {
     discovery.discoverType.and.resolveTo(undefined);
     discovery.refresh.and.resolveTo(undefined);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -131,6 +134,22 @@ describe('SolidTaskRepository', () => {
     expect(loaded.value[0].title).toBe('Legacy task');
   });
 
+  it('projects more than 250 catalog tasks without application batching', async () => {
+    const catalogThings = Array.from({ length: 251 }, (_, index) => {
+      const id = `task-${index}`;
+      return createThing(`Task ${index}`, {
+        uri: `https://pod.example/super-productivity/tasks/${id}.ttl#it`,
+        properties: { [SP_TASK.id]: [literal(id)] },
+      });
+    });
+    things.query.and.resolveTo({ things: catalogThings });
+
+    const loaded = await TestBed.inject(SolidTaskRepository).loadTasks();
+
+    expect(loaded.value).toHaveSize(251);
+    expect(loaded.value[250].id).toBe('task-250');
+  });
+
   afterEach(() => {
     TestBed.resetTestingModule();
   });
@@ -138,24 +157,11 @@ describe('SolidTaskRepository', () => {
   it('commits existing task updates through the runtime write plan API', async () => {
     const existingThing = createThing(task.title);
     const updatedThing = createThing('Updated title');
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -187,24 +193,11 @@ describe('SolidTaskRepository', () => {
         [ICAL_TASK.status]: [literal('COMPLETED')],
       },
     });
-    const plan = {
-      version: 2,
-      id: 'write-plan-complete',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: createdThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(createdThing.uri, {});
     things.query.and.resolveTo({ things: [] });
     things.create.and.resolveTo(createdThing);
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: completedThing,
@@ -223,22 +216,9 @@ describe('SolidTaskRepository', () => {
 
   it('updates the deterministic app Thing URI without treating an incomplete query as absence', async () => {
     const updatedThing = createThing('Updated without a lookup');
-    const plan = {
-      version: 2,
-      id: 'write-plan-direct-update',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: updatedThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    const plan = updateThingPlan(updatedThing.uri, {});
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -286,20 +266,7 @@ describe('SolidTaskRepository', () => {
         [SP_TASK.isDone]: [literal(true)],
       },
     });
-    const plan = {
-      version: 2,
-      id: 'write-plan-overlap',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: createdThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(createdThing.uri, {});
     let signalCreateStarted: (() => void) | undefined;
     const createStarted = new Promise<void>((resolve) => {
       signalCreateStarted = resolve;
@@ -314,8 +281,8 @@ describe('SolidTaskRepository', () => {
       await createGate;
       return createdThing;
     });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: completedThing,
@@ -344,23 +311,10 @@ describe('SolidTaskRepository', () => {
       },
       types: ['Task'],
     });
-    const plan = {
-      version: 2,
-      id: 'write-plan-external',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: externalUri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(externalUri, {});
     things.query.and.resolveTo({ things: [externalThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: externalThing,
@@ -389,6 +343,10 @@ describe('SolidTaskRepository', () => {
     );
     const createdThing = createdThings.things[0];
     expect(createdThing).toBeDefined();
+    expect(createdThing.objects(rdfType)).toContain(ICAL_VTODO_CLASS);
+    expect(createdThing.property(runtimeType)[0]).toEqual(
+      jasmine.objectContaining({ value: SOLID_PRODUCTIVITY_TASK_TYPE }),
+    );
     await repository.saveTask({
       ...task,
       isDone: true,
@@ -428,6 +386,7 @@ const createRuntimeRepository = async (): Promise<{
 }> => {
   const runtime = new SolidGraphRuntime();
   await runtime.boot();
+  installCompoundPatchSupport(runtime);
   const layout = runtime.layouts.define({
     namespace: 'https://super-productivity.com/ns#',
     containers: {
@@ -441,6 +400,9 @@ const createRuntimeRepository = async (): Promise<{
       },
     },
   });
+  for (const profile of SOLID_SEMANTIC_PROFILES) {
+    runtime.types.register(profile);
+  }
   TestBed.overrideProvider(SolidRuntimeService, {
     useValue: {
       client: runtime,
@@ -451,6 +413,44 @@ const createRuntimeRepository = async (): Promise<{
   return {
     repository: TestBed.inject(SolidTaskRepository),
     runtime,
+  };
+};
+
+/** The commit-qualified runtime's browser mock applies only the first INSERT DATA
+ * clause. Real Solid servers execute the complete SPARQL update, so make the
+ * in-memory transport exercise every reviewed clause for this consumer test. */
+const installCompoundPatchSupport = (runtime: SolidGraphRuntime): void => {
+  const runtimeTransport = runtime as unknown as { customFetch: typeof fetch };
+  const mockFetch = runtimeTransport.customFetch;
+  runtimeTransport.customFetch = async (input, init) => {
+    const headers = new Headers(init?.headers);
+    const body = init?.body;
+    if (
+      init?.method !== 'PATCH' ||
+      headers.get('Content-Type') !== 'application/sparql-update' ||
+      typeof body !== 'string' ||
+      !body.includes(' ;\n')
+    ) {
+      return mockFetch(input, init);
+    }
+
+    let response: Response | undefined;
+    for (const [index, operation] of body.split(' ;\n').entries()) {
+      const operationHeaders = new Headers(headers);
+      if (index > 0) {
+        operationHeaders.delete('If-Match');
+        operationHeaders.delete('If-Unmodified-Since');
+      }
+      response = await mockFetch(input, {
+        ...init,
+        body: operation,
+        headers: operationHeaders,
+      });
+      if (!response.ok) {
+        return response;
+      }
+    }
+    return response ?? mockFetch(input, init);
   };
 };
 

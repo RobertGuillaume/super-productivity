@@ -1,10 +1,4 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { PluginMetadata, PluginUserData } from '../plugins/plugin-persistence.model';
 import {
@@ -18,6 +12,10 @@ import {
 } from './solid-plugin-data.mapper';
 import { SolidPluginDataRepository } from './solid-plugin-data.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 
 describe('SolidPluginDataRepository', () => {
   const pluginUserData: PluginUserData = {
@@ -48,6 +46,7 @@ describe('SolidPluginDataRepository', () => {
     discovery = jasmine.createSpyObj('discovery', ['start']);
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -165,8 +164,8 @@ describe('SolidPluginDataRepository', () => {
     const plan = createPlan(existingThing);
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -216,8 +215,8 @@ describe('SolidPluginDataRepository', () => {
     const plan = createPlan(existingThing);
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -260,21 +259,8 @@ describe('SolidPluginDataRepository', () => {
   });
 });
 
-const createPlan = (thing: Thing): RuntimeWritePlan =>
-  ({
-    version: 2,
-    id: 'write-plan-1',
-    kind: 'thing.update',
-    request: {
-      kind: 'thing.update',
-      uri: thing.uri,
-      changes: {},
-    },
-    operations: [],
-    affectedResources: [],
-    preconditions: [],
-    diagnostics: [],
-  }) as RuntimeWritePlan;
+const createPlan = (thing: Thing): ReturnType<typeof updateThingPlan> =>
+  updateThingPlan(thing.uri, {});
 
 const createPluginUserDataThing = (pluginUserData: PluginUserData): Thing => {
   const resourceName = pluginUserDataResourceName(pluginUserData.id);

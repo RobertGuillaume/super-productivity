@@ -1,16 +1,14 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { DEFAULT_PROJECT } from '../features/project/project.const';
 import { Project } from '../features/project/project.model';
 import { SP_PROJECT } from './solid-productivity-vocab';
 import { SolidProjectRepository } from './solid-project.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 
 describe('SolidProjectRepository', () => {
   const project: Project = {
@@ -34,6 +32,7 @@ describe('SolidProjectRepository', () => {
   beforeEach(() => {
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete', 'subscribe']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -75,24 +74,11 @@ describe('SolidProjectRepository', () => {
   it('commits existing project updates through the runtime write plan API', async () => {
     const existingThing = createThing(project.title);
     const updatedThing = createThing('Updated project title');
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -117,20 +103,7 @@ describe('SolidProjectRepository', () => {
   it('serializes an edit that arrives while project creation is pending', async () => {
     const createdThing = createThing(project.title);
     const updatedThing = createThing('Edited immediately');
-    const plan = {
-      version: 2,
-      id: 'write-plan-overlap',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: createdThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(createdThing.uri, {});
     let created = false;
     let signalCreateStarted: (() => void) | undefined;
     const createStarted = new Promise<void>((resolve) => {
@@ -149,8 +122,8 @@ describe('SolidProjectRepository', () => {
       created = true;
       return createdThing;
     });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -168,7 +141,7 @@ describe('SolidProjectRepository', () => {
     releaseCreate?.();
     await Promise.all([create, edit]);
     expect(things.create).toHaveBeenCalledTimes(1);
-    expect(writes.commit).toHaveBeenCalledTimes(1);
+    expect(writes.commit).toHaveBeenCalledTimes(2);
   });
 });
 

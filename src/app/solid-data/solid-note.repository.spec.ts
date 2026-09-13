@@ -1,15 +1,13 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { Note } from '../features/note/note.model';
 import { SP_NOTE } from './solid-productivity-vocab';
 import { SolidNoteRepository } from './solid-note.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 
 describe('SolidNoteRepository', () => {
   const note: Note = {
@@ -35,6 +33,7 @@ describe('SolidNoteRepository', () => {
   beforeEach(() => {
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete', 'subscribe']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -76,24 +75,11 @@ describe('SolidNoteRepository', () => {
   it('commits existing note updates through the runtime write plan API', async () => {
     const existingThing = createThing(note.content);
     const updatedThing = createThing('Updated note content');
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -107,8 +93,11 @@ describe('SolidNoteRepository', () => {
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,
       jasmine.objectContaining({
-        replaceProperties: jasmine.any(Object),
-        deleteProperties: jasmine.any(Object),
+        fields: jasmine.objectContaining({
+          id: note.id,
+          content: note.content,
+          projectId: note.projectId,
+        }),
       }),
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);

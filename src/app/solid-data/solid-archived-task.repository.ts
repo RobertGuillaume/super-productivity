@@ -13,7 +13,6 @@ import {
 } from './solid-archived-task.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   settleSolidMutations,
@@ -27,7 +26,6 @@ type SolidArchivedTaskContainerScope = Extract<RuntimeScope, { kind: 'container'
 export class SolidArchivedTaskRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadArchivedTasks(): Promise<SolidRepositoryRead<SolidArchivedTask[]>> {
@@ -39,17 +37,15 @@ export class SolidArchivedTaskRepository {
     });
 
     return solidRepositoryRead(
-      this.catalogAuthority
-        .filterThings(archivedTaskContainerScope.uri, result.things)
-        .map((thing) => {
-          const archivedTask = solidThingToArchivedTask(thing);
-          return this.operations.remember(
-            'archivedTask',
-            archivedTaskKey(archivedTask),
-            thing,
-            archivedTask,
-          );
-        }),
+      result.things.map((thing) => {
+        const archivedTask = solidThingToArchivedTask(thing);
+        return this.operations.remember(
+          'archivedTask',
+          archivedTaskKey(archivedTask),
+          thing,
+          archivedTask,
+        );
+      }),
       result.metadata,
     );
   }
@@ -138,7 +134,17 @@ export class SolidArchivedTaskRepository {
         .filter(
           (thing) => !desiredKeys.has(archivedTaskKey(solidThingToArchivedTask(thing))),
         )
-        .map((thing) => this.solidRuntime.client.things.delete(thing.uri)),
+        .map((thing) => {
+          const archivedTask = solidThingToArchivedTask(thing);
+          const key = archivedTaskKey(archivedTask);
+          this.operations.remember('archivedTask', key, thing, archivedTask);
+          return this.operations.delete(
+            'archivedTask',
+            key,
+            this.solidRuntime.archivedTaskProfile,
+            archivedTaskResourceName(archivedTask.task.id, archivedTask.bucket),
+          );
+        }),
     );
   }
 

@@ -1,10 +1,4 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import {
   DEFAULT_TASK_REPEAT_CFG,
@@ -13,6 +7,10 @@ import {
 import { RDF_JSON_DATATYPE, SP_TASK_REPEAT_CFG } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 
 describe('SolidTaskRepeatCfgRepository', () => {
   const taskRepeatCfg: TaskRepeatCfg = {
@@ -42,6 +40,7 @@ describe('SolidTaskRepeatCfgRepository', () => {
     discovery = jasmine.createSpyObj('discovery', ['start']);
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete', 'subscribe']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -129,24 +128,11 @@ describe('SolidTaskRepeatCfgRepository', () => {
       ...taskRepeatCfg,
       title: 'Updated repeat title',
     });
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -160,7 +146,11 @@ describe('SolidTaskRepeatCfgRepository', () => {
       existingThing.uri,
       jasmine.objectContaining({
         replaceProperties: jasmine.any(Object),
-        deleteProperties: jasmine.any(Object),
+        fields: jasmine.objectContaining({
+          id: taskRepeatCfg.id,
+          appTitle: taskRepeatCfg.title,
+          projectId: taskRepeatCfg.projectId,
+        }),
       }),
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);

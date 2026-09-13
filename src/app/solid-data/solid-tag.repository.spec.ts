@@ -1,15 +1,13 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { DEFAULT_TAG } from '../features/tag/tag.const';
 import { Tag } from '../features/tag/tag.model';
 import { SP_TAG } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 import { SolidTagRepository } from './solid-tag.repository';
 
 describe('SolidTagRepository', () => {
@@ -35,6 +33,7 @@ describe('SolidTagRepository', () => {
   beforeEach(() => {
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete', 'subscribe']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -76,24 +75,11 @@ describe('SolidTagRepository', () => {
   it('commits existing tag updates through the runtime write plan API', async () => {
     const existingThing = createThing(tag.title);
     const updatedThing = createThing('Updated tag title');
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -108,7 +94,11 @@ describe('SolidTagRepository', () => {
       existingThing.uri,
       jasmine.objectContaining({
         replaceProperties: jasmine.any(Object),
-        deleteProperties: jasmine.any(Object),
+        fields: jasmine.objectContaining({
+          id: tag.id,
+          appTitle: tag.title,
+          taskId: tag.taskIds,
+        }),
       }),
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);

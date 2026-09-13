@@ -13,7 +13,6 @@ import {
 } from './solid-time-tracking.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   settleSolidMutations,
   SolidMutationCoordinator,
@@ -27,7 +26,6 @@ type SolidTimeTrackingContainerScope = Extract<RuntimeScope, { kind: 'container'
 export class SolidTimeTrackingRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadTimeTrackingState(): Promise<SolidRepositoryRead<TimeTrackingState>> {
@@ -37,8 +35,7 @@ export class SolidTimeTrackingRepository {
       scope: timeTrackingContainerScope,
       autoDiscover: false,
     });
-    const entries = this.catalogAuthority
-      .filterThings(timeTrackingContainerScope.uri, result.things)
+    const entries = result.things
       .map((thing) => {
         const entry = solidThingToTimeTrackingEntry(thing);
         return entry === null
@@ -127,10 +124,7 @@ export class SolidTimeTrackingRepository {
       autoDiscover: false,
     });
 
-    const things = this.catalogAuthority.filterThings(
-      this.timeTrackingContainerScope().uri,
-      result.things,
-    );
+    const things = result.things;
     for (const thing of things) {
       const entry = solidThingToTimeTrackingEntry(thing);
       if (entry !== null) {

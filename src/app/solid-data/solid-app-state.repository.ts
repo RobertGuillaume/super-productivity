@@ -13,7 +13,6 @@ import {
 } from './solid-app-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
@@ -26,17 +25,12 @@ type SolidAppContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidAppStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
   private lastAppState: SolidAppState | null = null;
 
   async loadAppState(): Promise<SolidRepositoryRead<SolidAppState | null>> {
     const result = await this.queryAppStateThing();
-    const existingThing =
-      this.catalogAuthority.filterThings(
-        this.appContainerScope().uri,
-        result.things,
-      )[0] ?? null;
+    const existingThing = result.things[0] ?? null;
     this.lastAppState =
       existingThing === null
         ? null

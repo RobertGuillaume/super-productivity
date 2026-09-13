@@ -24,7 +24,6 @@ import {
 import { SP_PLANNER_STATE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   settleSolidMutations,
   SolidMutationCoordinator,
@@ -38,7 +37,6 @@ type SolidPlannerContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidPlannerRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadPlannerState(): Promise<SolidRepositoryRead<PlannerState>> {
@@ -51,15 +49,8 @@ export class SolidPlannerRepository {
       }),
       this.queryPlannerStateThing(),
     ]);
-    const dayThings = this.catalogAuthority.filterThings(
-      plannerContainerScope.uri,
-      daysResult.things,
-    );
-    const stateThing =
-      this.catalogAuthority.filterThings(
-        plannerContainerScope.uri,
-        stateResult.things,
-      )[0] ?? null;
+    const dayThings = daysResult.things;
+    const stateThing = stateResult.things[0] ?? null;
 
     const days = dayThings.map((thing) => {
       const day = solidThingToPlannerDay(thing);
@@ -145,10 +136,7 @@ export class SolidPlannerRepository {
       scope: this.plannerContainerScope(),
       autoDiscover: false,
     });
-    const things = this.catalogAuthority.filterThings(
-      this.plannerContainerScope().uri,
-      result.things,
-    );
+    const things = result.things;
     const existingByDay = new Map(
       things.map((thing) => [solidThingToPlannerDay(thing).day, thing]),
     );
@@ -190,12 +178,10 @@ export class SolidPlannerRepository {
       autoDiscover: false,
     });
 
-    return this.catalogAuthority
-      .filterThings(this.plannerContainerScope().uri, result.things)
-      .map((thing) => {
-        const day = solidThingToPlannerDay(thing);
-        return this.operations.remember('plannerDay', day.day, thing, day);
-      });
+    return result.things.map((thing) => {
+      const day = solidThingToPlannerDay(thing);
+      return this.operations.remember('plannerDay', day.day, thing, day);
+    });
   }
 
   private async savePlannerDayNow(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {

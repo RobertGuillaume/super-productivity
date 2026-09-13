@@ -1,10 +1,4 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { SP_APP_STATE } from './solid-productivity-vocab';
 import {
@@ -13,6 +7,10 @@ import {
 } from './solid-app-state.mapper';
 import { SolidAppStateRepository } from './solid-app-state.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 
 describe('SolidAppStateRepository', () => {
   let discovery: {
@@ -31,6 +29,7 @@ describe('SolidAppStateRepository', () => {
     discovery = jasmine.createSpyObj('discovery', ['start']);
     things = jasmine.createSpyObj('things', ['query', 'create']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -138,24 +137,11 @@ describe('SolidAppStateRepository', () => {
       sectionOrder: ['section-2', 'section-1'],
       tagOrder: ['TODAY', 'tag-1'],
     });
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -170,10 +156,10 @@ describe('SolidAppStateRepository', () => {
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,
       jasmine.objectContaining({
-        replaceProperties: jasmine.objectContaining({
-          [SP_APP_STATE.projectOrder]: ['project-1'],
-          [SP_APP_STATE.sectionOrder]: ['section-2', 'section-1'],
-          [SP_APP_STATE.tagOrder]: ['TODAY', 'tag-1'],
+        fields: jasmine.objectContaining({
+          projectOrder: ['project-1'],
+          sectionOrder: ['section-2', 'section-1'],
+          tagOrder: ['TODAY', 'tag-1'],
         }),
       }),
     );

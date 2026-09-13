@@ -1,15 +1,13 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { SP_ARCHIVED_TASK } from './solid-productivity-vocab';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 
 describe('SolidArchivedTaskRepository', () => {
   const task: Task = {
@@ -39,6 +37,7 @@ describe('SolidArchivedTaskRepository', () => {
   beforeEach(() => {
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete', 'subscribe']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
     discovery = jasmine.createSpyObj('discovery', ['start']);
 
     const solidRuntime = {
@@ -123,24 +122,11 @@ describe('SolidArchivedTaskRepository', () => {
   it('commits existing archived task updates through the runtime write plan API', async () => {
     const existingThing = createThing(task.title, 'young');
     const updatedThing = createThing('Updated archive title', 'young');
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -155,7 +141,11 @@ describe('SolidArchivedTaskRepository', () => {
       existingThing.uri,
       jasmine.objectContaining({
         replaceProperties: jasmine.any(Object),
-        deleteProperties: jasmine.any(Object),
+        fields: jasmine.objectContaining({
+          id: task.id,
+          bucket: 'young',
+          title: task.title,
+        }),
       }),
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);

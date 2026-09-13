@@ -1,10 +1,4 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { RDF_JSON_DATATYPE, SP_TIME_TRACKING } from './solid-productivity-vocab';
 import {
@@ -14,6 +8,10 @@ import {
 } from './solid-time-tracking.mapper';
 import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 
 describe('SolidTimeTrackingRepository', () => {
   const entry: SolidTimeTrackingEntry = {
@@ -32,6 +30,7 @@ describe('SolidTimeTrackingRepository', () => {
 
   let discovery: {
     start: jasmine.Spy;
+    refresh: jasmine.Spy;
   };
   let things: {
     query: jasmine.Spy;
@@ -44,9 +43,11 @@ describe('SolidTimeTrackingRepository', () => {
   };
 
   beforeEach(() => {
-    discovery = jasmine.createSpyObj('discovery', ['start']);
+    discovery = jasmine.createSpyObj('discovery', ['start', 'refresh']);
+    discovery.refresh.and.resolveTo();
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -135,24 +136,11 @@ describe('SolidTimeTrackingRepository', () => {
       },
     };
     const updatedThing = createThing(updatedEntry);
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -184,20 +172,7 @@ describe('SolidTimeTrackingRepository', () => {
     };
     const existingThing = createThing(entry);
     const staleThing = createThing(staleEntry);
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.callFake((query: { where?: readonly unknown[] }) =>
       Promise.resolve({
@@ -209,8 +184,8 @@ describe('SolidTimeTrackingRepository', () => {
               : [],
       }),
     );
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: existingThing,

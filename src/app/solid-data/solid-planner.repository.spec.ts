@@ -1,15 +1,13 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import { SOLID_PLANNER_STATE_ID } from './solid-planner.mapper';
 import { SolidPlannerRepository } from './solid-planner.repository';
 import { SP_PLANNER_DAY, SP_PLANNER_STATE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 
 describe('SolidPlannerRepository', () => {
   let things: {
@@ -29,6 +27,7 @@ describe('SolidPlannerRepository', () => {
   beforeEach(() => {
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete', 'subscribe']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
     discovery = jasmine.createSpyObj('discovery', ['start']);
 
     const solidRuntime = {
@@ -128,24 +127,11 @@ describe('SolidPlannerRepository', () => {
 
   it('commits existing planner day updates through the runtime write plan API', async () => {
     const existingThing = createPlannerDayThing('2026-08-04', ['task-1']);
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: createPlannerDayThing('2026-08-04', ['task-2']),
@@ -162,7 +148,10 @@ describe('SolidPlannerRepository', () => {
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       existingThing.uri,
       jasmine.objectContaining({
-        replaceProperties: jasmine.any(Object),
+        fields: jasmine.objectContaining({
+          day: '2026-08-04',
+          taskId: ['task-2'],
+        }),
       }),
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);
@@ -172,23 +161,10 @@ describe('SolidPlannerRepository', () => {
   it('reconciles only planner days whose task order changed', async () => {
     const unchangedThing = createPlannerDayThing('2026-08-04', ['task-1']);
     const changedThing = createPlannerDayThing('2026-08-05', ['task-1', 'task-2']);
-    const plan = {
-      version: 2,
-      id: 'write-plan-2',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: changedThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(changedThing.uri, {});
     things.query.and.resolveTo({ things: [unchangedThing, changedThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: createPlannerDayThing('2026-08-05', ['task-2', 'task-1']),
@@ -205,7 +181,12 @@ describe('SolidPlannerRepository', () => {
     expect(things.query).toHaveBeenCalledTimes(1);
     expect(writes.planUpdate).toHaveBeenCalledOnceWith(
       changedThing.uri,
-      jasmine.objectContaining({ replaceProperties: jasmine.any(Object) }),
+      jasmine.objectContaining({
+        fields: jasmine.objectContaining({
+          day: '2026-08-05',
+          taskId: ['task-2', 'task-1'],
+        }),
+      }),
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);
     expect(things.create).not.toHaveBeenCalled();

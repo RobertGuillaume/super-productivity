@@ -16,7 +16,6 @@ import {
 } from './solid-menu-tree.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
@@ -29,16 +28,11 @@ type SolidMenuTreeContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidMenuTreeRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadMenuTree(): Promise<SolidRepositoryRead<MenuTreeState | null>> {
     const result = await this.queryMenuTreeThing();
-    const existingThing =
-      this.catalogAuthority.filterThings(
-        this.menuTreeContainerScope().uri,
-        result.things,
-      )[0] ?? null;
+    const existingThing = result.things[0] ?? null;
     const menuTree = existingThing === null ? null : this.mapMenuTree(existingThing);
     return solidRepositoryRead(menuTree, result.metadata);
   }

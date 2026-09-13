@@ -10,7 +10,6 @@ import {
 } from './solid-task-repeat-cfg.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
@@ -23,7 +22,6 @@ type SolidTaskRepeatCfgContainerScope = Extract<RuntimeScope, { kind: 'container
 export class SolidTaskRepeatCfgRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadTaskRepeatCfgs(): Promise<SolidRepositoryRead<TaskRepeatCfg[]>> {
@@ -35,12 +33,10 @@ export class SolidTaskRepeatCfgRepository {
     });
 
     return solidRepositoryRead(
-      this.catalogAuthority
-        .filterThings(taskRepeatCfgContainerScope.uri, result.things)
-        .map((thing) => {
-          const config = solidThingToTaskRepeatCfg(thing);
-          return this.operations.remember('taskRepeatCfg', config.id, thing, config);
-        }),
+      result.things.map((thing) => {
+        const config = solidThingToTaskRepeatCfg(thing);
+        return this.operations.remember('taskRepeatCfg', config.id, thing, config);
+      }),
       result.metadata,
     );
   }

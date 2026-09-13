@@ -15,7 +15,6 @@ import {
 } from './solid-archive-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
@@ -28,7 +27,6 @@ type SolidArchiveStateContainerScope = Extract<RuntimeScope, { kind: 'container'
 export class SolidArchiveStateRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadArchiveStates(): Promise<
@@ -43,8 +41,7 @@ export class SolidArchiveStateRepository {
       scope: archiveStateContainerScope,
       autoDiscover: false,
     });
-    const states = this.catalogAuthority
-      .filterThings(archiveStateContainerScope.uri, result.things)
+    const states = result.things
       .map((thing) => {
         const state = solidThingToArchiveState(thing);
         return state === null

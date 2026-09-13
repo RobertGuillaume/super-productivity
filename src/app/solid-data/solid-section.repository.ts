@@ -4,7 +4,6 @@ import { Section } from '../features/section/section.model';
 import { SP_SECTION } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
@@ -23,7 +22,6 @@ type SolidSectionContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidSectionRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadSections(): Promise<SolidRepositoryRead<Section[]>> {
@@ -35,12 +33,10 @@ export class SolidSectionRepository {
     });
 
     return solidRepositoryRead(
-      this.catalogAuthority
-        .filterThings(sectionContainerScope.uri, result.things)
-        .map((thing) => {
-          const section = solidThingToSection(thing);
-          return this.operations.remember('section', section.id, thing, section);
-        }),
+      result.things.map((thing) => {
+        const section = solidThingToSection(thing);
+        return this.operations.remember('section', section.id, thing, section);
+      }),
       result.metadata,
     );
   }

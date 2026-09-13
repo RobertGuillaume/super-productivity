@@ -1,10 +1,4 @@
-import type {
-  RdfLiteralValue,
-  RdfValue,
-  RuntimeWritePlan,
-  Thing,
-  ThingView,
-} from '@solid-intents/runtime';
+import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { TestBed } from '@angular/core/testing';
 import {
   SimpleCounter,
@@ -12,6 +6,10 @@ import {
 } from '../features/simple-counter/simple-counter.model';
 import { RDF_JSON_DATATYPE, SP_SIMPLE_COUNTER } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import {
+  installRuntimeWritePlanBridge,
+  updateThingPlan,
+} from './testing/solid-runtime-write-plan.fixture';
 import { SolidSimpleCounterRepository } from './solid-simple-counter.repository';
 
 describe('SolidSimpleCounterRepository', () => {
@@ -30,6 +28,7 @@ describe('SolidSimpleCounterRepository', () => {
 
   let discovery: {
     start: jasmine.Spy;
+    refresh: jasmine.Spy;
   };
   let things: {
     query: jasmine.Spy;
@@ -43,9 +42,11 @@ describe('SolidSimpleCounterRepository', () => {
   };
 
   beforeEach(() => {
-    discovery = jasmine.createSpyObj('discovery', ['start']);
+    discovery = jasmine.createSpyObj('discovery', ['start', 'refresh']);
+    discovery.refresh.and.resolveTo();
     things = jasmine.createSpyObj('things', ['query', 'create', 'delete', 'subscribe']);
     writes = jasmine.createSpyObj('writes', ['planUpdate', 'commit']);
+    installRuntimeWritePlanBridge(writes, things);
 
     const solidRuntime = {
       ensureLayout: () => ({
@@ -145,24 +146,11 @@ describe('SolidSimpleCounterRepository', () => {
       },
       0,
     );
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.resolveTo({ things: [existingThing] });
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: updatedThing,
@@ -176,7 +164,11 @@ describe('SolidSimpleCounterRepository', () => {
       existingThing.uri,
       jasmine.objectContaining({
         replaceProperties: jasmine.any(Object),
-        deleteProperties: jasmine.any(Object),
+        fields: jasmine.objectContaining({
+          id: simpleCounter.id,
+          appTitle: simpleCounter.title,
+          isEnabled: simpleCounter.isEnabled,
+        }),
       }),
     );
     expect(writes.commit).toHaveBeenCalledOnceWith(plan);
@@ -201,20 +193,7 @@ describe('SolidSimpleCounterRepository', () => {
       id: 'counter-2',
       title: 'Fresh counter',
     };
-    const plan = {
-      version: 2,
-      id: 'write-plan-1',
-      kind: 'thing.update',
-      request: {
-        kind: 'thing.update',
-        uri: existingThing.uri,
-        changes: {},
-      },
-      operations: [],
-      affectedResources: [],
-      preconditions: [],
-      diagnostics: [],
-    } as RuntimeWritePlan;
+    const plan = updateThingPlan(existingThing.uri, {});
 
     things.query.and.returnValues(
       Promise.resolve({ things: [staleThing, existingThing] }),
@@ -224,8 +203,8 @@ describe('SolidSimpleCounterRepository', () => {
     );
     things.delete.and.resolveTo();
     things.create.and.resolveTo(createThing(newCounter, 1));
-    writes.planUpdate.and.returnValue(plan);
-    writes.commit.and.resolveTo({
+    writes.planUpdate.and.resolveTo(plan);
+    writes.commit.withArgs(plan).and.resolveTo({
       planId: plan.id,
       kind: 'thing.update',
       result: existingThing,

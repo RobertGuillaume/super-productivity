@@ -15,7 +15,6 @@ import {
 } from './solid-plugin-data.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import {
   SolidMutationCoordinator,
   solidMutationKey,
@@ -28,7 +27,6 @@ type SolidPluginContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidPluginDataRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadPluginUserData(): Promise<SolidRepositoryRead<PluginUserData[]>> {
@@ -40,8 +38,7 @@ export class SolidPluginDataRepository {
     });
 
     return solidRepositoryRead(
-      this.catalogAuthority
-        .filterThings(scope.uri, result.things)
+      result.things
         .map((thing) => {
           const value = solidThingToPluginUserData(thing);
           return value === null
@@ -64,8 +61,7 @@ export class SolidPluginDataRepository {
     });
 
     return solidRepositoryRead(
-      this.catalogAuthority
-        .filterThings(scope.uri, result.things)
+      result.things
         .map((thing) => {
           const value = solidThingToPluginMetadata(thing);
           return value === null

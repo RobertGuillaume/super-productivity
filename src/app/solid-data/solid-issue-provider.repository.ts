@@ -11,7 +11,6 @@ import {
 } from './solid-issue-provider.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
@@ -24,7 +23,6 @@ type SolidIssueProviderContainerScope = Extract<RuntimeScope, { kind: 'container
 export class SolidIssueProviderRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadIssueProviders(): Promise<SolidRepositoryRead<IssueProvider[]>> {
@@ -36,8 +34,7 @@ export class SolidIssueProviderRepository {
     });
 
     return solidRepositoryRead(
-      this.catalogAuthority
-        .filterThings(issueProviderContainerScope.uri, result.things)
+      result.things
         .map((thing) => {
           const record = solidThingToIssueProviderRecord(thing);
           return this.operations.remember(

@@ -11,7 +11,6 @@ import {
 } from './solid-simple-counter.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   settleSolidMutations,
@@ -25,7 +24,6 @@ type SolidSimpleCounterContainerScope = Extract<RuntimeScope, { kind: 'container
 export class SolidSimpleCounterRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadSimpleCounters(): Promise<SolidRepositoryRead<SimpleCounter[]>> {
@@ -37,8 +35,7 @@ export class SolidSimpleCounterRepository {
     });
 
     return solidRepositoryRead(
-      this.catalogAuthority
-        .filterThings(simpleCounterContainerScope.uri, result.things)
+      result.things
         .map((thing) => {
           const record = solidThingToSimpleCounterRecord(thing);
           return this.operations.remember(
@@ -169,13 +166,11 @@ export class SolidSimpleCounterRepository {
       autoDiscover: false,
     });
 
-    return this.catalogAuthority
-      .filterThings(this.simpleCounterContainerScope().uri, result.things)
-      .map((thing) => {
-        const simpleCounter = solidThingToSimpleCounter(thing);
-        this.operations.remember('simpleCounter', simpleCounter.id, thing, simpleCounter);
-        return thing;
-      });
+    return result.things.map((thing) => {
+      const simpleCounter = solidThingToSimpleCounter(thing);
+      this.operations.remember('simpleCounter', simpleCounter.id, thing, simpleCounter);
+      return thing;
+    });
   }
 
   private simpleCounterContainerScope(): SolidSimpleCounterContainerScope {

@@ -10,7 +10,6 @@ import {
 } from './solid-metric.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
@@ -23,7 +22,6 @@ type SolidMetricContainerScope = Extract<RuntimeScope, { kind: 'container' }>;
 export class SolidMetricRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadMetrics(): Promise<SolidRepositoryRead<Metric[]>> {
@@ -35,8 +33,7 @@ export class SolidMetricRepository {
     });
 
     return solidRepositoryRead(
-      this.catalogAuthority
-        .filterThings(metricContainerScope.uri, result.things)
+      result.things
         .map((thing) => {
           const metric = solidThingToMetric(thing);
           return this.operations.remember('metric', metric.id, thing, metric);

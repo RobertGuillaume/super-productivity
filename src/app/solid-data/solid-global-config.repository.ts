@@ -16,7 +16,6 @@ import {
 } from './solid-global-config.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
   SolidMutationCoordinator,
@@ -29,16 +28,11 @@ type SolidGlobalConfigContainerScope = Extract<RuntimeScope, { kind: 'container'
 export class SolidGlobalConfigRepository {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly mutationCoordinator = inject(SolidMutationCoordinator);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
   private readonly operations = inject(SolidRepositoryOperations);
 
   async loadGlobalConfig(): Promise<SolidRepositoryRead<GlobalConfigState | null>> {
     const result = await this.queryGlobalConfigThing();
-    const existingThing =
-      this.catalogAuthority.filterThings(
-        this.globalConfigContainerScope().uri,
-        result.things,
-      )[0] ?? null;
+    const existingThing = result.things[0] ?? null;
     const config = existingThing === null ? null : this.mapGlobalConfig(existingThing);
     return solidRepositoryRead(config, result.metadata);
   }

@@ -2,7 +2,12 @@ import { vocab } from '@solid-intents/runtime';
 import type { RdfLiteralValue, RdfValue, Thing, ThingView } from '@solid-intents/runtime';
 import { DEFAULT_TASK, Task } from '../features/tasks/task.model';
 import { INBOX_PROJECT } from '../features/project/project.const';
-import { ICAL_TASK, SCHEMA_THING, SP_TASK } from './solid-productivity-vocab';
+import {
+  ICAL_TASK,
+  RDF_JSON_DATATYPE,
+  SCHEMA_THING,
+  SP_TASK,
+} from './solid-productivity-vocab';
 import {
   solidThingToTask,
   taskToSolidChanges,
@@ -157,6 +162,32 @@ describe('solidTask.mapper', () => {
     expect(solidThingToTask(withTimedDue).dueWithTime).toBe(explicitDue);
     expect(solidThingToTask(withAllDayDue).dueWithTime).toBeUndefined();
     expect(solidThingToTask(withAllDayDue).dueDay).toBe('2026-09-10');
+  });
+
+  it('falls back to legacy literals without discarding ambiguous or unknown RDF', () => {
+    const unknownPredicate = 'https://example.com/ns#untouched';
+    const properties: Readonly<Record<string, readonly RdfValue[]>> = {
+      [ICAL_TASK.summary]: [{ kind: 'literal', value: 'Tâche importée', language: 'fr' }],
+      [SP_TASK.id]: [literal('legacy-task')],
+      [SP_TASK.timeSpent]: [literal('1200')],
+      [SP_TASK.attachments]: [
+        {
+          kind: 'literal',
+          value: '[]',
+          datatype: RDF_JSON_DATATYPE,
+        },
+      ],
+      [unknownPredicate]: [{ kind: 'uri', uri: 'https://example.com/value' }],
+    };
+    const thing = createThing(properties, {});
+
+    const mapped = solidThingToTask(thing);
+
+    expect(mapped.id).toBe('legacy-task');
+    expect(mapped.title).toBe('Tâche importée');
+    expect(mapped.timeSpent).toBe(1200);
+    expect(mapped.attachments).toEqual([]);
+    expect(thing.property(unknownPredicate)).toEqual(properties[unknownPredicate]);
   });
 });
 
