@@ -83,7 +83,7 @@ import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 import { SolidRepositoryRead } from './solid-repository-read';
 import { solidCatalogReconciled } from './solid-catalog-reconciled.action';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidDiscoverySessionRegistryService } from './solid-discovery-session-registry.service';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { normalizeSolidTaskProjection } from './solid-task-projection';
@@ -134,7 +134,7 @@ export class SolidTaskHydrationService {
   private readonly store = inject(Store);
   private readonly archiveDbAdapter = inject(ArchiveDbAdapter);
   private readonly dataLayerState = inject(SolidDataLayerStateService);
-  private readonly catalogAuthority = inject(SolidCatalogAuthorityService);
+  private readonly discoverySessions = inject(SolidDiscoverySessionRegistryService);
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly taskAccess = inject(SolidTaskAccessService);
   private readonly archiveStateRepository = inject(SolidArchiveStateRepository);
@@ -269,7 +269,7 @@ export class SolidTaskHydrationService {
         previous,
         mergePartial,
         forcePartial: options.forcePartial === true,
-        catalogAuthority: this.catalogAuthority,
+        discoverySessions: this.discoverySessions,
         diagnostics,
         metadata,
         modelOutcomes,
@@ -290,6 +290,8 @@ export class SolidTaskHydrationService {
         (oldValue, newValue) => mergeById(oldValue, newValue, (item) => item.id),
       );
 
+    const taskContainerComplete =
+      this.discoverySessions.containerCoverage('tasks') === 'complete';
     const tasks = read(
       settled[0],
       [] as Task[],
@@ -300,13 +302,14 @@ export class SolidTaskHydrationService {
         mergeById(
           previous.filter(
             (previousTask) =>
+              !taskContainerComplete ||
               !this.taskAccess.isAppOwned(previousTask.id) ||
               current.some((currentTask) => currentTask.id === previousTask.id),
           ),
           current,
           (task) => task.id,
         ),
-      { forcePartial: true },
+      { forcePartial: this.discoverySessions.coverage('tasks') !== 'complete' },
     );
     const archiveStates = read(
       settled[1],
@@ -549,7 +552,7 @@ const readSettledValue = <T>({
   previous,
   mergePartial,
   forcePartial,
-  catalogAuthority,
+  discoverySessions,
   diagnostics,
   metadata,
   modelOutcomes,
@@ -561,19 +564,16 @@ const readSettledValue = <T>({
   previous: T | undefined;
   mergePartial: (oldValue: T, newValue: T) => T;
   forcePartial: boolean;
-  catalogAuthority: SolidCatalogAuthorityService;
+  discoverySessions: SolidDiscoverySessionRegistryService;
   diagnostics: SolidCatalogDiagnostic[];
   metadata: QueryMetadata[];
   modelOutcomes: SolidCatalogModelOutcome[];
 }): T => {
   if (result.status === 'fulfilled') {
     metadata.push(...result.value.metadata);
-    const runtimeComplete =
-      result.value.metadata.length > 0 &&
-      result.value.metadata.every((item) => item.completeness.status === 'complete');
     const complete =
-      runtimeComplete ||
-      (!forcePartial && catalogAuthority.isAuthoritative(containerUri));
+      !forcePartial &&
+      discoverySessions.coverageForContainerUri(containerUri) === 'complete';
     modelOutcomes.push({ model, status: complete ? 'complete' : 'partial' });
     if (previous === undefined || complete) {
       return result.value.value;

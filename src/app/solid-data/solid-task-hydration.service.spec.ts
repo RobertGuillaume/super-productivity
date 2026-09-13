@@ -60,7 +60,7 @@ import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository
 import { SolidTimeTrackingRepository } from './solid-time-tracking.repository';
 import { SolidDataLayerStateService } from './solid-data-layer-state.service';
 import { SolidRuntimeService } from './solid-runtime.service';
-import { SolidCatalogAuthorityService } from './solid-catalog-authority.service';
+import { SolidDiscoverySessionRegistryService } from './solid-discovery-session-registry.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { solidCatalogReconciled } from './solid-catalog-reconciled.action';
 
@@ -536,11 +536,13 @@ describe('SolidTaskHydrationService', () => {
       },
       types: {},
     });
-    const catalogAuthority = jasmine.createSpyObj<SolidCatalogAuthorityService>(
-      'SolidCatalogAuthorityService',
-      ['isAuthoritative'],
+    const discoverySessions = jasmine.createSpyObj<SolidDiscoverySessionRegistryService>(
+      'SolidDiscoverySessionRegistryService',
+      ['coverageForContainerUri', 'coverage', 'containerCoverage'],
     );
-    catalogAuthority.isAuthoritative.and.returnValue(false);
+    discoverySessions.coverageForContainerUri.and.returnValue('partial');
+    discoverySessions.coverage.and.returnValue('partial');
+    discoverySessions.containerCoverage.and.returnValue('partial');
     const taskAccess = jasmine.createSpyObj<SolidTaskAccessService>(
       'SolidTaskAccessService',
       ['isAppOwned'],
@@ -593,7 +595,10 @@ describe('SolidTaskHydrationService', () => {
         { provide: ArchiveDbAdapter, useValue: archiveDbAdapter },
         { provide: SolidDataLayerStateService, useValue: dataLayerState },
         { provide: SolidRuntimeService, useValue: solidRuntime },
-        { provide: SolidCatalogAuthorityService, useValue: catalogAuthority },
+        {
+          provide: SolidDiscoverySessionRegistryService,
+          useValue: discoverySessions,
+        },
         { provide: SolidTaskAccessService, useValue: taskAccess },
         { provide: SolidArchiveStateRepository, useValue: archiveStateRepository },
         { provide: SolidTaskRepository, useValue: taskRepository },
@@ -699,8 +704,27 @@ describe('SolidTaskHydrationService', () => {
     expect(partialAction.appDataComplete.task.ids).toEqual(['task-1']);
     expect(partialAction.appDataComplete.note.ids).toEqual(['note-1', 'note-2']);
 
-    catalogAuthority.isAuthoritative.and.callFake(
-      (containerUri) => containerUri === 'https://pod.example/notes/',
+    taskRepository.loadTasks.and.resolveTo(solidRepositoryRead([]));
+    taskAccess.isAppOwned.and.returnValue(false);
+    await service.reconcileStore();
+    let taskAuthorityAction = store.dispatch.calls.mostRecent()
+      .args[0] as unknown as ReturnType<typeof solidCatalogReconciled>;
+    expect(taskAuthorityAction.appDataComplete.task.ids).toEqual(['task-1']);
+
+    taskAccess.isAppOwned.and.returnValue(true);
+    await service.reconcileStore();
+    taskAuthorityAction = store.dispatch.calls.mostRecent()
+      .args[0] as unknown as ReturnType<typeof solidCatalogReconciled>;
+    expect(taskAuthorityAction.appDataComplete.task.ids).toEqual(['task-1']);
+
+    discoverySessions.containerCoverage.and.returnValue('complete');
+    await service.reconcileStore();
+    taskAuthorityAction = store.dispatch.calls.mostRecent()
+      .args[0] as unknown as ReturnType<typeof solidCatalogReconciled>;
+    expect(taskAuthorityAction.appDataComplete.task.ids).toEqual([]);
+
+    discoverySessions.coverageForContainerUri.and.callFake((containerUri) =>
+      containerUri === 'https://pod.example/notes/' ? 'complete' : 'partial',
     );
     noteRepository.loadNotes.and.resolveTo(solidRepositoryRead([]));
     await service.reconcileStore();

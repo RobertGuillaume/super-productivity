@@ -190,6 +190,8 @@ describe('SolidDataLayerStateService', () => {
         cooldownUntil,
         consecutiveNonRateLimitedResponses: 0,
         rateLimitEpisodeCount: 1,
+        dispatchedRequests: 3,
+        retryAttempts: 1,
       },
     });
 
