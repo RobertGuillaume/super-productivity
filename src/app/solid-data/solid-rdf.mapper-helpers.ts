@@ -5,6 +5,7 @@ import type {
   ThingRdfPropertyValue,
 } from '@solid-intents/runtime';
 import { RDF_JSON_DATATYPE } from './solid-productivity-vocab';
+import { solidSemanticValue } from './solid-semantic-profiles';
 
 export type SolidRdfPropertyMap = Record<string, readonly ThingRdfPropertyValue[]>;
 
@@ -70,6 +71,8 @@ export const deleteAbsentValue = (
 };
 
 export const stringProp = (thing: Thing, predicate: string): string | undefined => {
+  const semantic = solidSemanticValue(thing, predicate);
+  if (typeof semantic === 'string') return semantic;
   const value = literalProps(thing, predicate)[0]?.value;
   return typeof value === 'string' ? value : undefined;
 };
@@ -83,11 +86,14 @@ export const stringOrNullProp = (
 };
 
 export const stringArrayProp = (thing: Thing, predicate: string): string[] =>
+  typedStringArray(thing, predicate) ??
   literalProps(thing, predicate)
     .map((value) => value.value)
     .filter((value): value is string => typeof value === 'string');
 
 export const numberProp = (thing: Thing, predicate: string): number | undefined => {
+  const semantic = solidSemanticValue(thing, predicate);
+  if (typeof semantic === 'number') return semantic;
   const value = literalProps(thing, predicate)[0]?.value;
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -106,6 +112,8 @@ export const numberOrNullProp = (
 };
 
 export const booleanProp = (thing: Thing, predicate: string): boolean | undefined => {
+  const semantic = solidSemanticValue(thing, predicate);
+  if (typeof semantic === 'boolean') return semantic;
   const value = literalProps(thing, predicate)[0]?.value;
   if (typeof value === 'boolean') return value;
   if (value === 'true') return true;
@@ -129,3 +137,10 @@ const literalProps = (thing: Thing, predicate: string): RdfLiteralValue[] =>
 
 const isLiteralValue = (value: RdfValue): value is RdfLiteralValue =>
   value.kind === 'literal';
+
+const typedStringArray = (thing: Thing, predicate: string): string[] | undefined => {
+  const semantic = solidSemanticValue(thing, predicate);
+  if (!Array.isArray(semantic)) return undefined;
+  const matching = semantic.filter((value): value is string => typeof value === 'string');
+  return matching.length === semantic.length ? matching : undefined;
+};

@@ -6,15 +6,16 @@ import { SolidTaskAccessService } from './solid-task-access.service';
 describe('SolidTaskAccessService', () => {
   const webId = 'https://pod.example/profile/card#me';
   let authState: ReturnType<SolidRuntime['auth']['state']>;
-  let authenticatedFetch: jasmine.Spy;
   let resolvePermissions: jasmine.Spy;
   let service: SolidTaskAccessService;
 
   beforeEach(() => {
     authState = { status: 'authenticated', webId };
-    authenticatedFetch = jasmine.createSpy('authenticatedFetch');
-    authenticatedFetch.and.resolveTo(response(200));
-    resolvePermissions = jasmine.createSpy('resolvePermissions');
+    resolvePermissions = jasmine.createSpy('resolvePermissions').and.resolveTo({
+      status: 'known',
+      provenance: 'resource-acl',
+      permissions: [{ agent: webId, read: true, write: true }],
+    });
     TestBed.configureTestingModule({
       providers: [
         {
@@ -28,7 +29,6 @@ describe('SolidTaskAccessService', () => {
             client: {
               auth: {
                 state: () => authState,
-                fetch: () => authenticatedFetch,
               },
               share: { resolvePermissions },
               diagnostics: { status: () => ({ requestScheduling: [] }) },
@@ -70,10 +70,14 @@ describe('SolidTaskAccessService', () => {
     expect(service.accessDecision('external-task')).toEqual({ state: 'writable' });
   });
 
-  it('uses an effective WAC-Allow response for an external task resource', async () => {
-    authenticatedFetch.and.resolveTo(
-      response(200, new Headers([['WAC-Allow', 'user="read write"']])),
-    );
+  it('does not accept a grant for a different WebID', async () => {
+    resolvePermissions.and.resolveTo({
+      status: 'known',
+      provenance: 'resource-acl',
+      permissions: [
+        { agent: 'https://other.example/profile/card#me', read: true, write: true },
+      ],
+    });
     service.registerThing(
       'external-task',
       thing('https://pod.example/calendar/tasks.ttl#todo-1'),
@@ -81,12 +85,11 @@ describe('SolidTaskAccessService', () => {
 
     await service.refreshExternalPermissions();
 
-    expect(service.isMutationBlocked('external-task')).toBe(false);
-    expect(authenticatedFetch).toHaveBeenCalledOnceWith(
+    expect(service.isMutationBlocked('external-task')).toBe(true);
+    expect(service.accessDecision('external-task')).toEqual({ state: 'unknown' });
+    expect(resolvePermissions).toHaveBeenCalledOnceWith(
       'https://pod.example/calendar/tasks.ttl',
-      { method: 'HEAD' },
     );
-    expect(resolvePermissions).not.toHaveBeenCalled();
   });
 
   it('labels only an explicit matching denial as read-only', async () => {
@@ -161,9 +164,6 @@ describe('SolidTaskAccessService', () => {
   });
 
   it('checks one source once for multiple Things and repeated catalog registration', async () => {
-    authenticatedFetch.and.resolveTo(
-      response(200, new Headers([['WAC-Allow', 'user="read write"']])),
-    );
     service.registerThing(
       'external-task-1',
       thing('https://pod.example/calendar/tasks.ttl#todo-1'),
@@ -180,7 +180,7 @@ describe('SolidTaskAccessService', () => {
     );
     await service.scheduleExternalPermissionChecks();
 
-    expect(authenticatedFetch).toHaveBeenCalledTimes(1);
+    expect(resolvePermissions).toHaveBeenCalledTimes(1);
     expect(service.accessDecision('external-task-1')).toEqual({ state: 'writable' });
     expect(service.accessDecision('external-task-2')).toEqual({ state: 'writable' });
   });
@@ -263,6 +263,3 @@ const thing = (uri: string): Thing => ({
   objects: (): readonly string[] => [],
   as: <View>(_view: ThingView<View>): View => ({}) as View,
 });
-
-const response = (status: number, headers?: HeadersInit): Response =>
-  new Response(null, { status, headers });

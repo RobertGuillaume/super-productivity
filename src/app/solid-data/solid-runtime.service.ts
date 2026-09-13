@@ -1,10 +1,10 @@
-import { inject, Injectable } from '@angular/core';
-import { getSolidDataset, getThing, getUrlAll } from '@inrupt/solid-client';
+import { DestroyRef, inject, Injectable } from '@angular/core';
 import type {
   AuthState,
   AuthSessionOptions,
   RuntimeBootOptions,
   RuntimeLayout,
+  RuntimeRdfQuad,
   SolidRuntime,
 } from '@solid-intents/runtime';
 import { Log } from '../core/log';
@@ -31,14 +31,15 @@ import {
   SOLID_PRODUCTIVITY_TASK_REPEAT_CFG_TYPE,
   SOLID_PRODUCTIVITY_TIME_TRACKING_TYPE,
 } from './solid-productivity-vocab';
+import {
+  installSolidSemanticViewResolver,
+  SOLID_SEMANTIC_PROFILES,
+} from './solid-semantic-profiles';
 import { SOLID_RUNTIME } from './solid-runtime.token';
 import { SolidStorageRootCacheService } from './solid-storage-root-cache.service';
 
 const PIM_STORAGE = 'http://www.w3.org/ns/pim/space#storage';
-const LDP_BASIC_CONTAINER = 'http://www.w3.org/ns/ldp#BasicContainer';
-const SOLID_TERMS = 'http://www.w3.org/ns/solid/terms#';
-const PUBLIC_TYPE_INDEX = `${SOLID_TERMS}publicTypeIndex`;
-const PRIVATE_TYPE_INDEX = `${SOLID_TERMS}privateTypeIndex`;
+const RUNTIME_OPERATION_TIMEOUT_MS = 15_000;
 
 export type SolidStorageRootResolution = 'unchanged' | 'changed' | 'unavailable';
 
@@ -46,9 +47,17 @@ export type SolidStorageRootResolution = 'unchanged' | 'changed' | 'unavailable'
 export class SolidRuntimeService {
   private readonly runtime = inject(SOLID_RUNTIME);
   private readonly storageRootCache = inject(SolidStorageRootCacheService);
+  private readonly destroyRef = inject(DestroyRef);
   private layout: RuntimeLayout | null = null;
   private layoutPodUrl: string | null = null;
-  private verifiedTypeIndexUris: readonly string[] | null = null;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      void this.runtime.close({ abortReads: true, timeoutMs: 2_000 }).catch(() => {
+        // Application teardown is best effort; ordinary logout never closes the runtime.
+      });
+    });
+  }
 
   get client(): SolidRuntime {
     return this.runtime;
@@ -135,7 +144,6 @@ export class SolidRuntimeService {
   }
 
   async boot(options: RuntimeBootOptions = {}): Promise<void> {
-    this.verifiedTypeIndexUris = null;
     this.clearLayout();
     await this.runtime.boot(options);
     this.clearLayout();
@@ -143,7 +151,6 @@ export class SolidRuntimeService {
   }
 
   async restoreSession(options: AuthSessionOptions = {}): Promise<AuthState> {
-    this.verifiedTypeIndexUris = null;
     this.clearLayout();
     const state = await this.runtime.auth.restoreSession({
       clientName: 'Super Productivity',
@@ -178,12 +185,7 @@ export class SolidRuntimeService {
 
   async logout(): Promise<void> {
     await this.runtime.auth.logout();
-    this.verifiedTypeIndexUris = null;
     this.clearLayout();
-  }
-
-  getVerifiedTypeIndexUris(): readonly string[] | null {
-    return this.verifiedTypeIndexUris;
   }
 
   ensureLayout(): RuntimeLayout {
@@ -191,6 +193,17 @@ export class SolidRuntimeService {
 
     if (this.layout === null || this.layoutPodUrl !== podUrl) {
       this.layout = this.runtime.layouts.define(SOLID_PRODUCTIVITY_LAYOUT);
+      for (const profile of SOLID_SEMANTIC_PROFILES) {
+        this.runtime.types.register(profile);
+      }
+      installSolidSemanticViewResolver(
+        (type) => this.runtime.types.view(type),
+        (type) =>
+          Log.warn('Solid semantic-projection-degraded', {
+            operation: 'semantic-projection-degraded',
+            type,
+          }),
+      );
       this.layoutPodUrl = podUrl;
     }
 
@@ -200,11 +213,10 @@ export class SolidRuntimeService {
   async ensureAppContainers(): Promise<void> {
     const layout = this.ensureLayout();
     const podUrl = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
-    const fetchResource = this.runtime.auth.fetch();
     const containerUris = collectContainerUris(podUrl, Object.values(layout.containers));
 
     for (const containerUri of containerUris) {
-      await ensureContainer(fetchResource, containerUri);
+      await ensureContainer(this.runtime, containerUri);
     }
   }
 
@@ -213,12 +225,11 @@ export class SolidRuntimeService {
     knownExisting: Set<string> = new Set(),
   ): Promise<void> {
     const podUrl = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
-    const fetchResource = this.runtime.auth.fetch();
     const containerUris = collectContainerUris(podUrl, [containerUri]);
 
     for (const uri of containerUris) {
       if (!knownExisting.has(uri)) {
-        await ensureContainer(fetchResource, uri, uri === containerUri);
+        await ensureContainer(this.runtime, uri);
         knownExisting.add(uri);
       }
     }
@@ -276,28 +287,33 @@ export class SolidRuntimeService {
 
   private async discoverStorageRoot(webId: string): Promise<string | null> {
     try {
-      const profileDataset = await getSolidDataset(webId, {
-        fetch: this.runtime.auth.fetch(),
-      });
-      const profileThing = getThing(profileDataset, webId);
-      this.verifiedTypeIndexUris =
-        profileThing === null
-          ? []
-          : Array.from(
-              new Set(
-                [
-                  ...getUrlAll(profileThing, PUBLIC_TYPE_INDEX),
-                  ...getUrlAll(profileThing, PRIVATE_TYPE_INDEX),
-                ].filter(isHttpUri),
-              ),
-            );
-      const storageRoots =
-        profileThing === null ? [] : getUrlAll(profileThing, PIM_STORAGE);
-      const storageRoot = storageRoots[0];
+      const quads: RuntimeRdfQuad[] = [];
+      let complete = false;
+      for await (const batch of this.runtime.resources.readRdf(
+        webId,
+        runtimeOperationOptions(),
+      )) {
+        quads.push(...batch.quads);
+        complete = batch.complete;
+      }
+      if (!complete) {
+        return null;
+      }
+      const objectsFor = (predicate: string): string[] =>
+        quads
+          .filter(
+            (quad) =>
+              quad.subject.termType === 'NamedNode' &&
+              quad.subject.value === webId &&
+              quad.predicate.value === predicate &&
+              quad.object.termType === 'NamedNode' &&
+              isHttpUri(quad.object.value),
+          )
+          .map((quad) => quad.object.value);
+      const storageRoot = objectsFor(PIM_STORAGE)[0];
 
       return storageRoot === undefined ? null : normalizeContainerUrl(storageRoot);
     } catch (error) {
-      this.verifiedTypeIndexUris = null;
       Log.err('SolidRuntimeService: Failed to discover Solid storage root', {
         name: error instanceof Error ? error.name : 'UnknownError',
       });
@@ -331,8 +347,7 @@ const collectContainerUris = (podUrl: string, appContainerUris: string[]): strin
       parsedContainer.origin !== rootUrl.origin ||
       !containerPath.startsWith(rootPath)
     ) {
-      containerUris.add(normalizeContainerUrl(parsedContainer.toString()));
-      continue;
+      throw new Error('Solid application container is outside the verified storage root');
     }
 
     const relativePath = containerPath.slice(rootPath.length);
@@ -356,48 +371,42 @@ const normalizeContainerPath = (path: string): string =>
   path.endsWith('/') ? path : `${path}/`;
 
 const ensureContainer = async (
-  fetchResource: typeof fetch,
+  runtime: SolidRuntime,
   containerUri: string,
-  isKnownMissing = false,
 ): Promise<void> => {
-  if (!isKnownMissing) {
-    const existing = await fetchResource(containerUri, { method: 'HEAD' });
-    if (existing.ok) {
-      return;
-    }
-
-    if (existing.status !== 404 && existing.status !== 410 && existing.status !== 405) {
-      throw new Error(`Failed to inspect Solid container: HTTP ${existing.status}`);
-    }
-
-    if (
-      existing.status === 405 &&
-      (await canReadContainer(fetchResource, containerUri))
-    ) {
-      return;
-    }
-  }
-
-  const created = await fetchResource(containerUri, {
-    method: 'PUT',
-    headers: new Headers([['Link', `<${LDP_BASIC_CONTAINER}>; rel="type"`]]),
-  });
-
-  if (created.ok || created.status === 201) {
+  const existing = await runtime.storage.listContainer(
+    containerUri,
+    runtimeOperationOptions(),
+  );
+  if (existing.status === 'ok' || existing.status === 'not-modified') {
     return;
   }
-
-  if (created.status === 409 && (await canReadContainer(fetchResource, containerUri))) {
-    return;
+  if (existing.status !== 'missing') {
+    throw (
+      existing.error ?? new Error(`Failed to inspect Solid container: ${existing.status}`)
+    );
   }
 
-  throw new Error(`Failed to create Solid container: HTTP ${created.status}`);
+  try {
+    const plan = await runtime.writes.planContainerCreate(
+      containerUri,
+      runtimeOperationOptions(),
+    );
+    await runtime.writes.commit(plan, runtimeOperationOptions());
+    return;
+  } catch (error) {
+    const listing = await runtime.storage.listContainer(
+      containerUri,
+      runtimeOperationOptions(),
+    );
+    if (listing.status === 'ok' || listing.status === 'not-modified') {
+      return;
+    }
+    throw error;
+  }
 };
 
-const canReadContainer = async (
-  fetchResource: typeof fetch,
-  containerUri: string,
-): Promise<boolean> => {
-  const response = await fetchResource(containerUri, { method: 'GET' });
-  return response.ok;
-};
+const runtimeOperationOptions = (): { signal: AbortSignal; deadline: Date } => ({
+  signal: AbortSignal.timeout(RUNTIME_OPERATION_TIMEOUT_MS),
+  deadline: new Date(Date.now() + RUNTIME_OPERATION_TIMEOUT_MS),
+});
