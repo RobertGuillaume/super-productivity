@@ -545,8 +545,9 @@ The server prunes after conflict detection, before storage.
 
 **Decision**: The browser Solid backend treats `@solid-intents/runtime` as the
 exclusive Solid protocol and RDF-semantics boundary. Super Productivity owns
-only application-model projection, discovery target priority, and conservative
-write-readiness policy.
+only application-model projection, discovery target priority, and mutation
+admission policy. Discovery coverage and observed ACL state are evidence, not a
+global write lock.
 
 **Rationale**:
 
@@ -558,14 +559,21 @@ write-readiness policy.
 - Runtime-bound version-4 plans bind identity, semantic profile, source
   validators, and exact HTTP intent. The app must never fabricate or replay
   those bindings.
+- For resources in the verified Super Productivity storage tree, the runtime's
+  conditional plan/commit result is authoritative for write access. Cached or
+  live ACL observations are advisory. External resources remain fail-closed and
+  require an exact matching-WebID write grant.
+- Every accepted action owns an immutable WebID/root/generation context. Failed
+  targets remain reserved through authoritative reconciliation; unrelated
+  targets continue, and a stale whole-application snapshot is never restored.
 - Keeping Pod paths and predicates stable preserves existing data without an
   application schema bump or migration.
 
 **Implementation**:
 
-- Pin the privately qualified `2.0.0-rc.2` archive, checksum, source commit, and
-  qualification report. A prebuild provenance check rejects stale cached runtime
-  installations before Angular compilation.
+- Keep the privately qualified `2.0.0-rc.2` archive until an immutable qualified
+  rc.3 containing WAC fix `24c8969` is available. A prebuild provenance check
+  rejects stale cached runtime installations before Angular compilation.
 - Keep the runtime-qualified JSON-LD 9 override at the application root until a
   final runtime qualifies an ordinary upstream dependency tree. Super
   Productivity remains on its Node 22.18/npm 11.18 toolchain and owns the
@@ -577,6 +585,8 @@ write-readiness policy.
 - Use one non-recursive named session per application container and one
   cross-origin `Task` type session. Only complete session coverage authorizes
   replacement of an already published model slice.
+- Provision the exact create target lazily and initialize each discovery session
+  independently. Background discovery failure must not veto an app-owned write.
 - Retain raw RDF projection only as a compatibility fallback and surface
   `semantic-projection-degraded` without hiding readable Things.
 

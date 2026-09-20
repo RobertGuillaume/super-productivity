@@ -62,6 +62,9 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
   also appear in Today.
 - Start offline with a populated local catalog. Confirm cached data remains
   viewable, writes stay blocked, and browser-online recovery refreshes in place.
+- Keep one background application container unavailable while editing a cached
+  app-owned task. Confirm the edit commits, the failed session stays degraded,
+  and unrelated mutation targets remain usable.
 
 ## Core Model Path
 
@@ -155,6 +158,12 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
   success only after the resulting Thing is visible in the catalog.
 - Force a deferred/rate-limited write outcome and confirm recovery does not run
   before `retryAt`. Authentication failures should recover immediately.
+- Force one same-resource write to fail while a descendant is queued. Confirm
+  the descendant is not planned, reconciliation completes before release, and
+  an unrelated resource continues to save.
+- Force recovery itself to fail. Confirm only the affected target is
+  quarantined, no older whole-app snapshot replaces newer work, and the UI does
+  not claim that the write was restored.
 - Test a Pod that rejects container `HEAD` but supports listing. Confirm nested
   parents are created shortest-path first, a concurrent create is accepted only
   after re-listing, and a target outside the verified storage root is rejected.
@@ -173,6 +182,10 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 - Record any runtime limitation in `docs/solid-runtime-gaps.md` only if `@solid-intents/runtime` blocks a clean Solid-native implementation.
 
 ## Deployment Qualification
+
+Do not start rc.3 deployment qualification until its immutable archive,
+checksum, source commit, and machine-readable report are available. A dirty
+runtime checkout is never a substitute.
 
 - Run the first Netlify rc.2 deployment with the dependency cache cleared and
   confirm the runtime preflight passes before Angular compilation.

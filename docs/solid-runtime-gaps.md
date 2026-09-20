@@ -20,17 +20,25 @@ application does not parse WebID profiles, type indexes, ACL responses, or
 container RDF directly.
 
 Super Productivity owns projection into its application models, foreground and
-background target priority, and the conservative policy that editing requires
-a proven write grant for the authenticated WebID. Unknown, deferred, and
-inaccessible permissions stay blocked.
+background target priority, and mutation admission. For application-owned
+resources under the verified storage root, authenticated runtime plan/commit is
+the write authority; ACL observations remain diagnostic. External resources are
+fail-closed and require a matching-WebID write grant.
+
+Runtime binding, discovery coverage, access observation, connectivity, and
+per-target mutation recovery are independent state axes. The settings phase is
+only a presentation of those axes and is never write authority. Cached data may
+remain interactive while background discovery is incomplete; offline Solid is
+read-only.
 
 Repository reads remain catalog-only. Startup publishes the existing IndexedDB
-catalog before network work. The coordinator then provisions the unchanged
-container layout and resumes stable named runtime sessions: one direct,
+catalog before network work. The coordinator lazily provisions exact targets
+and resumes stable named runtime sessions: one direct,
 non-recursive session per application container and one cross-origin `Task`
 type-index session with storage-root fallback disabled. Complete session
 coverage can remove absent records; partial or failed coverage preserves the
-previously published model slice.
+previously published model slice. A failed background container does not stop
+unrelated sessions or app-owned mutations.
 
 All semantic mutations use awaited version-4 plans. Plans are never replayed:
 any future retry must read and plan again. A completed content mutation followed
@@ -38,6 +46,12 @@ only by registration or reconciliation failure is accepted only after targeted
 catalog refresh confirms the Thing. Conflict, rejection, and unknown outcomes
 project authoritative Pod state instead of assuming success. Deferred outcomes
 wait until the runtime-provided retry deadline.
+
+Every accepted action carries an immutable WebID, storage-root, runtime
+generation, entity-key, source, and catalog-generation context through its
+repository calls. Same-resource descendants are canceled after a predecessor
+failure. Recovery refreshes authoritative Pod state and never restores an older
+whole-application snapshot.
 
 ## Compatibility
 
@@ -73,6 +87,10 @@ Netlify deployments remain external qualification steps.
 
 - There is no offline Solid write outbox. Cached catalog data remains readable,
   while writes wait for connectivity and verified access.
+- Runtime rc.3 adoption is blocked on an immutable qualification archive and
+  machine-readable report. The local `release/2.0.0-rc.3` branch contains WAC
+  metadata fix `24c8969`, but its dirty working tree is not acceptable
+  dependency provenance. No application ACL parser or rc.2 workaround is used.
 - Explicit headless execution, Pod checkpoint maintenance, raw publication,
   archive workflows, and application consumption of acknowledged discovery
   observations remain intentionally out of scope.
@@ -94,7 +112,7 @@ Netlify deployments remain external qualification steps.
 - The production-only comparison improved from six findings (five moderate, one
   high) to two unrelated findings (one low, one high). Those remaining findings
   are `@simplewebauthn/server` and `nodemailer`, outside the Solid runtime chain.
-- Final public runtime 2.0 remains follow-up work. It must remove the temporary
+- Final public runtime 2.0 remains follow-up work after qualified rc.3. It must remove the temporary
   consumer override and pass the ordinary upstream audit, but it does not block
   the feature-gated rc.2 rollout.
 
