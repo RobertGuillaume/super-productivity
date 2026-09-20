@@ -9,6 +9,7 @@ import type {
 } from '@solid-intents/runtime';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SOLID_RUNTIME } from './solid-runtime.token';
+import { SolidStorageRootCacheService } from './solid-storage-root-cache.service';
 import {
   ICAL_VTODO_CLASS,
   SOLID_PRODUCTIVITY_LEGACY_TASK_CLASS,
@@ -98,13 +99,36 @@ describe('SolidRuntimeService', () => {
 
   it('trusts a WebID storage root only after the RDF stream completes', async () => {
     const service = TestBed.inject(SolidRuntimeService);
-    expect(await service.resolveAuthenticatedStorageRoot()).toBe('changed');
+    expect(await service.resolveAuthenticatedStorageRoot()).toEqual({
+      status: 'trusted-live',
+      changed: true,
+      storageRoot,
+      webId,
+    });
     expect(service.taskProfile.target?.containerUri).toContain('https://pod.example/');
 
     podUrl = 'https://mock-pod.local/';
     completeProfile = false;
-    expect(await service.resolveAuthenticatedStorageRoot()).toBe('unavailable');
+    expect(await service.resolveAuthenticatedStorageRoot()).toEqual({
+      status: 'unavailable',
+      changed: false,
+      webId,
+    });
     expect(podUrl).toBe('https://mock-pod.local/');
+  });
+
+  it('retains a WebID-matched verified root when the profile stream is incomplete', async () => {
+    const service = TestBed.inject(SolidRuntimeService);
+    TestBed.inject(SolidStorageRootCacheService).remember(webId, storageRoot);
+    podUrl = storageRoot;
+    completeProfile = false;
+
+    expect(await service.resolveAuthenticatedStorageRoot()).toEqual({
+      status: 'trusted-cache',
+      changed: false,
+      storageRoot,
+      webId,
+    });
   });
 
   it('creates missing parents shortest-path first through version-4 plans', async () => {

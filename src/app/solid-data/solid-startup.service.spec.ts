@@ -26,7 +26,11 @@ describe('SolidStartupService', () => {
         } as SolidRuntime,
       },
     );
-    solidRuntime.activateRememberedStorageRoot.and.resolveTo('unchanged');
+    solidRuntime.activateRememberedStorageRoot.and.resolveTo({
+      status: 'unavailable',
+      changed: false,
+      webId: '',
+    });
     sessionRecovery = jasmine.createSpyObj<SolidSessionRecoveryService>(
       'SolidSessionRecoveryService',
       ['promptForLogin'],

@@ -48,7 +48,12 @@ describe('SolidPodRefreshCoordinatorService', () => {
       ['resolveAuthenticatedStorageRoot', 'ensureAppContainers', 'ensureLayout'],
       { client: runtime },
     );
-    runtimeService.resolveAuthenticatedStorageRoot.and.resolveTo('unchanged');
+    runtimeService.resolveAuthenticatedStorageRoot.and.resolveTo({
+      status: 'trusted-live',
+      changed: false,
+      storageRoot: 'https://pod.example/',
+      webId,
+    });
     runtimeService.ensureAppContainers.and.resolveTo();
     runtimeService.ensureLayout.and.returnValue(layout as never);
     sessions = jasmine.createSpyObj<SolidDiscoverySessionRegistryService>(
@@ -80,6 +85,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
         'setRefreshProgress',
         'clearWriteReadiness',
         'setContainerReadiness',
+        'setRuntimeBinding',
         'addDiagnostics',
       ],
     );
@@ -132,6 +138,12 @@ describe('SolidPodRefreshCoordinatorService', () => {
   it('provisions and restores durable sessions before publishing refreshed data', async () => {
     await TestBed.inject(SolidPodRefreshCoordinatorService).start();
     expect(runtimeService.ensureAppContainers).toHaveBeenCalledTimes(1);
+    expect(dataLayerState.setRuntimeBinding).toHaveBeenCalledWith({
+      status: 'trusted-live',
+      generation: 0,
+      storageRoot: 'https://pod.example/',
+      webId,
+    });
     expect(sessions.initialize).toHaveBeenCalledWith(
       layout as never,
       webId,

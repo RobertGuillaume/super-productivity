@@ -200,7 +200,7 @@ describe('SolidDataLayerStateService', () => {
     expect(service.rateLimitedUntil()).toBeNull();
   }));
 
-  it('enables writes only for containers with proven writable access', () => {
+  it('admits app-owned writes without waiting for container ACL observations', () => {
     localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
     localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
@@ -213,7 +213,10 @@ describe('SolidDataLayerStateService', () => {
     service.setContainerReadiness('config', 'checking');
     expect(service.canApplyPersistentAction(action)).toBe(false);
 
-    service.setContainerReadiness('config', 'writable');
+    trustRuntimeBinding(service);
+    expect(service.canApplyPersistentAction(action)).toBe(true);
+
+    service.setContainerReadiness('config', 'unavailable');
     expect(service.canApplyPersistentAction(action)).toBe(true);
   });
 
@@ -222,6 +225,7 @@ describe('SolidDataLayerStateService', () => {
     localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
     const service = TestBed.inject(SolidDataLayerStateService);
+    trustRuntimeBinding(service);
     service.setContainerReadiness('tasks', 'writable');
     service.setContainerReadiness('projects', 'unavailable');
     service.setContainerReadiness('tags', 'read-only');
@@ -237,6 +241,7 @@ describe('SolidDataLayerStateService', () => {
 
   it('demotes proven access after authorization and connectivity failures', () => {
     const service = TestBed.inject(SolidDataLayerStateService);
+    trustRuntimeBinding(service);
     service.setContainerReadiness('tasks', 'writable');
     service.demoteWriteAccessAfterFailure({ outcomes: [{ httpStatus: 403 }] });
     expect(service.containerReadiness('tasks')).toBe('read-only');
@@ -258,6 +263,7 @@ describe('SolidDataLayerStateService', () => {
       (taskIds) => !taskIds.includes('external-read-only'),
     );
     const service = TestBed.inject(SolidDataLayerStateService);
+    trustRuntimeBinding(service);
     for (const container of ['tasks', 'projects', 'tags', 'planner', 'app'] as const) {
       service.setContainerWriteReady(container, true);
     }
@@ -281,6 +287,7 @@ describe('SolidDataLayerStateService', () => {
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
     taskAccess.hasBlockedExternalTask.and.returnValue(true);
     const service = TestBed.inject(SolidDataLayerStateService);
+    trustRuntimeBinding(service);
     service.setContainerWriteReady('tasks', true);
     service.setContainerWriteReady('tags', true);
 
@@ -350,11 +357,7 @@ describe('SolidDataLayerStateService', () => {
     expect(service.canApplyPersistentAction(action)).toBe(false);
 
     authState = { status: 'authenticated', webId: 'https://user.example/#me' };
-    service.setContainerWriteReady('tasks', true);
-    service.setContainerWriteReady('projects', true);
-    service.setContainerWriteReady('tags', true);
-    service.setContainerWriteReady('planner', true);
-    service.setContainerWriteReady('app', true);
+    trustRuntimeBinding(service);
     expect(service.canApplyPersistentAction(action)).toBe(true);
     expect(service.ownsPersistentAction(addBoard({ board }) as PersistentAction)).toBe(
       true,
@@ -1170,3 +1173,12 @@ describe('SolidDataLayerStateService', () => {
     ).toBe(true);
   });
 });
+
+const trustRuntimeBinding = (service: SolidDataLayerStateService): void => {
+  service.setRuntimeBinding({
+    status: 'trusted-live',
+    generation: 1,
+    storageRoot: 'https://pod.example/',
+    webId: 'https://user.example/#me',
+  });
+};

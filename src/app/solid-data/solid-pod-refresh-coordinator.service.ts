@@ -150,11 +150,19 @@ export class SolidPodRefreshCoordinatorService {
   private async startInternal(): Promise<void> {
     if (!this.canRun()) return;
     const generation = this.lifecycleGeneration;
-    this.dataLayerState.clearWriteReadiness();
+    this.dataLayerState.setRuntimeBinding({ status: 'resolving', generation });
     try {
       const resolution = await this.solidRuntime.resolveAuthenticatedStorageRoot();
-      this.rootVerified = resolution !== 'unavailable';
-      if (resolution === 'changed') {
+      this.rootVerified = resolution.status !== 'unavailable';
+      if (resolution.status !== 'unavailable') {
+        this.dataLayerState.setRuntimeBinding({
+          status: resolution.status,
+          generation,
+          storageRoot: resolution.storageRoot,
+          webId: resolution.webId,
+        });
+      }
+      if (resolution.changed) {
         this.identities.clear();
         this.mutationIntents.clear();
         this.hydration.resetCatalogBaseline();
@@ -163,11 +171,15 @@ export class SolidPodRefreshCoordinatorService {
       }
     } catch (error) {
       this.rootVerified = false;
+      this.dataLayerState.setRuntimeBinding({ status: 'untrusted', generation });
       await this.handleStartupFailure('root-discovery', error);
     }
     this.started = true;
     if (!this.rootVerified || generation !== this.lifecycleGeneration) {
       this.startupFailed = !this.rootVerified;
+      if (!this.rootVerified) {
+        this.dataLayerState.setRuntimeBinding({ status: 'untrusted', generation });
+      }
       this.dataLayerState.setPhase('degraded');
       return;
     }
@@ -197,8 +209,16 @@ export class SolidPodRefreshCoordinatorService {
   private async refreshManually(): Promise<void> {
     if (!this.rootVerified) {
       const resolution = await this.solidRuntime.resolveAuthenticatedStorageRoot();
-      this.rootVerified = resolution !== 'unavailable';
-      if (resolution === 'changed') {
+      this.rootVerified = resolution.status !== 'unavailable';
+      if (resolution.status !== 'unavailable') {
+        this.dataLayerState.setRuntimeBinding({
+          status: resolution.status,
+          generation: this.lifecycleGeneration,
+          storageRoot: resolution.storageRoot,
+          webId: resolution.webId,
+        });
+      }
+      if (resolution.changed) {
         await this.restartAfterRuntimeBoot();
         return;
       }
@@ -336,7 +356,6 @@ export class SolidPodRefreshCoordinatorService {
   private async handleStartupFailure(operation: string, error: unknown): Promise<void> {
     const diagnostic = this.reportFailure(operation, error);
     this.startupFailed = true;
-    this.dataLayerState.clearWriteReadiness();
     this.dataLayerState.setPhase('degraded');
     this.stopSubscription();
     try {
@@ -383,7 +402,6 @@ export class SolidPodRefreshCoordinatorService {
       this.lifecycleGeneration++;
       await runSolidRuntimeStage('session-retry-pause', () => this.sessions.pause());
       this.stopSubscription();
-      this.dataLayerState.clearWriteReadiness();
       this.started = false;
       this.startupFailed = false;
       await this.start();

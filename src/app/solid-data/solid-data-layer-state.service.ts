@@ -49,6 +49,16 @@ export interface SolidRefreshProgress {
 
 export type SolidWriteReadiness = SolidAccessState;
 
+export type SolidRuntimeBindingState =
+  | { status: 'untrusted'; generation: number }
+  | { status: 'resolving'; generation: number }
+  | {
+      status: 'trusted-live' | 'trusted-cache';
+      generation: number;
+      storageRoot: string;
+      webId: string;
+    };
+
 @Injectable({ providedIn: 'root' })
 export class SolidDataLayerStateService {
   private readonly destroyRef = inject(DestroyRef);
@@ -73,6 +83,10 @@ export class SolidDataLayerStateService {
   readonly refreshProgress = signal<SolidRefreshProgress | null>(null);
   readonly diagnosticCount = signal(0);
   readonly rateLimitedUntil = signal<Date | null>(null);
+  readonly runtimeBinding = signal<SolidRuntimeBindingState>({
+    status: 'untrusted',
+    generation: 0,
+  });
   readonly writeReadiness = signal<ReadonlyMap<SolidContainerKey, SolidWriteReadiness>>(
     new Map(),
   );
@@ -154,6 +168,10 @@ export class SolidDataLayerStateService {
     this.writeReadiness.set(new Map());
   }
 
+  setRuntimeBinding(binding: SolidRuntimeBindingState): void {
+    this.runtimeBinding.set(binding);
+  }
+
   private recordRateLimit(cooldownUntil: Date | null): void {
     if (cooldownUntil === null) {
       return;
@@ -202,13 +220,8 @@ export class SolidDataLayerStateService {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       return false;
     }
-
-    const targets = solidContainerKeysForActionType(action.type);
-    const readiness = this.writeReadiness();
-    if (
-      targets.length === 0 ||
-      !targets.every((target) => readiness.get(target) === 'writable')
-    ) {
+    const binding = this.runtimeBinding();
+    if (binding.status !== 'trusted-live' && binding.status !== 'trusted-cache') {
       return false;
     }
 
@@ -273,6 +286,7 @@ export class SolidDataLayerStateService {
 
   private reportBlockedMutation(action: PersistentAction): void {
     const readiness = this.writeReadiness();
+    const binding = this.runtimeBinding();
     const blockedContainers = solidContainerKeysForActionType(action.type)
       .filter((container) => readiness.get(container) !== 'writable')
       .map((container) => ({
@@ -283,6 +297,12 @@ export class SolidDataLayerStateService {
       operation: action.type,
       blockedContainers,
       blockedExternalTask: !this.taskAccess.canMutateTasks(solidTaskIdsForAction(action)),
+      reason:
+        typeof navigator !== 'undefined' && navigator.onLine === false
+          ? 'offline'
+          : binding.status === 'untrusted' || binding.status === 'resolving'
+            ? 'storage-root-untrusted'
+            : 'external-access',
     });
     if (this.blockedMutationWasReported) {
       return;

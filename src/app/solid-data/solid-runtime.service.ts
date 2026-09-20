@@ -41,7 +41,20 @@ import { SolidStorageRootCacheService } from './solid-storage-root-cache.service
 const PIM_STORAGE = 'http://www.w3.org/ns/pim/space#storage';
 const RUNTIME_OPERATION_TIMEOUT_MS = 15_000;
 
-export type SolidStorageRootResolution = 'unchanged' | 'changed' | 'unavailable';
+export type SolidStorageRootTrust = 'trusted-live' | 'trusted-cache';
+
+export type SolidStorageRootResolution =
+  | {
+      status: SolidStorageRootTrust;
+      changed: boolean;
+      storageRoot: string;
+      webId: string;
+    }
+  | {
+      status: 'unavailable';
+      changed: false;
+      webId: string;
+    };
 
 @Injectable({ providedIn: 'root' })
 export class SolidRuntimeService {
@@ -166,15 +179,21 @@ export class SolidRuntimeService {
   async activateRememberedStorageRoot(): Promise<SolidStorageRootResolution> {
     const state = this.runtime.auth.state();
     if (state.status !== 'authenticated') {
-      return 'unchanged';
+      return { status: 'unavailable', changed: false, webId: '' };
     }
 
     const rememberedRoot = this.storageRootCache.get(state.webId);
     if (rememberedRoot === null) {
-      return 'unchanged';
+      return { status: 'unavailable', changed: false, webId: state.webId };
     }
 
-    return this.activateStorageRoot(rememberedRoot);
+    const changed = await this.activateStorageRoot(rememberedRoot);
+    return {
+      status: 'trusted-cache',
+      changed,
+      storageRoot: rememberedRoot,
+      webId: state.webId,
+    };
   }
 
   async login(issuer: string): Promise<void> {
@@ -249,35 +268,44 @@ export class SolidRuntimeService {
   async resolveAuthenticatedStorageRoot(): Promise<SolidStorageRootResolution> {
     const state = this.runtime.auth.state();
     if (state.status !== 'authenticated') {
-      return 'unchanged';
+      return { status: 'unavailable', changed: false, webId: '' };
     }
 
     const storageRoot = await this.discoverStorageRoot(state.webId);
     if (storageRoot === null) {
-      return 'unavailable';
+      const rememberedRoot = this.storageRootCache.get(state.webId);
+      const activeRoot = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
+      if (rememberedRoot !== null && rememberedRoot === activeRoot) {
+        return {
+          status: 'trusted-cache',
+          changed: false,
+          storageRoot: rememberedRoot,
+          webId: state.webId,
+        };
+      }
+      return { status: 'unavailable', changed: false, webId: state.webId };
     }
 
-    const currentPodUrl = this.runtime.diagnostics.status().podUrl;
     this.storageRootCache.remember(state.webId, storageRoot);
-    if (normalizeContainerUrl(currentPodUrl) === storageRoot) {
-      return 'unchanged';
-    }
-
-    return this.activateStorageRoot(storageRoot);
+    const changed = await this.activateStorageRoot(storageRoot);
+    return {
+      status: 'trusted-live',
+      changed,
+      storageRoot,
+      webId: state.webId,
+    };
   }
 
-  private async activateStorageRoot(
-    storageRoot: string,
-  ): Promise<SolidStorageRootResolution> {
+  private async activateStorageRoot(storageRoot: string): Promise<boolean> {
     const currentPodUrl = normalizeContainerUrl(this.runtime.diagnostics.status().podUrl);
     if (currentPodUrl === storageRoot) {
-      return 'unchanged';
+      return false;
     }
 
     await this.runtime.boot({ podUrl: storageRoot, fetch: this.runtime.auth.fetch() });
     this.clearLayout();
     this.ensureLayout();
-    return 'changed';
+    return true;
   }
 
   private clearLayout(): void {
