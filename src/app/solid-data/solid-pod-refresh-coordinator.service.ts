@@ -189,9 +189,6 @@ export class SolidPodRefreshCoordinatorService {
     const auth = this.solidRuntime.client.auth.state();
     if (auth.status !== 'authenticated') return;
     try {
-      await runSolidRuntimeStage('container-provisioning', () =>
-        this.solidRuntime.ensureAppContainers(),
-      );
       await runSolidRuntimeStage('session-initialization', () =>
         this.sessions.initialize(layout, auth.webId, () => this.scheduleReconciliation()),
       );

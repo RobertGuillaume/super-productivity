@@ -11,6 +11,7 @@ import { SolidContainerKey } from './solid-persistent-action-ownership';
 import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { runSolidRuntimeStage } from './solid-runtime-failure';
+import { SolidContainerProvisioningService } from './solid-container-provisioning.service';
 
 const SESSION_PREFIX = 'super-productivity-v2';
 const MULTI_TAB_LEASE_MS = 30_000;
@@ -27,6 +28,7 @@ const FOREGROUND_CONTAINERS = new Set<SolidContainerKey>([
 export class SolidDiscoverySessionRegistryService {
   private readonly runtime = inject(SolidRuntimeService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly provisioning = inject(SolidContainerProvisioningService);
   private readonly sessions = new Map<string, DiscoverySession>();
   private readonly snapshots = new Map<string, DiscoverySessionSnapshot>();
   private readonly containerSessionIds = new Map<SolidContainerKey, string>();
@@ -36,6 +38,9 @@ export class SolidDiscoverySessionRegistryService {
   private catalogChanged: (() => void) | null = null;
   private generation = 0;
   private runAbortController = new AbortController();
+  private failedSessionIds = new Set<string>();
+  private layout: RuntimeLayout | null = null;
+  private webId: string | null = null;
 
   constructor() {
     this.destroyRef.onDestroy(() => void this.pause());
@@ -49,29 +54,53 @@ export class SolidDiscoverySessionRegistryService {
     await this.pause();
     this.clearLocalState();
     this.catalogChanged = catalogChanged;
+    this.layout = layout;
+    this.webId = webId;
+    await this.ensureSessions();
+    this.activateSubscriptions();
+  }
+
+  private async ensureSessions(): Promise<void> {
+    const layout = this.layout;
+    const webId = this.webId;
+    if (layout === null || webId === null) return;
     for (const [key, uri] of Object.entries(layout.containers)) {
       const containerKey = key as SolidContainerKey;
       const id = `${SESSION_PREFIX}:container:${containerKey}`;
-      const session = await this.runtime.client.discovery.createSession({
-        id,
-        targets: [{ kind: 'container', uri, recursive: false }],
-        priority: FOREGROUND_CONTAINERS.has(containerKey) ? 'foreground' : 'background',
-        allowedOrigins: [new URL(uri).origin],
-        readScope: { allowedContainerRoots: [uri] },
+      if (this.sessions.has(id)) continue;
+      try {
+        await this.provisioning.ensure(uri);
+        const session = await this.runtime.client.discovery.createSession({
+          id,
+          targets: [{ kind: 'container', uri, recursive: false }],
+          priority: FOREGROUND_CONTAINERS.has(containerKey) ? 'foreground' : 'background',
+          allowedOrigins: [new URL(uri).origin],
+          readScope: { allowedContainerRoots: [uri] },
+          fallbackStorageRoots: [],
+        });
+        this.containerSessionIds.set(containerKey, id);
+        this.containerKeysByUri.set(normalizeContainerUri(uri), containerKey);
+        this.addSession(session);
+        this.failedSessionIds.delete(id);
+      } catch (error) {
+        this.failedSessionIds.add(id);
+        this.logSessionFailure(error, 'discovery-session-initialize');
+      }
+    }
+    if (this.sessions.has(this.nativeTaskSessionId)) return;
+    try {
+      const nativeTaskSession = await this.runtime.client.discovery.createSession({
+        id: this.nativeTaskSessionId,
+        targets: [{ kind: 'type', type: SOLID_PRODUCTIVITY_TASK_TYPE, webId }],
+        priority: 'foreground',
         fallbackStorageRoots: [],
       });
-      this.containerSessionIds.set(containerKey, id);
-      this.containerKeysByUri.set(normalizeContainerUri(uri), containerKey);
-      this.addSession(session);
+      this.addSession(nativeTaskSession);
+      this.failedSessionIds.delete(this.nativeTaskSessionId);
+    } catch (error) {
+      this.failedSessionIds.add(this.nativeTaskSessionId);
+      this.logSessionFailure(error, 'discovery-session-initialize');
     }
-    const nativeTaskSession = await this.runtime.client.discovery.createSession({
-      id: this.nativeTaskSessionId,
-      targets: [{ kind: 'type', type: SOLID_PRODUCTIVITY_TASK_TYPE, webId }],
-      priority: 'foreground',
-      fallbackStorageRoots: [],
-    });
-    this.addSession(nativeTaskSession);
-    this.activateSubscriptions();
   }
 
   async runStartupPass(): Promise<void> {
@@ -86,6 +115,8 @@ export class SolidDiscoverySessionRegistryService {
   }
 
   async refreshAndRun(): Promise<void> {
+    await this.ensureSessions();
+    this.activateSubscriptions();
     await runSolidRuntimeStage('discovery-manual-prepare', () =>
       this.refreshSessions(this.sessions.values()),
     );
@@ -116,10 +147,13 @@ export class SolidDiscoverySessionRegistryService {
   }
 
   isDegraded(): boolean {
-    return [...this.snapshots.values()].some(
-      (snapshot) =>
-        snapshot.stoppingReason !== 'owned-elsewhere' &&
-        (snapshot.state === 'blocked' || snapshot.coverage.status !== 'complete'),
+    return (
+      this.failedSessionIds.size > 0 ||
+      [...this.snapshots.values()].some(
+        (snapshot) =>
+          snapshot.stoppingReason !== 'owned-elsewhere' &&
+          (snapshot.state === 'blocked' || snapshot.coverage.status !== 'complete'),
+      )
     );
   }
 
@@ -305,6 +339,9 @@ export class SolidDiscoverySessionRegistryService {
     this.snapshots.clear();
     this.containerSessionIds.clear();
     this.containerKeysByUri.clear();
+    this.failedSessionIds.clear();
+    this.layout = null;
+    this.webId = null;
     this.clearRetryTimers();
   }
 

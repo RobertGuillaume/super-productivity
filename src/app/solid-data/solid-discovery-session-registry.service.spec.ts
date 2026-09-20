@@ -7,6 +7,7 @@ import type {
 } from '@solid-intents/runtime';
 import { SolidDiscoverySessionRegistryService } from './solid-discovery-session-registry.service';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { SolidContainerProvisioningService } from './solid-container-provisioning.service';
 
 describe('SolidDiscoverySessionRegistryService', () => {
   const layout = {
@@ -36,6 +37,10 @@ describe('SolidDiscoverySessionRegistryService', () => {
           provide: SolidRuntimeService,
           useValue: { client: { discovery: { createSession } } },
         },
+        {
+          provide: SolidContainerProvisioningService,
+          useValue: { ensure: jasmine.createSpy('ensure').and.resolveTo() },
+        },
       ],
     });
   });
@@ -62,6 +67,25 @@ describe('SolidDiscoverySessionRegistryService', () => {
       priority: 'foreground',
       fallbackStorageRoots: [],
     });
+  });
+
+  it('keeps healthy sessions when one container cannot be provisioned', async () => {
+    const provisioning = TestBed.inject(
+      SolidContainerProvisioningService,
+    ) as jasmine.SpyObj<SolidContainerProvisioningService>;
+    provisioning.ensure.and.callFake((uri) =>
+      uri === layout.containers.metrics
+        ? Promise.reject(new Error('metrics unavailable'))
+        : Promise.resolve(),
+    );
+
+    await registry().initialize(layout, webId, () => undefined);
+
+    expect(sessions.has('super-productivity-v2:container:tasks')).toBeTrue();
+    expect(sessions.has('super-productivity-v2:container:projects')).toBeTrue();
+    expect(sessions.has('super-productivity-v2:container:metrics')).toBeFalse();
+    expect(sessions.has('super-productivity-v2:type:task')).toBeTrue();
+    expect(registry().isDegraded()).toBeTrue();
   });
 
   it('finishes retained work, acknowledges output, then refreshes settled sessions', async () => {

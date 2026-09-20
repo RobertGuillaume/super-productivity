@@ -129,9 +129,8 @@ describe('SolidPodRefreshCoordinatorService', () => {
     TestBed.resetTestingModule();
   });
 
-  it('provisions and restores durable sessions before publishing refreshed data', async () => {
+  it('restores durable sessions before publishing refreshed data', async () => {
     await TestBed.inject(SolidPodRefreshCoordinatorService).start();
-    expect(runtimeService.ensureAppContainers).toHaveBeenCalledTimes(1);
     expect(dataLayerState.setRuntimeBinding).toHaveBeenCalledWith({
       status: 'trusted-live',
       generation: 0,
@@ -189,7 +188,6 @@ describe('SolidPodRefreshCoordinatorService', () => {
 
     expect(sessions.pause).toHaveBeenCalledTimes(2);
     expect(sessions.initialize).toHaveBeenCalledTimes(2);
-    expect(runtimeService.ensureAppContainers).toHaveBeenCalledTimes(2);
     expect(access.check).toHaveBeenCalledTimes(2);
     expect(dataLayerState.setPhase).toHaveBeenCalledWith('ready');
   });

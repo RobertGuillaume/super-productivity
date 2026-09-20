@@ -17,6 +17,7 @@ import {
   deleteThingPlan,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
+import { SolidContainerProvisioningService } from './solid-container-provisioning.service';
 
 describe('SolidRepositoryOperations', () => {
   const profile = {
@@ -39,6 +40,7 @@ describe('SolidRepositoryOperations', () => {
   let planUpdate: jasmine.Spy;
   let planDelete: jasmine.Spy;
   let commit: jasmine.Spy;
+  let ensureContainer: jasmine.Spy;
 
   beforeEach(() => {
     query = jasmine.createSpy('query');
@@ -48,6 +50,7 @@ describe('SolidRepositoryOperations', () => {
     planUpdate = jasmine.createSpy('planUpdate');
     planDelete = jasmine.createSpy('planDelete');
     commit = jasmine.createSpy('commit');
+    ensureContainer = jasmine.createSpy('ensure').and.resolveTo();
     runtime = {
       things: { query, get },
       discovery: { refresh },
@@ -58,6 +61,10 @@ describe('SolidRepositoryOperations', () => {
         {
           provide: SolidRuntimeService,
           useValue: { client: runtime },
+        },
+        {
+          provide: SolidContainerProvisioningService,
+          useValue: { ensure: ensureContainer },
         },
       ],
     });
@@ -92,6 +99,7 @@ describe('SolidRepositoryOperations', () => {
     const result = await TestBed.inject(SolidRepositoryOperations).create(mutation());
 
     expect(planCreate).toHaveBeenCalledTimes(1);
+    expect(ensureContainer).toHaveBeenCalledOnceWith('https://pod.example/tasks/');
     const plannedInput = planCreate.calls.mostRecent().args[0] as CreateThingInput;
     expect(plannedInput.title).toBeUndefined();
     expect(plannedInput.fields).toEqual(

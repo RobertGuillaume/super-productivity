@@ -15,6 +15,7 @@ import {
   normalizeSolidCreateInput,
 } from './solid-semantic-profiles';
 import { classifySolidRuntimeOutcomes, outcomesFromError } from './solid-runtime-outcome';
+import { SolidContainerProvisioningService } from './solid-container-provisioning.service';
 
 export interface SolidRepositoryMutation<T> {
   model: string;
@@ -31,6 +32,7 @@ export interface SolidRepositoryMutation<T> {
 export class SolidRepositoryOperations {
   private readonly solidRuntime = inject(SolidRuntimeService);
   private readonly identities = inject(SolidThingIdentityRegistry);
+  private readonly provisioning = inject(SolidContainerProvisioningService);
 
   remember<T>(model: string, id: string, thing: Thing, mapped: T): T {
     this.identities.remember(model, id, thing);
@@ -45,6 +47,11 @@ export class SolidRepositoryOperations {
 
   async create<T>(mutation: SolidRepositoryMutation<T>): Promise<T> {
     try {
+      const containerUri = mutation.profile.target?.containerUri;
+      if (containerUri === undefined) {
+        throw new Error('Solid create profile has no target container');
+      }
+      await this.provisioning.ensure(containerUri);
       const plan = await this.solidRuntime.client.writes.planCreate(
         normalizeSolidCreateInput(mutation.createInput),
       );

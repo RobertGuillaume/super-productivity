@@ -9,11 +9,13 @@ import type {
 import { TestBed } from '@angular/core/testing';
 import { SOLID_SEMANTIC_PROFILES } from '../solid-semantic-profiles';
 import { SolidMutationIntentRegistry } from '../solid-mutation-intent-registry.service';
+import { SolidContainerProvisioningService } from '../solid-container-provisioning.service';
 
 const POD_URL = 'https://pod.example/';
 const WEB_ID = `${POD_URL}profile/card#me`;
 
 export const activateSolidMutationTestBinding = (): void => {
+  spyOn(TestBed.inject(SolidContainerProvisioningService), 'ensure').and.resolveTo();
   TestBed.inject(SolidMutationIntentRegistry).activateBinding({
     runtimeGeneration: 1,
     storageRoot: POD_URL,
