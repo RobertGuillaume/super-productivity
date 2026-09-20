@@ -4,6 +4,9 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 
 ## Setup
 
+- Run `npm run verify:solid-runtime` and confirm the installed package is
+  `2.0.0-rc.2` from source commit
+  `50af91b10286bbc0647d9380fb3d038eda2abae0` before starting the browser.
 - Start from a fresh Super Productivity profile.
 - On the first screen, enter the disposable Solid identity provider and choose
   **Continue with Solid**.
@@ -156,8 +159,8 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
   parents are created shortest-path first, a concurrent create is accepted only
   after re-listing, and a target outside the verified storage root is rejected.
 - Upgrade a profile containing the runtime IndexedDB schema-2 catalog. Confirm
-  schema-3 session state and existing cached Things remain readable without a
-  destructive startup rewrite.
+  durable session state and existing cached Things remain readable without a
+  schema bump or destructive startup rewrite.
 - Revoke or expire the active Solid session, attempt a task edit, and confirm a
   single persistent **Sign in again** prompt appears. Complete login and confirm
   the Pod remains the primary data source.
@@ -168,3 +171,14 @@ Use this with a disposable Solid pod and a fresh Super Productivity profile. Do 
 - Inspect the pod and confirm resources are under the expected roots.
 - Run the app long enough to trigger ordinary effects, then reload again and confirm no duplicate resources were created.
 - Record any runtime limitation in `docs/solid-runtime-gaps.md` only if `@solid-intents/runtime` blocks a clean Solid-native implementation.
+
+## Deployment Qualification
+
+- Run the first Netlify rc.2 deployment with the dependency cache cleared and
+  confirm the runtime preflight passes before Angular compilation.
+- Run a second ordinary cached deployment and confirm it still installs rc.2;
+  no missing durable-session, RDF-stream, semantic-profile, or v4-write exports
+  may be reported.
+- Record the Node/npm versions, archive checksum, resolved JSON-LD dependency
+  chain, audit totals, production build, and two-browser Pod results with the
+  deployment handoff.

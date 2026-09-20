@@ -563,6 +563,13 @@ write-readiness policy.
 
 **Implementation**:
 
+- Pin the privately qualified `2.0.0-rc.2` archive, checksum, source commit, and
+  qualification report. A prebuild provenance check rejects stale cached runtime
+  installations before Angular compilation.
+- Keep the runtime-qualified JSON-LD 9 override at the application root until a
+  final runtime qualifies an ordinary upstream dependency tree. Super
+  Productivity remains on its Node 22.18/npm 11.18 toolchain and owns the
+  corresponding consumer qualification.
 - Register all application semantic profiles after every boot/layout definition.
 - Stream profile RDF with `resources.readRdf()`, provision via planned container
   creates, resolve access through `share.resolvePermissions()`, and mutate via
@@ -582,9 +589,10 @@ write-readiness policy.
 `src/app/solid-data/solid-discovery-session-registry.service.ts`, and
 `src/app/solid-data/solid-repository-operations.service.ts`
 
-**When to Update This Pattern**: Revisit only when a qualified runtime contract
-removes one of these capabilities or a reproducible end-to-end failure proves
-that the ownership boundary cannot preserve data correctly.
+**When to Update This Pattern**: Revisit when final runtime 2.0 removes the
+temporary dependency override, when the qualified runtime contract removes one
+of these capabilities, or when a reproducible end-to-end failure proves that the
+ownership boundary cannot preserve data correctly.
 
 ---
 
