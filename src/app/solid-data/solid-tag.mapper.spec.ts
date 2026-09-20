@@ -85,21 +85,36 @@ describe('solidTag.mapper', () => {
     expect(mapped.advancedCfg).toEqual(tag.advancedCfg);
     expect(mapped.icon).toBe(tag.icon);
   });
+
+  it('preserves a legacy Thing URI when the application id is absent', () => {
+    const uri = 'https://pod.example/super-productivity/tags/TODAY.ttl#it';
+    const thing = createThing(
+      {
+        [SP_TAG.title]: [literal('Today')],
+      },
+      { title: 'Today', status: 'open' },
+      uri,
+    );
+
+    expect(solidThingToTag(thing).id).toBe(uri);
+  });
 });
 
 const createThing = (
   properties: Readonly<Record<string, readonly RdfValue[]>>,
   facets: Thing['facets'],
+  uri = 'https://pod.example/super-productivity/tags/tag-1.ttl#it',
 ): Thing => {
+  const sourceUri = uri.split('#')[0];
   const thing: Thing = {
-    uri: 'https://pod.example/super-productivity/tags/tag-1.ttl#it',
+    uri,
     content: {
-      uri: 'https://pod.example/super-productivity/tags/tag-1.ttl',
+      uri: sourceUri,
       kind: 'rdf',
       source: 'runtime-managed',
     },
     source: {
-      uri: 'https://pod.example/super-productivity/tags/tag-1.ttl',
+      uri: sourceUri,
       kind: 'runtime-managed',
     },
     types: ['SuperProductivityTag'],

@@ -81,6 +81,7 @@ import { selectProjectById } from '../project/store/project.selectors';
 import { Project } from '../project/project.model';
 import { Log } from '../../core/log';
 import { LOCAL_ACTIONS } from '../../util/local-actions.token';
+import { parseRoutedWorkContext } from './work-context-route.util';
 
 /**
  * Resolve the theme to apply for a work context.
@@ -536,21 +537,15 @@ export class WorkContextService {
       .subscribe(({ urlAfterRedirects }: NavigationEnd) => {
         this._markNavigationEnd(urlAfterRedirects);
 
-        const split = urlAfterRedirects.split('/');
-        const id = split[2];
+        const routedContext = parseRoutedWorkContext(this._router, urlAfterRedirects);
+        if (routedContext === null) return;
 
         // prevent issue when setActiveContext is called directly
-        if (this.activeWorkContextId === id) {
+        if (this.activeWorkContextId === routedContext.activeId) {
           return;
         }
 
-        if (urlAfterRedirects.match(/tag\/.+/)) {
-          this._setActiveContext(id, WorkContextType.TAG);
-        } else if (urlAfterRedirects.match(/project\/.+/)) {
-          this._setActiveContext(id, WorkContextType.PROJECT);
-        } else if (urlAfterRedirects.match(/timeline/)) {
-          this._setActiveContext(TODAY_TAG.id, WorkContextType.TAG);
-        }
+        this._setActiveContext(routedContext.activeId, routedContext.activeType);
       });
   }
 
