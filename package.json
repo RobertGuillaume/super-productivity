@@ -193,7 +193,7 @@
     "@capacitor/status-bar": "^8.0.2",
     "@material-symbols/font-400": "^0.45.5",
     "@noble/ciphers": "^2.2.0",
-    "@solid-intents/runtime": "file:vendor/solid-intents-runtime-1.1.1-27eb32547b72e6c5c1f14986ee1338663787990f-C3-v22.23.0.tgz",
+    "@solid-intents/runtime": "file:vendor/solid-intents-runtime-2.0.0-rc.2-50af91b10286bbc0647d9380fb3d038eda2abae0-C3-jsonld9-v22.23.2.tgz",
     "capacitor-plugin-safe-area": "^5.0.0",
     "electron-dl": "^3.5.2",
     "electron-localshortcut": "^3.2.1",
@@ -327,6 +327,9 @@
     "typia": "^12.0.2"
   },
   "overrides": {
+    "@noeldemartin/solid-utils": {
+      "jsonld": "9.0.0"
+    },
     "app-builder-lib": {
       "minimatch": "10.2.5"
     },

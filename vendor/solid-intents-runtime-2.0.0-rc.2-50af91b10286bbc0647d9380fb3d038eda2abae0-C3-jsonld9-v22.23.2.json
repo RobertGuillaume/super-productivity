@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "50af91b10286bbc0647d9380fb3d038eda2abae0",
+  "packageVersion": "2.0.0-rc.2",
+  "workingTree": false,
+  "bundle": "C3",
+  "dependencyProfile": "jsonld9",
+  "sha256": "3b431af31e2c3c92af63b5b3a649259be4981764154033ee656e3a57a14d549a",
+  "archiveBytes": 437015,
+  "node": "v22.23.2",
+  "npm": "10.9.8",
+  "platform": "darwin",
+  "architecture": "x64",
+  "writePlanVersions": [
+    3,
+    4
+  ],
+  "checkpointVersions": [
+    1
+  ],
+  "checkpointRootFormats": [
+    "rdf-manifest-v1"
+  ],
+  "observationVersions": [
+    1
+  ],
+  "rdfBatchVersions": [
+    1
+  ],
+  "completedContractBundles": [
+    "C1",
+    "C2",
+    "C3"
+  ],
+  "remainingBundles": [],
+  "archiveQualification": {
+    "status": "passed-separately",
+    "report": "artifacts/qualification/archive-diagnostics/f09-archive-100000-da9aee9.json",
+    "repeated": false
+  },
+  "repositoryQualification": "separate-supported-version-and-browser-matrix",
+  "dependencyQualification": {
+    "resolvedDependencies": {
+      "solidUtils": [
+        "0.6.1"
+      ],
+      "jsonld": [
+        "9.0.0"
+      ],
+      "httpClient": [
+        "4.4.0"
+      ],
+      "undici": [
+        "6.28.1"
+      ]
+    },
+    "productionAudit": {
+      "status": "passed",
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      }
+    },
+    "compatibility": {
+      "fixture": "jsonld9-compatibility",
+      "status": "passed",
+      "quads": 2,
+      "language": "es",
+      "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+    },
+    "declarations": "passed",
+    "browserBuild": "passed"
+  },
+  "engineeringQualification": {
+    "scope": "isolated-packed-consumer",
+    "status": "passed",
+    "results": [
+      {
+        "bundle": "baseline",
+        "status": "passed",
+        "node": "v22.23.2",
+        "requests": 12,
+        "persistence": "memory",
+        "qualifiedBundles": []
+      },
+      {
+        "bundle": "C1",
+        "status": "passed",
+        "node": "v22.23.2",
+        "completedContractBundles": [
+          "C1"
+        ],
+        "writePlanVersions": [
+          3,
+          4
+        ],
+        "checkpointVersions": [],
+        "persistence": "memory",
+        "principals": 2,
+        "owners": 2,
+        "pathPods": 2,
+        "requests": 25,
+        "automaticPostReplays": 0
+      },
+      {
+        "bundle": "C2",
+        "passed": true,
+        "httpRequests": 14,
+        "patches": 3,
+        "publicationIds": "consumer-owned",
+        "lostSuccess": "reconciled-by-consumer-marker",
+        "automaticPatchReplays": 0,
+        "sourceDiscoveryRequests": 0
+      },
+      {
+        "bundle": "C3",
+        "passed": true,
+        "checkpointVersion": 1,
+        "observationVersion": 1,
+        "restoredWithoutSourceReads": true,
+        "stableRedelivery": true,
+        "unknownClasses": true,
+        "publicExample": true,
+        "checkpointRequests": 245,
+        "sourceRequests": 3,
+        "cleanup": {
+          "complete": true,
+          "phase": "idle",
+          "steps": 18,
+          "deletedPages": 27,
+          "deletedMetadata": 20,
+          "retainedEpochs": 0,
+          "retainedPages": 2,
+          "completedCycles": 1
+        },
+        "archiveQualification": "separate-100000-resource-gate"
+      }
+    ]
+  },
+  "privatePrereleaseQualification": "passed",
+  "publicReleaseQualification": "blocked",
+  "publicationStatus": "unpublished",
+  "releaseBlockers": [
+    "The ordinary unoverridden upstream production dependency audit must pass",
+    "Final 2.0.0 versioning and publication are separate release actions"
+  ],
+  "archive": "solid-intents-runtime-2.0.0-rc.2-50af91b10286bbc0647d9380fb3d038eda2abae0-C3-jsonld9-v22.23.2.tgz"
+}
