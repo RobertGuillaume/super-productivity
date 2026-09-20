@@ -87,6 +87,41 @@ describe('SolidDiscoverySessionRegistryService', () => {
     expect(changed).toHaveBeenCalled();
   });
 
+  it('prepares settled-session refreshes sequentially', async () => {
+    await registry().initialize(layout, webId, () => undefined);
+    let activeRefreshes = 0;
+    let maximumActiveRefreshes = 0;
+
+    for (const fake of sessions.values()) {
+      fake.refresh.and.callFake(async () => {
+        activeRefreshes++;
+        maximumActiveRefreshes = Math.max(maximumActiveRefreshes, activeRefreshes);
+        await Promise.resolve();
+        activeRefreshes--;
+      });
+    }
+
+    await registry().runStartupPass();
+
+    expect(maximumActiveRefreshes).toBe(1);
+  });
+
+  it('surfaces a rejected session run after draining the other sessions', async () => {
+    await registry().initialize(layout, webId, () => undefined);
+    const failure = Object.assign(new Error('catalog write included private details'), {
+      name: 'CatalogPersistenceError',
+      kind: 'conflict',
+    });
+    const taskSession = sessions.get('super-productivity-v2:container:tasks')!;
+    taskSession.run.and.rejectWith(failure);
+
+    await expectAsync(registry().resume()).toBeRejectedWith(failure);
+
+    for (const fake of sessions.values()) {
+      expect(fake.session.readOutput).toHaveBeenCalled();
+    }
+  });
+
   it('uses additional bounded turns only for exhausted or output-blocked work', async () => {
     await registry().initialize(layout, webId, () => undefined);
     const taskSession = sessions.get('super-productivity-v2:container:tasks')!;

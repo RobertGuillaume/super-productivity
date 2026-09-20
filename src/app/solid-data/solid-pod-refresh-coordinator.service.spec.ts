@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import type { AuthState, SolidRuntime } from '@solid-intents/runtime';
+import { Log } from '../core/log';
 import {
   SOLID_DATA_LAYER_ENABLED_STORAGE_KEY,
   SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY,
@@ -29,6 +30,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
   let hydration: jasmine.SpyObj<SolidTaskHydrationService>;
   let dataLayerState: jasmine.SpyObj<SolidDataLayerStateService>;
   let discovery: jasmine.SpyObj<SolidRuntime['discovery']>;
+  let access: jasmine.SpyObj<SolidContainerAccessService>;
 
   beforeEach(() => {
     localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
@@ -95,7 +97,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
       'SolidThingIdentityRegistry',
       ['clear'],
     );
-    const access = jasmine.createSpyObj<SolidContainerAccessService>(
+    access = jasmine.createSpyObj<SolidContainerAccessService>(
       'SolidContainerAccessService',
       ['check'],
     );
@@ -164,4 +166,98 @@ describe('SolidPodRefreshCoordinatorService', () => {
       uris: ['https://pod.example/super-productivity/tasks/one.ttl'],
     });
   });
+
+  it('reinitializes the full registry after a failed startup on manual refresh', async () => {
+    sessions.runStartupPass.and.rejectWith(catalogFailure('unavailable'));
+    const service = TestBed.inject(SolidPodRefreshCoordinatorService);
+
+    await service.start();
+
+    expect(access.check).not.toHaveBeenCalled();
+    expect(dataLayerState.clearWriteReadiness).toHaveBeenCalled();
+    sessions.runStartupPass.and.resolveTo();
+
+    await service.refreshNow();
+
+    expect(sessions.pause).toHaveBeenCalledTimes(2);
+    expect(sessions.initialize).toHaveBeenCalledTimes(2);
+    expect(runtimeService.ensureAppContainers).toHaveBeenCalledTimes(2);
+    expect(access.check).toHaveBeenCalledTimes(2);
+    expect(dataLayerState.setPhase).toHaveBeenCalledWith('ready');
+  });
+
+  it('reinitializes the full registry after a failed startup when coming online', async () => {
+    sessions.runStartupPass.and.rejectWith(catalogFailure('unavailable'));
+    const service = TestBed.inject(SolidPodRefreshCoordinatorService);
+    await service.start();
+    sessions.runStartupPass.and.resolveTo();
+
+    window.dispatchEvent(new Event('online'));
+    await drainMicrotasks();
+
+    expect(sessions.pause).toHaveBeenCalledTimes(2);
+    expect(sessions.initialize).toHaveBeenCalledTimes(2);
+    expect(access.check).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a coordination failure once after the ownership window', async () => {
+    jasmine.clock().install();
+    spyOnProperty(navigator, 'onLine', 'get').and.returnValue(true);
+    sessions.runStartupPass.and.rejectWith(catalogFailure('conflict'));
+    try {
+      await TestBed.inject(SolidPodRefreshCoordinatorService).start();
+      sessions.runStartupPass.and.resolveTo();
+
+      jasmine.clock().tick(29_999);
+      await drainMicrotasks();
+      expect(sessions.initialize).toHaveBeenCalledTimes(1);
+
+      jasmine.clock().tick(1);
+      await drainMicrotasks();
+      expect(sessions.initialize).toHaveBeenCalledTimes(2);
+
+      jasmine.clock().tick(30_000);
+      await drainMicrotasks();
+      expect(sessions.initialize).toHaveBeenCalledTimes(2);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('logs only structured content-safe startup failure data', async () => {
+    const logSpy = spyOn(Log, 'err');
+    sessions.runStartupPass.and.rejectWith(
+      catalogFailure(
+        'corrupt-store',
+        new DOMException('https://private.example/TODAY.ttl#it', 'DataError'),
+      ),
+    );
+
+    await TestBed.inject(SolidPodRefreshCoordinatorService).start();
+
+    expect(logSpy).toHaveBeenCalledOnceWith('Solid runtime operation failed', {
+      operation: 'discovery-startup',
+      errorName: 'CatalogPersistenceError',
+      catalogKind: 'corrupt-store',
+      causeName: 'DataError',
+      retryPolicy: 'manual',
+    });
+    const serialized = JSON.stringify(logSpy.calls.mostRecent().args);
+    expect(serialized).not.toContain('private.example');
+    expect(serialized).not.toContain('TODAY.ttl');
+  });
 });
+
+const catalogFailure = (
+  kind: string,
+  cause: unknown = undefined,
+): Error & { kind: string; cause: unknown } =>
+  Object.assign(new Error('private runtime failure'), {
+    name: 'CatalogPersistenceError',
+    kind,
+    cause,
+  });
+
+const drainMicrotasks = async (): Promise<void> => {
+  for (let index = 0; index < 20; index++) await Promise.resolve();
+};

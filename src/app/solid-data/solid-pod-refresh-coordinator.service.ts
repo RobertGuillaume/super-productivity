@@ -15,8 +15,14 @@ import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskAccessService } from './solid-task-access.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
+import {
+  classifySolidRuntimeFailure,
+  runSolidRuntimeStage,
+  SolidRuntimeFailureDiagnostic,
+} from './solid-runtime-failure';
 
 const RECONCILIATION_DEBOUNCE_MS = 100;
+const DISCOVERY_COORDINATION_RETRY_MS = 30_000;
 
 /** Coordinates app policy around runtime-owned durable discovery sessions. */
 @Injectable({ providedIn: 'root' })
@@ -38,8 +44,12 @@ export class SolidPodRefreshCoordinatorService {
   private reconciliationTimer: ReturnType<typeof setTimeout> | null = null;
   private subscription: Unsubscribe | null = null;
   private started = false;
+  private startupFailed = false;
   private rootVerified = false;
   private lifecycleGeneration = 0;
+  private automaticStartupRetryUsed = false;
+  private startupRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private startupRetryPromise: Promise<void> | null = null;
   private readonly recoveryPromises = new WeakMap<object, Promise<void>>();
   private recoveryWithoutIntent: Promise<void> | null = null;
 
@@ -48,12 +58,14 @@ export class SolidPodRefreshCoordinatorService {
       this.recoverRejectedMutation(context, error, source),
     );
     const online = (): void => {
-      if (this.started) {
-        void this.sessions.resume().then(() => this.enqueueReconciliation());
-      }
+      void this.handleOnlineTransition();
     };
     const offline = (): void => {
-      void this.sessions.pause();
+      this.cancelStartupRetryTimer();
+      this.dataLayerState.clearWriteReadiness();
+      void this.sessions
+        .pause()
+        .catch((error) => this.reportFailure('discovery-offline-pause', error));
       this.dataLayerState.setPhase('degraded');
     };
     window.addEventListener('online', online);
@@ -61,6 +73,7 @@ export class SolidPodRefreshCoordinatorService {
     this.destroyRef.onDestroy(() => {
       window.removeEventListener('online', online);
       window.removeEventListener('offline', offline);
+      this.cancelStartupRetryTimer();
       this.stopSubscription();
       if (this.reconciliationTimer !== null) clearTimeout(this.reconciliationTimer);
       void this.sessions.pause();
@@ -68,19 +81,24 @@ export class SolidPodRefreshCoordinatorService {
   }
 
   start(): Promise<void> {
-    if (this.started) return this.refreshPromise ?? Promise.resolve();
+    if (this.started) {
+      return this.startupFailed
+        ? this.retryDiscoveryStartup(true)
+        : (this.refreshPromise ?? Promise.resolve());
+    }
     if (this.startPromise !== null) return this.startPromise;
     this.startPromise = this.startInternal().finally(() => (this.startPromise = null));
     return this.startPromise;
   }
 
   refreshNow(): Promise<void> {
+    if (this.startupFailed) return this.retryDiscoveryStartup(true);
     if (!this.started) return this.start();
     if (this.refreshPromise !== null) return this.refreshPromise;
     if (!this.canRun()) return Promise.resolve();
-    this.refreshPromise = this.refreshManually().finally(
-      () => (this.refreshPromise = null),
-    );
+    this.refreshPromise = this.refreshManually()
+      .catch((error) => this.handleStartupFailure('discovery-manual-refresh', error))
+      .finally(() => (this.refreshPromise = null));
     return this.refreshPromise;
   }
 
@@ -110,6 +128,7 @@ export class SolidPodRefreshCoordinatorService {
   }
 
   async restartAfterRuntimeBoot(): Promise<void> {
+    this.cancelStartupRetryTimer();
     this.lifecycleGeneration++;
     await this.sessions.pause();
     this.stopSubscription();
@@ -120,6 +139,8 @@ export class SolidPodRefreshCoordinatorService {
     this.dataLayerState.clearWriteReadiness();
     this.rootVerified = false;
     this.started = false;
+    this.startupFailed = false;
+    this.automaticStartupRetryUsed = false;
     this.startPromise = null;
     this.refreshPromise = null;
     await this.hydration.reconcileStore();
@@ -142,10 +163,11 @@ export class SolidPodRefreshCoordinatorService {
       }
     } catch (error) {
       this.rootVerified = false;
-      this.reportFailure('root-discovery', error);
+      await this.handleStartupFailure('root-discovery', error);
     }
     this.started = true;
     if (!this.rootVerified || generation !== this.lifecycleGeneration) {
+      this.startupFailed = !this.rootVerified;
       this.dataLayerState.setPhase('degraded');
       return;
     }
@@ -154,17 +176,21 @@ export class SolidPodRefreshCoordinatorService {
     const auth = this.solidRuntime.client.auth.state();
     if (auth.status !== 'authenticated') return;
     try {
-      await this.solidRuntime.ensureAppContainers();
-      await this.sessions.initialize(layout, auth.webId, () =>
-        this.scheduleReconciliation(),
+      await runSolidRuntimeStage('container-provisioning', () =>
+        this.solidRuntime.ensureAppContainers(),
+      );
+      await runSolidRuntimeStage('session-initialization', () =>
+        this.sessions.initialize(layout, auth.webId, () => this.scheduleReconciliation()),
       );
       this.installSubscription();
       this.setProgress(layout, 0);
       await this.sessions.runStartupPass();
-      await this.reconcileAndCheckAccess(layout, generation);
+      await runSolidRuntimeStage('permission-reconciliation', () =>
+        this.reconcileAndCheckAccess(layout, generation),
+      );
+      this.markStartupSuccessful();
     } catch (error) {
-      this.reportFailure('discovery-startup', error);
-      this.dataLayerState.setPhase('degraded');
+      await this.handleStartupFailure('discovery-startup', error);
     }
   }
 
@@ -184,7 +210,29 @@ export class SolidPodRefreshCoordinatorService {
     const layout = this.solidRuntime.ensureLayout();
     this.setProgress(layout, 0);
     await this.sessions.refreshAndRun();
-    await this.reconcileAndCheckAccess(layout, this.lifecycleGeneration);
+    await runSolidRuntimeStage('permission-reconciliation', () =>
+      this.reconcileAndCheckAccess(layout, this.lifecycleGeneration),
+    );
+    this.markStartupSuccessful();
+  }
+
+  private async handleOnlineTransition(): Promise<void> {
+    if (!this.started) return;
+    if (this.startupFailed) {
+      await this.retryDiscoveryStartup(true);
+      return;
+    }
+
+    try {
+      await runSolidRuntimeStage('discovery-online-run', () => this.sessions.resume());
+      const layout = this.solidRuntime.ensureLayout();
+      await runSolidRuntimeStage('permission-reconciliation', () =>
+        this.reconcileAndCheckAccess(layout, this.lifecycleGeneration),
+      );
+      this.markStartupSuccessful();
+    } catch (error) {
+      await this.handleStartupFailure('discovery-online-resume', error);
+    }
   }
 
   private async reconcileAndCheckAccess(
@@ -285,11 +333,76 @@ export class SolidPodRefreshCoordinatorService {
     });
   }
 
-  private reportFailure(operation: string, error: unknown): void {
+  private async handleStartupFailure(operation: string, error: unknown): Promise<void> {
+    const diagnostic = this.reportFailure(operation, error);
+    this.startupFailed = true;
+    this.dataLayerState.clearWriteReadiness();
+    this.dataLayerState.setPhase('degraded');
+    this.stopSubscription();
+    try {
+      await this.sessions.pause();
+    } catch (pauseError) {
+      this.reportFailure('discovery-failure-pause', pauseError);
+    }
+    if (diagnostic.retryPolicy === 'coordination') {
+      this.scheduleCoordinationRetry();
+    }
+  }
+
+  private reportFailure(
+    operation: string,
+    error: unknown,
+  ): SolidRuntimeFailureDiagnostic {
+    const diagnostic = classifySolidRuntimeFailure(operation, error);
     this.dataLayerState.addDiagnostics();
-    Log.err('Solid runtime operation failed', {
-      operation,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-    });
+    Log.err('Solid runtime operation failed', diagnostic);
+    return diagnostic;
+  }
+
+  private scheduleCoordinationRetry(): void {
+    if (
+      this.automaticStartupRetryUsed ||
+      this.startupRetryTimer !== null ||
+      navigator.onLine === false
+    ) {
+      return;
+    }
+    this.automaticStartupRetryUsed = true;
+    this.startupRetryTimer = setTimeout(() => {
+      this.startupRetryTimer = null;
+      void this.retryDiscoveryStartup(false);
+    }, DISCOVERY_COORDINATION_RETRY_MS);
+  }
+
+  private retryDiscoveryStartup(resetAutomaticRetry: boolean): Promise<void> {
+    if (this.startupRetryPromise !== null) return this.startupRetryPromise;
+    this.cancelStartupRetryTimer();
+    if (resetAutomaticRetry) this.automaticStartupRetryUsed = false;
+
+    this.startupRetryPromise = (async () => {
+      this.lifecycleGeneration++;
+      await runSolidRuntimeStage('session-retry-pause', () => this.sessions.pause());
+      this.stopSubscription();
+      this.dataLayerState.clearWriteReadiness();
+      this.started = false;
+      this.startupFailed = false;
+      await this.start();
+    })()
+      .catch((error) => this.handleStartupFailure('discovery-startup-retry', error))
+      .finally(() => (this.startupRetryPromise = null));
+    return this.startupRetryPromise;
+  }
+
+  private markStartupSuccessful(): void {
+    this.startupFailed = false;
+    this.automaticStartupRetryUsed = false;
+    this.cancelStartupRetryTimer();
+  }
+
+  private cancelStartupRetryTimer(): void {
+    if (this.startupRetryTimer !== null) {
+      clearTimeout(this.startupRetryTimer);
+      this.startupRetryTimer = null;
+    }
   }
 }

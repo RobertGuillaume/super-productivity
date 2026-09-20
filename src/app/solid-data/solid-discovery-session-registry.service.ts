@@ -10,6 +10,7 @@ import { Log } from '../core/log';
 import { SolidContainerKey } from './solid-persistent-action-ownership';
 import { SOLID_PRODUCTIVITY_TASK_TYPE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import { runSolidRuntimeStage } from './solid-runtime-failure';
 
 const SESSION_PREFIX = 'super-productivity-v2';
 const MULTI_TAB_LEASE_MS = 30_000;
@@ -77,14 +78,18 @@ export class SolidDiscoverySessionRegistryService {
     const settled = [...this.sessions.values()].filter(
       (session) => session.snapshot().state === 'settled',
     );
-    await this.runRounds();
-    await Promise.all(settled.map((session) => session.refresh()));
-    await this.runRounds();
+    await runSolidRuntimeStage('discovery-retained-run', () => this.runRounds());
+    await runSolidRuntimeStage('discovery-fresh-prepare', () =>
+      this.refreshSessions(settled),
+    );
+    await runSolidRuntimeStage('discovery-fresh-run', () => this.runRounds());
   }
 
   async refreshAndRun(): Promise<void> {
-    await Promise.all([...this.sessions.values()].map((session) => session.refresh()));
-    await this.runRounds();
+    await runSolidRuntimeStage('discovery-manual-prepare', () =>
+      this.refreshSessions(this.sessions.values()),
+    );
+    await runSolidRuntimeStage('discovery-manual-run', () => this.runRounds());
   }
 
   async resume(): Promise<void> {
@@ -150,6 +155,7 @@ export class SolidDiscoverySessionRegistryService {
 
   private async runRounds(): Promise<void> {
     let active = [...this.sessions.values()];
+    const terminalFailures: unknown[] = [];
     while (active.length > 0) {
       const signal = this.runAbortController.signal;
       const results = await Promise.allSettled(
@@ -167,7 +173,10 @@ export class SolidDiscoverySessionRegistryService {
         const outputDrained = await this.tryDrainOutput(session, signal);
         if (result.status === 'rejected') {
           this.snapshots.set(session.id, session.snapshot());
-          if (!signal.aborted) this.logSessionFailure(result.reason);
+          if (!signal.aborted) {
+            this.logSessionFailure(result.reason);
+            terminalFailures.push(result.reason);
+          }
           continue;
         }
         this.snapshots.set(session.id, result.value.snapshot);
@@ -185,6 +194,15 @@ export class SolidDiscoverySessionRegistryService {
       if (active.length > 0) {
         await yieldToBrowser();
       }
+    }
+    if (terminalFailures.length > 0) {
+      throw terminalFailures[0];
+    }
+  }
+
+  private async refreshSessions(sessions: Iterable<DiscoverySession>): Promise<void> {
+    for (const session of sessions) {
+      await session.refresh();
     }
   }
 
