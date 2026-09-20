@@ -211,6 +211,7 @@ export class SolidDiscoverySessionRegistryService {
     signal: AbortSignal,
   ): Promise<boolean> {
     try {
+      let outputAcknowledged = false;
       let output = await session.readOutput({
         signal,
         deadline: new Date(Date.now() + 10_000),
@@ -220,12 +221,13 @@ export class SolidDiscoverySessionRegistryService {
           signal,
           deadline: new Date(Date.now() + 10_000),
         });
+        outputAcknowledged = true;
         output = await session.readOutput({
           signal,
           deadline: new Date(Date.now() + 10_000),
         });
       }
-      return true;
+      return outputAcknowledged;
     } catch (error) {
       if (!signal.aborted) this.logSessionFailure(error, 'discovery-output-drain');
       return false;

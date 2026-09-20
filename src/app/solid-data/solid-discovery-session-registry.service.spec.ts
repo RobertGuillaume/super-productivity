@@ -144,6 +144,32 @@ describe('SolidDiscoverySessionRegistryService', () => {
     expect(taskSession.run).toHaveBeenCalledTimes(1);
   });
 
+  it('does not continue output-blocked work when no output was available', async () => {
+    await registry().initialize(layout, webId, () => undefined);
+    const taskSession = sessions.get('super-productivity-v2:container:tasks')!;
+    taskSession.reasons = ['output-blocked'];
+    taskSession.run.and.callFake(async () => {
+      if (taskSession.run.calls.count() > 1) {
+        throw new Error('output-blocked session reran without making progress');
+      }
+      const reason = taskSession.reasons.shift() ?? 'settled';
+      taskSession.current = snapshot(taskSession.session.id, 'partial', reason);
+      return {
+        usage: { requests: 1, bytes: 1 },
+        reason,
+        runs: 1,
+        dispatchedJobs: 1,
+        completedJobs: 0,
+        failedJobs: 0,
+        snapshot: taskSession.current,
+      };
+    });
+
+    await registry().resume();
+
+    expect(taskSession.run).toHaveBeenCalledTimes(1);
+  });
+
   it('retries deferred and owned-elsewhere work at their runtime windows', async () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date('2026-09-13T10:00:00.000Z'));
