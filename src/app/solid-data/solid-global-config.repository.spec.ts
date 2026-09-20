@@ -6,6 +6,7 @@ import { RDF_JSON_DATATYPE, SP_GLOBAL_CONFIG } from './solid-productivity-vocab'
 import { SOLID_GLOBAL_CONFIG_ID, SolidGlobalConfig } from './solid-global-config.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -73,6 +74,8 @@ describe('SolidGlobalConfigRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

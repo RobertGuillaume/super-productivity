@@ -51,12 +51,16 @@ export class SolidBoardPersistenceEffects {
               from(
                 settleSolidMutations(
                   boards.map((board) =>
-                    this.solidBoardRepository.saveBoard(board.board, board.order),
+                    this.solidBoardRepository.saveBoard(
+                      board.board,
+                      board.order,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
                   ),
                 ),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -73,9 +77,12 @@ export class SolidBoardPersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidBoardRepository.deleteBoard(action.id)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
+          from(
+            this.solidBoardRepository.deleteBoard(
+              action.id,
+              this.solidDataLayerState.requireMutationContext(action),
+            ),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -106,11 +113,12 @@ export class SolidBoardPersistenceEffects {
     );
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidBoardPersistenceEffects: failed to persist board',
     });
   }

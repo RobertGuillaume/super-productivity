@@ -58,11 +58,16 @@ export class SolidEmbeddedTaskPersistenceEffects {
               concatMap((tasks) =>
                 from(
                   settleSolidMutations(
-                    tasks.map((task) => this.solidTaskRepository.saveTask(task)),
+                    tasks.map((task) =>
+                      this.solidTaskRepository.saveTask(
+                        task,
+                        this.solidDataLayerState.requireMutationContext(action),
+                      ),
+                    ),
                   ),
                 ),
               ),
-              catchError((error) => this.handlePersistenceError(error)),
+              catchError((error) => this.handlePersistenceError(error, action)),
             );
           }
 
@@ -73,11 +78,16 @@ export class SolidEmbeddedTaskPersistenceEffects {
               concatMap((tasks) =>
                 from(
                   settleSolidMutations(
-                    tasks.map((task) => this.solidTaskRepository.saveTask(task)),
+                    tasks.map((task) =>
+                      this.solidTaskRepository.saveTask(
+                        task,
+                        this.solidDataLayerState.requireMutationContext(action),
+                      ),
+                    ),
                   ),
                 ),
               ),
-              catchError((error) => this.handlePersistenceError(error)),
+              catchError((error) => this.handlePersistenceError(error, action)),
             );
         }),
       ),
@@ -129,11 +139,12 @@ export class SolidEmbeddedTaskPersistenceEffects {
     return [];
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidEmbeddedTaskPersistenceEffects: failed to persist task change',
     });
   }

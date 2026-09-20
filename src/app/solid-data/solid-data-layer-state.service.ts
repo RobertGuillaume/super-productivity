@@ -28,9 +28,17 @@ import { SolidTaskAccessService } from './solid-task-access.service';
 import {
   SolidMutationIntentContext,
   SolidMutationIntentRegistry,
+  solidEntitiesForAction,
 } from './solid-mutation-intent-registry.service';
 import { SolidTaskHydrationService } from './solid-task-hydration.service';
 import type { SolidAccessState } from './solid-access.model';
+import { classifySolidRuntimeOutcomes, outcomesFromError } from './solid-runtime-outcome';
+
+export type SolidMutationTargetState =
+  | 'reconciling'
+  | 'deferred'
+  | 'authentication-blocked'
+  | 'quarantined';
 
 export type SolidDataLayerPhase =
   | 'disabled'
@@ -87,6 +95,9 @@ export class SolidDataLayerStateService {
     status: 'untrusted',
     generation: 0,
   });
+  readonly mutationTargets = signal<ReadonlyMap<string, SolidMutationTargetState>>(
+    new Map(),
+  );
   readonly writeReadiness = signal<ReadonlyMap<SolidContainerKey, SolidWriteReadiness>>(
     new Map(),
   );
@@ -169,7 +180,28 @@ export class SolidDataLayerStateService {
   }
 
   setRuntimeBinding(binding: SolidRuntimeBindingState): void {
+    const previous = this.runtimeBinding();
     this.runtimeBinding.set(binding);
+    if (binding.status === 'trusted-live' || binding.status === 'trusted-cache') {
+      if (
+        previous.status === 'untrusted' ||
+        previous.status === 'resolving' ||
+        previous.generation !== binding.generation ||
+        previous.storageRoot !== binding.storageRoot ||
+        previous.webId !== binding.webId
+      ) {
+        this.mutationIntents.clear();
+        this.mutationTargets.set(new Map());
+      }
+      this.mutationIntents.activateBinding({
+        runtimeGeneration: binding.generation,
+        storageRoot: binding.storageRoot,
+        webId: binding.webId,
+      });
+    } else {
+      this.mutationIntents.clear();
+      this.mutationTargets.set(new Map());
+    }
   }
 
   private recordRateLimit(cooldownUntil: Date | null): void {
@@ -224,6 +256,10 @@ export class SolidDataLayerStateService {
     if (binding.status !== 'trusted-live' && binding.status !== 'trusted-cache') {
       return false;
     }
+    const blockedTargets = this.mutationTargets();
+    if (mutationKeysForAction(action).some((key) => blockedTargets.has(key))) {
+      return false;
+    }
 
     if (
       solidActionAffectsAllTasks(action.type) &&
@@ -240,7 +276,10 @@ export class SolidDataLayerStateService {
       .handleAuthenticationError(error);
   }
 
-  demoteWriteAccessAfterFailure(error: unknown): void {
+  demoteWriteAccessAfterFailure(
+    error: unknown,
+    context: SolidMutationIntentContext | null,
+  ): void {
     const httpStatus = findHttpStatus(error);
     const readiness: SolidWriteReadiness =
       httpStatus === 401 || httpStatus === 403
@@ -248,7 +287,19 @@ export class SolidDataLayerStateService {
         : httpStatus === 429
           ? 'rate-limited'
           : 'unavailable';
-    const affected = this.mutationIntents.forFailure(error)?.containerKeys ?? [];
+    const affected = context?.containerKeys ?? [];
+    if (context !== null && this.mutationIntents.isCurrent(context)) {
+      const classification = classifySolidRuntimeOutcomes(outcomesFromError(error));
+      const targetState: SolidMutationTargetState =
+        httpStatus === 401
+          ? 'authentication-blocked'
+          : httpStatus === 403
+            ? 'quarantined'
+            : classification.state === 'deferred'
+              ? 'deferred'
+              : 'reconciling';
+      this.setMutationTargetState(context, targetState);
+    }
     this.writeReadiness.update((current) => {
       const next = new Map(current);
       const targets = affected.length > 0 ? affected : Array.from(current.keys());
@@ -257,13 +308,35 @@ export class SolidDataLayerStateService {
     });
   }
 
-  async recoverRejectedMutation(error: unknown, source: string): Promise<void> {
+  mutationContextFor(action: object): SolidMutationIntentContext | null {
+    return this.mutationIntents.forAction(action);
+  }
+
+  requireMutationContext(action: object): SolidMutationIntentContext {
+    const context = this.mutationContextFor(action);
+    if (context === null) {
+      throw new Error('Accepted Solid action has no mutation context');
+    }
+    return context;
+  }
+
+  async recoverRejectedMutation(
+    context: SolidMutationIntentContext | null,
+    error: unknown,
+    source: string,
+  ): Promise<void> {
     await this.injector.get(SolidSessionRecoveryService).whenRecoverySettled();
-    await this.mutationRecoveryHandler?.(
-      this.mutationIntents.forFailure(error),
-      error,
-      source,
-    );
+    try {
+      await this.mutationRecoveryHandler?.(context, error, source);
+      if (context !== null && this.mutationIntents.isCurrent(context)) {
+        this.clearMutationTargetState(context);
+      }
+    } catch (recoveryError) {
+      if (context !== null && this.mutationIntents.isCurrent(context)) {
+        this.setMutationTargetState(context, 'quarantined');
+      }
+      throw recoveryError;
+    }
   }
 
   registerMutationRecoveryHandler(
@@ -277,10 +350,22 @@ export class SolidDataLayerStateService {
   }
 
   private captureMutationIntent(action: PersistentAction): void {
+    const binding = this.runtimeBinding();
+    if (binding.status !== 'trusted-live' && binding.status !== 'trusted-cache') {
+      return;
+    }
+    const catalog = this.injector
+      .get(SolidTaskHydrationService)
+      .captureLastPublishedProjection();
     this.mutationIntents.record(
       action,
       solidContainerKeysForActionType(action.type),
-      this.injector.get(SolidTaskHydrationService).captureLastPublishedProjection(),
+      catalog?.generation ?? 0,
+      {
+        runtimeGeneration: binding.generation,
+        storageRoot: binding.storageRoot,
+        webId: binding.webId,
+      },
     );
   }
 
@@ -302,7 +387,9 @@ export class SolidDataLayerStateService {
           ? 'offline'
           : binding.status === 'untrusted' || binding.status === 'resolving'
             ? 'storage-root-untrusted'
-            : 'external-access',
+            : mutationKeysForAction(action).some((key) => this.mutationTargets().has(key))
+              ? 'mutation-recovery'
+              : 'external-access',
     });
     if (this.blockedMutationWasReported) {
       return;
@@ -314,7 +401,42 @@ export class SolidDataLayerStateService {
       msg: T.PS.SOLID.WRITE_NOT_READY,
     });
   }
+
+  private setMutationTargetState(
+    context: SolidMutationIntentContext,
+    state: SolidMutationTargetState,
+  ): void {
+    this.mutationTargets.update((current) => {
+      const next = new Map(current);
+      mutationKeysForContext(context).forEach((key) => next.set(key, state));
+      return next;
+    });
+  }
+
+  private clearMutationTargetState(context: SolidMutationIntentContext): void {
+    this.mutationTargets.update((current) => {
+      const next = new Map(current);
+      mutationKeysForContext(context).forEach((key) => next.delete(key));
+      return next;
+    });
+  }
 }
+
+const mutationKeysForAction = (action: PersistentAction): readonly string[] => {
+  const entityKeys = solidEntitiesForAction(action).map(
+    ({ model, id }) => `${model}:${id}`,
+  );
+  return entityKeys.length > 0
+    ? entityKeys
+    : solidContainerKeysForActionType(action.type).map((key) => `container:${key}`);
+};
+
+const mutationKeysForContext = (
+  context: SolidMutationIntentContext,
+): readonly string[] =>
+  context.entityKeys.length > 0
+    ? context.entityKeys
+    : context.containerKeys.map((key) => `container:${key}`);
 
 const findHttpStatus = (value: unknown, seen = new Set<unknown>()): number | null => {
   if (typeof value !== 'object' || value === null || seen.has(value)) {

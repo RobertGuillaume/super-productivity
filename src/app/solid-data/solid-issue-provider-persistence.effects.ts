@@ -56,12 +56,13 @@ export class SolidIssueProviderPersistenceEffects {
                       this.solidIssueProviderRepository.saveIssueProvider(
                         issueProvider,
                         (state.ids as string[]).indexOf(issueProvider.id),
+                        this.solidDataLayerState.requireMutationContext(action),
                       ),
                     ),
                 ),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -84,13 +85,21 @@ export class SolidIssueProviderPersistenceEffects {
               from(
                 settleSolidMutations([
                   ...this.issueProviderIdsForDeleteAction(action).map((id) =>
-                    this.solidIssueProviderRepository.deleteIssueProvider(id),
+                    this.solidIssueProviderRepository.deleteIssueProvider(
+                      id,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
                   ),
-                  ...tasks.map((task) => this.solidTaskRepository.saveTask(task)),
+                  ...tasks.map((task) =>
+                    this.solidTaskRepository.saveTask(
+                      task,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
+                  ),
                 ]),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -120,11 +129,12 @@ export class SolidIssueProviderPersistenceEffects {
       : action.ids;
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidIssueProviderPersistenceEffects: failed to persist provider change',
     });
   }

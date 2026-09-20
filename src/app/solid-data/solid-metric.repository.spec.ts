@@ -5,6 +5,7 @@ import { RDF_JSON_DATATYPE, SP_METRIC } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidMetricRepository } from './solid-metric.repository';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -76,6 +77,8 @@ describe('SolidMetricRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

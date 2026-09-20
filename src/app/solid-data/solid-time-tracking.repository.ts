@@ -47,15 +47,25 @@ export class SolidTimeTrackingRepository {
     return solidRepositoryRead(timeTrackingEntriesToState(entries), result.metadata);
   }
 
-  saveTimeTrackingEntry(entry: SolidTimeTrackingEntry): Promise<SolidTimeTrackingEntry> {
-    return this.mutationCoordinator.run(solidMutationKey('timeTracking', '*'), () =>
-      this.saveTimeTrackingEntryNow(entry),
+  saveTimeTrackingEntry(
+    entry: SolidTimeTrackingEntry,
+    context = this.mutationCoordinator.systemContext('time-tracking-repository'),
+  ): Promise<SolidTimeTrackingEntry> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('timeTracking', '*'),
+      context,
+      () => this.saveTimeTrackingEntryNow(entry),
     );
   }
 
-  replaceTimeTrackingState(state: TimeTrackingState): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('timeTracking', '*'), () =>
-      this.replaceTimeTrackingStateNow(state),
+  replaceTimeTrackingState(
+    state: TimeTrackingState,
+    context = this.mutationCoordinator.systemContext('time-tracking-repository'),
+  ): Promise<void> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('timeTracking', '*'),
+      context,
+      () => this.replaceTimeTrackingStateNow(state),
     );
   }
 

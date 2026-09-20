@@ -63,9 +63,13 @@ export class SolidArchiveStateRepository {
     );
   }
 
-  saveArchiveState(archiveState: SolidArchiveState): Promise<SolidArchiveState> {
+  saveArchiveState(
+    archiveState: SolidArchiveState,
+    context = this.mutationCoordinator.systemContext('archive-state-repository'),
+  ): Promise<SolidArchiveState> {
     return this.mutationCoordinator.run(
       solidMutationKey('archiveState', archiveState.bucket),
+      context,
       () => this.saveArchiveStateNow(archiveState),
     );
   }

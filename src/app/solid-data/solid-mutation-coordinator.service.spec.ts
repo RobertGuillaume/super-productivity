@@ -1,10 +1,28 @@
 import { TestBed } from '@angular/core/testing';
 import {
   SolidMutationCoordinator,
+  SolidMutationDependencyError,
+  SolidStaleMutationContextError,
   settleSolidMutations,
 } from './solid-mutation-coordinator.service';
+import {
+  SolidMutationIntentContext,
+  SolidMutationIntentRegistry,
+} from './solid-mutation-intent-registry.service';
 
 describe('SolidMutationCoordinator', () => {
+  let context: SolidMutationIntentContext;
+
+  beforeEach(() => {
+    const registry = TestBed.inject(SolidMutationIntentRegistry);
+    registry.activateBinding({
+      runtimeGeneration: 1,
+      storageRoot: 'https://pod.example/',
+      webId: 'https://pod.example/profile/card#me',
+    });
+    context = registry.createSystemContext('test');
+  });
+
   it('orders same-resource writes while unrelated resources overlap', async () => {
     const coordinator = TestBed.inject(SolidMutationCoordinator);
     const calls: string[] = [];
@@ -21,16 +39,16 @@ describe('SolidMutationCoordinator', () => {
       markUnrelatedStarted = resolve;
     });
 
-    const first = coordinator.run('task:1', async () => {
+    const first = coordinator.run('task:1', context, async () => {
       calls.push('first:start');
       markFirstStarted?.();
       await firstGate;
       calls.push('first:end');
     });
-    const sameResource = coordinator.run('task:1', async () => {
+    const sameResource = coordinator.run('task:1', context, async () => {
       calls.push('same');
     });
-    const unrelated = coordinator.run('task:2', async () => {
+    const unrelated = coordinator.run('task:2', context, async () => {
       calls.push('unrelated');
       markUnrelatedStarted?.();
     });
@@ -44,25 +62,25 @@ describe('SolidMutationCoordinator', () => {
     expect(coordinator.inFlightCount()).toBe(0);
   });
 
-  it('holds the next same-resource mutation until rejected state is reconciled', async () => {
+  it('cancels a dependent mutation after rejected state is reconciled', async () => {
     const coordinator = TestBed.inject(SolidMutationCoordinator);
     const error = new Error('rejected write');
     let nextStarted = false;
 
     await expectAsync(
-      coordinator.run('task:1', async () => {
+      coordinator.run('task:1', context, async () => {
         throw error;
       }),
     ).toBeRejectedWith(error);
-    const next = coordinator.run('task:1', async () => {
+    const next = coordinator.run('task:1', context, async () => {
       nextStarted = true;
     });
     await Promise.resolve();
     expect(nextStarted).toBe(false);
 
     coordinator.completeFailedIntent(null, error);
-    await next;
-    expect(nextStarted).toBe(true);
+    await expectAsync(next).toBeRejectedWithError(SolidMutationDependencyError);
+    expect(nextStarted).toBe(false);
   });
 
   it('waits for every sibling before surfacing a partial failure', async () => {
@@ -81,25 +99,42 @@ describe('SolidMutationCoordinator', () => {
     expect(siblingFinished).toBe(true);
   });
 
-  it('holds the next same-resource mutation until failed intent recovery completes', async () => {
+  it('does not plan a queued descendant after its predecessor failed', async () => {
     const coordinator = TestBed.inject(SolidMutationCoordinator);
     const error = new Error('save failed');
     let nextStarted = false;
 
     await expectAsync(
-      coordinator.run('task:1', async () => {
+      coordinator.run('task:1', context, async () => {
         throw error;
       }),
     ).toBeRejectedWith(error);
 
-    const next = coordinator.run('task:1', async () => {
+    const next = coordinator.run('task:1', context, async () => {
       nextStarted = true;
     });
     await Promise.resolve();
     expect(nextStarted).toBe(false);
 
     coordinator.completeFailedIntent(null, error);
-    await next;
-    expect(nextStarted).toBe(true);
+    await expectAsync(next).toBeRejectedWithError(SolidMutationDependencyError);
+    expect(nextStarted).toBe(false);
+  });
+
+  it('rejects old-generation work before invoking the operation', async () => {
+    const coordinator = TestBed.inject(SolidMutationCoordinator);
+    const registry = TestBed.inject(SolidMutationIntentRegistry);
+    const staleContext = registry.createSystemContext('test');
+    registry.activateBinding({
+      runtimeGeneration: 2,
+      storageRoot: 'https://other.example/',
+      webId: 'https://other.example/profile/card#me',
+    });
+    const operation = jasmine.createSpy('operation').and.resolveTo(undefined);
+
+    await expectAsync(
+      coordinator.run('task:1', staleContext, operation),
+    ).toBeRejectedWithError(SolidStaleMutationContextError);
+    expect(operation).not.toHaveBeenCalled();
   });
 });

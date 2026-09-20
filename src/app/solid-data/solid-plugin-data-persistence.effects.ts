@@ -44,9 +44,9 @@ export class SolidPluginDataPersistenceEffects {
         concatMap((action) =>
           this.pluginDataForSaveAction(action).pipe(
             concatMap((pluginData) =>
-              pluginData === null ? EMPTY : from(this.savePluginData(pluginData)),
+              pluginData === null ? EMPTY : from(this.savePluginData(pluginData, action)),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -64,7 +64,7 @@ export class SolidPluginDataPersistenceEffects {
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
           from(this.deletePluginData(action)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -99,31 +99,45 @@ export class SolidPluginDataPersistenceEffects {
 
   private savePluginData(
     pluginData: PluginUserData | PluginMetadata,
+    action: object,
   ): Promise<PluginUserData | PluginMetadata> {
     if ('data' in pluginData) {
-      return this.solidPluginDataRepository.savePluginUserData(pluginData);
+      return this.solidPluginDataRepository.savePluginUserData(
+        pluginData,
+        this.solidDataLayerState.requireMutationContext(action),
+      );
     }
 
-    return this.solidPluginDataRepository.savePluginMetadata(pluginData);
+    return this.solidPluginDataRepository.savePluginMetadata(
+      pluginData,
+      this.solidDataLayerState.requireMutationContext(action),
+    );
   }
 
   private deletePluginData(action: SolidPluginDataDeleteAction): Promise<void> {
     if (action.type === deletePluginUserData.type) {
-      return this.solidPluginDataRepository.deletePluginUserData(action.pluginId);
+      return this.solidPluginDataRepository.deletePluginUserData(
+        action.pluginId,
+        this.solidDataLayerState.requireMutationContext(action),
+      );
     }
 
     if (action.type === deletePluginMetadata.type) {
-      return this.solidPluginDataRepository.deletePluginMetadata(action.pluginId);
+      return this.solidPluginDataRepository.deletePluginMetadata(
+        action.pluginId,
+        this.solidDataLayerState.requireMutationContext(action),
+      );
     }
 
     return Promise.resolve();
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidPluginDataPersistenceEffects: failed to persist plugin data',
     });
   }

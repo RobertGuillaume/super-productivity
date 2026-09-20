@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Section } from '../features/section/section.model';
 import { SP_SECTION } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -41,16 +42,32 @@ export class SolidSectionRepository {
     );
   }
 
-  saveSection(section: Section): Promise<Section> {
-    return this.mutationCoordinator.run(solidMutationKey('section', section.id), () =>
-      this.saveSectionNow(section),
+  saveSection(
+    section: Section,
+    context = this.systemContext(section.id),
+  ): Promise<Section> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('section', section.id),
+      context,
+      () => this.saveSectionNow(section),
     );
   }
 
-  deleteSection(sectionId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('section', sectionId), () =>
-      this.deleteSectionNow(sectionId),
+  deleteSection(
+    sectionId: string,
+    context = this.systemContext(sectionId),
+  ): Promise<void> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('section', sectionId),
+      context,
+      () => this.deleteSectionNow(sectionId),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('section-repository', [
+      solidMutationKey('section', id),
+    ]);
   }
 
   private async saveSectionNow(section: Section): Promise<Section> {

@@ -55,9 +55,12 @@ export class SolidSectionPersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidSectionRepository.saveSection(action.section)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
+          from(
+            this.solidSectionRepository.saveSection(
+              action.section,
+              this.solidDataLayerState.requireMutationContext(action),
+            ),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -88,11 +91,16 @@ export class SolidSectionPersistenceEffects {
                         : section;
                     })
                     .filter((section): section is Section => !!section)
-                    .map((section) => this.solidSectionRepository.saveSection(section)),
+                    .map((section) =>
+                      this.solidSectionRepository.saveSection(
+                        section,
+                        this.solidDataLayerState.requireMutationContext(action),
+                      ),
+                    ),
                 ),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           );
         }),
       ),
@@ -109,9 +117,12 @@ export class SolidSectionPersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidSectionRepository.deleteSection(action.id)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
+          from(
+            this.solidSectionRepository.deleteSection(
+              action.id,
+              this.solidDataLayerState.requireMutationContext(action),
+            ),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -126,17 +137,20 @@ export class SolidSectionPersistenceEffects {
             !(action as PersistentAction).meta?.isRemote,
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
-        concatMap(() =>
+        concatMap((action) =>
           this.store.select(selectSectionFeatureState).pipe(
             take(1),
             concatMap((state) =>
               from(
-                this.solidAppStateRepository.saveAppStateOrder({
-                  sectionOrder: state.ids as string[],
-                }),
+                this.solidAppStateRepository.saveAppStateOrder(
+                  {
+                    sectionOrder: state.ids as string[],
+                  },
+                  this.solidDataLayerState.requireMutationContext(action),
+                ),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -154,8 +168,8 @@ export class SolidSectionPersistenceEffects {
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
           action.workContextType === WorkContextType.PROJECT
-            ? this.persistProjectTaskOrder(action.workContextId)
-            : this.persistTagTaskOrder(action.workContextId),
+            ? this.persistProjectTaskOrder(action.workContextId, action)
+            : this.persistTagTaskOrder(action.workContextId, action),
         ),
       ),
     { dispatch: false },
@@ -179,29 +193,47 @@ export class SolidSectionPersistenceEffects {
     return [action.sectionId];
   }
 
-  private persistProjectTaskOrder(projectId: string): Observable<unknown> {
+  private persistProjectTaskOrder(
+    projectId: string,
+    action: object,
+  ): Observable<unknown> {
     return this.store.select(selectProjectById, { id: projectId }).pipe(
       take(1),
       filter((project): project is Project => !!project),
-      concatMap((project) => from(this.solidProjectRepository.saveProject(project))),
-      catchError((error) => this.handlePersistenceError(error)),
+      concatMap((project) =>
+        from(
+          this.solidProjectRepository.saveProject(
+            project,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
+      ),
+      catchError((error) => this.handlePersistenceError(error, action)),
     );
   }
 
-  private persistTagTaskOrder(tagId: string): Observable<unknown> {
+  private persistTagTaskOrder(tagId: string, action: object): Observable<unknown> {
     return this.store.select(selectTagById, { id: tagId }).pipe(
       take(1),
       filter((tag): tag is Tag => !!tag),
-      concatMap((tag) => from(this.solidTagRepository.saveTag(tag))),
-      catchError((error) => this.handlePersistenceError(error)),
+      concatMap((tag) =>
+        from(
+          this.solidTagRepository.saveTag(
+            tag,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
+      ),
+      catchError((error) => this.handlePersistenceError(error, action)),
     );
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidSectionPersistenceEffects: failed to persist section change',
     });
   }

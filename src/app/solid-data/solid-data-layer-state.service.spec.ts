@@ -90,6 +90,7 @@ import { SolidSessionRecoveryService } from './solid-session-recovery.service';
 import { SnackService } from '../core/snack/snack.service';
 import { resetSolidMutationGuard } from './solid-mutation-guard.meta-reducer';
 import { SolidTaskAccessService } from './solid-task-access.service';
+import { SolidMutationIntentRegistry } from './solid-mutation-intent-registry.service';
 
 describe('SolidDataLayerStateService', () => {
   let authState: AuthState;
@@ -243,16 +244,45 @@ describe('SolidDataLayerStateService', () => {
     const service = TestBed.inject(SolidDataLayerStateService);
     trustRuntimeBinding(service);
     service.setContainerReadiness('tasks', 'writable');
-    service.demoteWriteAccessAfterFailure({ outcomes: [{ httpStatus: 403 }] });
+    service.demoteWriteAccessAfterFailure({ outcomes: [{ httpStatus: 403 }] }, null);
     expect(service.containerReadiness('tasks')).toBe('read-only');
 
     service.setContainerReadiness('tasks', 'writable');
-    service.demoteWriteAccessAfterFailure(new TypeError('offline'));
+    service.demoteWriteAccessAfterFailure(new TypeError('offline'), null);
     expect(service.containerReadiness('tasks')).toBe('unavailable');
 
     service.setContainerReadiness('tasks', 'writable');
-    service.demoteWriteAccessAfterFailure({ status: 429 });
+    service.demoteWriteAccessAfterFailure({ status: 429 }, null);
     expect(service.containerReadiness('tasks')).toBe('rate-limited');
+  });
+
+  it('quarantines only the exact mutation target after an access denial', () => {
+    localStorage.setItem(SOLID_DATA_LAYER_ENABLED_STORAGE_KEY, 'true');
+    localStorage.setItem(SOLID_DATA_LAYER_PRIMARY_ENABLED_STORAGE_KEY, 'true');
+    authState = { status: 'authenticated', webId: 'https://user.example/#me' };
+    const service = TestBed.inject(SolidDataLayerStateService);
+    trustRuntimeBinding(service);
+    const blockedAction = TaskSharedActions.updateTask({
+      task: { id: 'task-1', changes: { title: 'Blocked' } },
+    }) as PersistentAction;
+    const unrelatedAction = TaskSharedActions.updateTask({
+      task: { id: 'task-2', changes: { title: 'Allowed' } },
+    }) as PersistentAction;
+    const context = TestBed.inject(SolidMutationIntentRegistry).record(
+      blockedAction,
+      ['tasks'],
+      1,
+      {
+        runtimeGeneration: 1,
+        storageRoot: 'https://pod.example/',
+        webId: 'https://user.example/#me',
+      },
+    );
+
+    service.demoteWriteAccessAfterFailure({ status: 403 }, context);
+
+    expect(service.canApplyPersistentAction(blockedAction)).toBe(false);
+    expect(service.canApplyPersistentAction(unrelatedAction)).toBe(true);
   });
 
   it('blocks a mixed bulk task action when one external task is read-only', () => {

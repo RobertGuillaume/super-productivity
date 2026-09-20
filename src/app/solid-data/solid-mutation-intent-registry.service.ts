@@ -1,5 +1,4 @@
 import { inject, Injectable } from '@angular/core';
-import { AppDataComplete } from '../op-log/model/model-config';
 import { PersistentAction } from '../op-log/core/persistent-action.interface';
 import {
   SolidContainerKey,
@@ -8,65 +7,98 @@ import {
 import { SolidThingIdentityRegistry } from './solid-thing-identity-registry.service';
 
 export interface SolidMutationIntentContext {
-  action: PersistentAction;
+  readonly action: PersistentAction | null;
   actionType: string;
   entityKeys: readonly string[];
   resourceUris: readonly string[];
   containerKeys: readonly SolidContainerKey[];
-  projection: AppDataComplete | null;
   catalogGeneration: number;
+  runtimeGeneration: number;
+  storageRoot: string;
+  webId: string;
+}
+
+export interface SolidMutationBinding {
+  readonly runtimeGeneration: number;
+  readonly storageRoot: string;
+  readonly webId: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class SolidMutationIntentRegistry {
   private readonly identities = inject(SolidThingIdentityRegistry);
-  private latestContext: SolidMutationIntentContext | null = null;
-  private readonly failedContexts = new WeakMap<object, SolidMutationIntentContext>();
+  private actionContexts = new WeakMap<object, SolidMutationIntentContext>();
+  private activeBinding: SolidMutationBinding | null = null;
 
   record(
     action: PersistentAction,
     containerKeys: readonly SolidContainerKey[],
-    catalog: { appDataComplete: AppDataComplete; generation: number } | null,
+    catalogGeneration: number,
+    binding: SolidMutationBinding,
   ): SolidMutationIntentContext {
-    const entities = entitiesForAction(action);
+    const entities = solidEntitiesForAction(action);
     const resourceUris = entities
       .map(({ model, id }) => this.identities.get(model, id)?.sourceUri)
       .filter((uri): uri is string => uri !== undefined);
-    const context: SolidMutationIntentContext = {
+    const context: SolidMutationIntentContext = Object.freeze({
       action,
       actionType: action.type,
-      entityKeys: entities.map(({ model, id }) => `${model}:${id}`),
-      resourceUris: Array.from(new Set(resourceUris)),
-      containerKeys: Array.from(new Set(containerKeys)),
-      projection: catalog?.appDataComplete ?? null,
-      catalogGeneration: catalog?.generation ?? 0,
-    };
-    this.latestContext = context;
+      entityKeys: Object.freeze(entities.map(({ model, id }) => `${model}:${id}`)),
+      resourceUris: Object.freeze(Array.from(new Set(resourceUris))),
+      containerKeys: Object.freeze(Array.from(new Set(containerKeys))),
+      catalogGeneration,
+      runtimeGeneration: binding.runtimeGeneration,
+      storageRoot: binding.storageRoot,
+      webId: binding.webId,
+    });
+    this.actionContexts.set(action, context);
     return context;
   }
 
-  latest(): SolidMutationIntentContext | null {
-    return this.latestContext;
+  forAction(action: object): SolidMutationIntentContext | null {
+    return this.actionContexts.get(action) ?? null;
   }
 
-  associateFailure(error: unknown, context: SolidMutationIntentContext | null): void {
-    if (context !== null && typeof error === 'object' && error !== null) {
-      this.failedContexts.set(error, context);
+  activateBinding(binding: SolidMutationBinding): void {
+    this.activeBinding = binding;
+  }
+
+  isCurrent(context: SolidMutationIntentContext): boolean {
+    const binding = this.activeBinding;
+    return (
+      binding !== null &&
+      context.runtimeGeneration === binding.runtimeGeneration &&
+      context.storageRoot === binding.storageRoot &&
+      context.webId === binding.webId
+    );
+  }
+
+  createSystemContext(
+    actionType: string,
+    entityKeys: readonly string[] = [],
+  ): SolidMutationIntentContext {
+    const binding = this.activeBinding;
+    if (binding === null) {
+      throw new Error('Solid mutation binding is unavailable');
     }
-  }
-
-  forFailure(error: unknown): SolidMutationIntentContext | null {
-    return typeof error === 'object' && error !== null
-      ? (this.failedContexts.get(error) ?? this.latestContext)
-      : this.latestContext;
+    return Object.freeze({
+      action: null,
+      actionType,
+      entityKeys: Object.freeze(Array.from(new Set(entityKeys))),
+      resourceUris: Object.freeze([]),
+      containerKeys: Object.freeze([]),
+      catalogGeneration: 0,
+      ...binding,
+    });
   }
 
   clear(): void {
-    this.latestContext = null;
+    this.actionContexts = new WeakMap<object, SolidMutationIntentContext>();
+    this.activeBinding = null;
   }
 }
 
-const entitiesForAction = (
+export const solidEntitiesForAction = (
   action: PersistentAction,
 ): Array<{ model: string; id: string }> => {
   const entities: Array<{ model: string; id: string }> = [];

@@ -103,13 +103,13 @@ export class SolidPodRefreshCoordinatorService {
   }
 
   recoverRejectedMutation(
-    context: SolidMutationIntentContext | null = this.mutationIntents.latest(),
+    context: SolidMutationIntentContext | null,
     error: unknown = null,
     source = '',
   ): Promise<void> {
-    if (context === null) {
+    if (context?.action == null) {
       if (this.recoveryWithoutIntent !== null) return this.recoveryWithoutIntent;
-      this.recoveryWithoutIntent = this.recoverMutationIntent(null, source).finally(
+      this.recoveryWithoutIntent = this.recoverMutationIntent(context, source).finally(
         () => {
           this.mutations.completeFailedIntent(null, error);
           this.recoveryWithoutIntent = null;
@@ -117,13 +117,14 @@ export class SolidPodRefreshCoordinatorService {
       );
       return this.recoveryWithoutIntent;
     }
-    const pending = this.recoveryPromises.get(context.action);
+    const action = context.action;
+    const pending = this.recoveryPromises.get(action);
     if (pending !== undefined) return pending;
     const recovery = this.recoverMutationIntent(context, source).finally(() => {
-      this.mutations.completeFailedIntent(context.action, error);
-      this.recoveryPromises.delete(context.action);
+      this.mutations.completeFailedIntent(action, error);
+      this.recoveryPromises.delete(action);
     });
-    this.recoveryPromises.set(context.action, recovery);
+    this.recoveryPromises.set(action, recovery);
     return recovery;
   }
 
@@ -286,6 +287,9 @@ export class SolidPodRefreshCoordinatorService {
     source: string,
   ): Promise<void> {
     await this.mutations.whenIdle();
+    if (context !== null && !this.mutationIntents.isCurrent(context)) {
+      throw new Error('Cannot recover a mutation from an inactive Solid binding');
+    }
     const uris = context?.resourceUris ?? [];
     try {
       if (uris.length > 0) {
@@ -294,12 +298,8 @@ export class SolidPodRefreshCoordinatorService {
       await this.hydration.reconcileStore();
     } catch (error) {
       this.reportFailure(`recover-mutation:${source}`, error);
-      if (context?.projection !== null && context?.projection !== undefined) {
-        await this.hydration.restoreProjection(context.projection);
-      } else {
-        await this.hydration.restoreLastPublishedSnapshot();
-      }
       this.dataLayerState.setPhase('degraded');
+      throw error;
     }
   }
 

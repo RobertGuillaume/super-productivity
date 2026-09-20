@@ -41,9 +41,12 @@ export class SolidNotePersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidNoteRepository.saveNote(action.note)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
+          from(
+            this.solidNoteRepository.saveNote(
+              action.note,
+              this.solidDataLayerState.requireMutationContext(action),
+            ),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -64,8 +67,15 @@ export class SolidNotePersistenceEffects {
             .pipe(
               take(1),
               filter((note): note is Note => !!note),
-              concatMap((note) => from(this.solidNoteRepository.saveNote(note))),
-              catchError((error) => this.handlePersistenceError(error)),
+              concatMap((note) =>
+                from(
+                  this.solidNoteRepository.saveNote(
+                    note,
+                    this.solidDataLayerState.requireMutationContext(action),
+                  ),
+                ),
+              ),
+              catchError((error) => this.handlePersistenceError(error, action)),
             ),
         ),
       ),
@@ -82,9 +92,12 @@ export class SolidNotePersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidNoteRepository.deleteNote(action.id)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
+          from(
+            this.solidNoteRepository.deleteNote(
+              action.id,
+              this.solidDataLayerState.requireMutationContext(action),
+            ),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -94,11 +107,12 @@ export class SolidNotePersistenceEffects {
     return action.note.id as string;
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidNotePersistenceEffects: failed to persist note change',
     });
   }

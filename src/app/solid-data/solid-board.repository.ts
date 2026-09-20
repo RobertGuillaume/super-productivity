@@ -10,6 +10,7 @@ import {
   solidThingToBoardRecord,
 } from './solid-board.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -45,16 +46,28 @@ export class SolidBoardRepository {
     );
   }
 
-  saveBoard(board: BoardCfg, order = 0): Promise<BoardCfg> {
-    return this.mutationCoordinator.run(solidMutationKey('board', board.id), () =>
-      this.saveBoardNow(board, order),
+  saveBoard(
+    board: BoardCfg,
+    order = 0,
+    context = this.systemContext(board.id),
+  ): Promise<BoardCfg> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('board', board.id),
+      context,
+      () => this.saveBoardNow(board, order),
     );
   }
 
-  deleteBoard(boardId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('board', boardId), () =>
+  deleteBoard(boardId: string, context = this.systemContext(boardId)): Promise<void> {
+    return this.mutationCoordinator.run(solidMutationKey('board', boardId), context, () =>
       this.deleteBoardNow(boardId),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('board-repository', [
+      solidMutationKey('board', id),
+    ]);
   }
 
   private async saveBoardNow(board: BoardCfg, order: number): Promise<BoardCfg> {

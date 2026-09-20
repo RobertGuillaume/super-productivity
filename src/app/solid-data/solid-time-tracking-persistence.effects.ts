@@ -43,10 +43,15 @@ export class SolidTimeTrackingPersistenceEffects {
           this.timeTrackingEntryForAction(action).pipe(
             concatMap((entry) =>
               entry
-                ? from(this.solidTimeTrackingRepository.saveTimeTrackingEntry(entry))
+                ? from(
+                    this.solidTimeTrackingRepository.saveTimeTrackingEntry(
+                      entry,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
+                  )
                 : EMPTY,
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -98,11 +103,12 @@ export class SolidTimeTrackingPersistenceEffects {
       : null;
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidTimeTrackingPersistenceEffects: failed to persist time tracking',
     });
   }

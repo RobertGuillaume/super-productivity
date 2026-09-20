@@ -5,6 +5,7 @@ import { SolidPlannerRepository } from './solid-planner.repository';
 import { SP_PLANNER_DAY, SP_PLANNER_STATE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -77,6 +78,8 @@ describe('SolidPlannerRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

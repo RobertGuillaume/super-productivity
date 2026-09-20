@@ -62,7 +62,7 @@ export class SolidProjectDeleteCascadeEffects {
             concatMap(({ noteTodayOrder, projects, sections, tags }) =>
               from(this.persistCascade(action, projects, tags, sections, noteTodayOrder)),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -86,29 +86,59 @@ export class SolidProjectDeleteCascadeEffects {
       .map((section) => section.id);
 
     await settleSolidMutations([
-      this.solidProjectRepository.deleteProject(action.projectId),
-      ...action.allTaskIds.map((taskId) => this.solidTaskRepository.deleteTask(taskId)),
-      ...action.noteIds.map((noteId) => this.solidNoteRepository.deleteNote(noteId)),
-      ...tags.map((tag) => this.solidTagRepository.saveTag(tag)),
-      ...sections.map((section) => this.solidSectionRepository.saveSection(section)),
-      ...deletedProjectSectionIds.map((sectionId) =>
-        this.solidSectionRepository.deleteSection(sectionId),
+      this.solidProjectRepository.deleteProject(
+        action.projectId,
+        this.solidDataLayerState.requireMutationContext(action),
       ),
-      this.solidAppStateRepository.saveAppStateOrder({
-        noteTodayOrder: [...noteTodayOrder],
-        projectOrder: projects
-          .filter((project) => project.id !== INBOX_PROJECT.id)
-          .map((project) => project.id),
-        sectionOrder: sections.map((section) => section.id),
-      }),
+      ...action.allTaskIds.map((taskId) =>
+        this.solidTaskRepository.deleteTask(
+          taskId,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...action.noteIds.map((noteId) =>
+        this.solidNoteRepository.deleteNote(
+          noteId,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...tags.map((tag) =>
+        this.solidTagRepository.saveTag(
+          tag,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...sections.map((section) =>
+        this.solidSectionRepository.saveSection(
+          section,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...deletedProjectSectionIds.map((sectionId) =>
+        this.solidSectionRepository.deleteSection(
+          sectionId,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      this.solidAppStateRepository.saveAppStateOrder(
+        {
+          noteTodayOrder: [...noteTodayOrder],
+          projectOrder: projects
+            .filter((project) => project.id !== INBOX_PROJECT.id)
+            .map((project) => project.id),
+          sectionOrder: sections.map((section) => section.id),
+        },
+        this.solidDataLayerState.requireMutationContext(action),
+      ),
     ]);
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidProjectDeleteCascadeEffects: failed to persist project delete',
     });
   }

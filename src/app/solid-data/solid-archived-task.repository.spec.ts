@@ -5,6 +5,7 @@ import { SP_ARCHIVED_TASK } from './solid-productivity-vocab';
 import { SolidArchivedTaskRepository } from './solid-archived-task.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -73,6 +74,8 @@ describe('SolidArchivedTaskRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

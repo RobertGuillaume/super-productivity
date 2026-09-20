@@ -9,6 +9,7 @@ import {
   solidThingToMetric,
 } from './solid-metric.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -43,16 +44,26 @@ export class SolidMetricRepository {
     );
   }
 
-  saveMetric(metric: Metric): Promise<Metric> {
-    return this.mutationCoordinator.run(solidMutationKey('metric', metric.id), () =>
-      this.saveMetricNow(metric),
+  saveMetric(metric: Metric, context = this.systemContext(metric.id)): Promise<Metric> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('metric', metric.id),
+      context,
+      () => this.saveMetricNow(metric),
     );
   }
 
-  deleteMetric(metricId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('metric', metricId), () =>
-      this.deleteMetricNow(metricId),
+  deleteMetric(metricId: string, context = this.systemContext(metricId)): Promise<void> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('metric', metricId),
+      context,
+      () => this.deleteMetricNow(metricId),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('metric-repository', [
+      solidMutationKey('metric', id),
+    ]);
   }
 
   private async saveMetricNow(metric: Metric): Promise<Metric> {

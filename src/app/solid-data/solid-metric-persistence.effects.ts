@@ -44,9 +44,16 @@ export class SolidMetricPersistenceEffects {
         concatMap((action) =>
           this.metricForSaveAction(action).pipe(
             concatMap((metric) =>
-              metric ? from(this.solidMetricRepository.saveMetric(metric)) : EMPTY,
+              metric
+                ? from(
+                    this.solidMetricRepository.saveMetric(
+                      metric,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
+                  )
+                : EMPTY,
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -63,9 +70,12 @@ export class SolidMetricPersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidMetricRepository.deleteMetric(action.id)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
+          from(
+            this.solidMetricRepository.deleteMetric(
+              action.id,
+              this.solidDataLayerState.requireMutationContext(action),
+            ),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -87,11 +97,12 @@ export class SolidMetricPersistenceEffects {
     return String(action.metric.id);
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidMetricPersistenceEffects: failed to persist metric',
     });
   }

@@ -5,6 +5,7 @@ import { RDF_JSON_DATATYPE, SP_ISSUE_PROVIDER } from './solid-productivity-vocab
 import { SolidIssueProviderRepository } from './solid-issue-provider.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -74,6 +75,8 @@ describe('SolidIssueProviderRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

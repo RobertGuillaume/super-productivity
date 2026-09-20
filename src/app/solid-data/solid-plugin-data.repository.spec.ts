@@ -13,6 +13,7 @@ import {
 import { SolidPluginDataRepository } from './solid-plugin-data.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -96,6 +97,8 @@ describe('SolidPluginDataRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

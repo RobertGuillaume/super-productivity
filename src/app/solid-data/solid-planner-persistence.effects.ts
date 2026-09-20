@@ -49,7 +49,7 @@ export class SolidPlannerPersistenceEffects {
             concatMap(({ plannerState, tags, tasks }) =>
               from(this.persistPlannerState(action, plannerState, tasks, tags)),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -75,21 +75,39 @@ export class SolidPlannerPersistenceEffects {
     const todayTag = tags.find((tag) => tag.id === TODAY_TAG.id);
 
     await settleSolidMutations([
-      this.solidPlannerRepository.reconcilePlannerDays(plannerState),
+      this.solidPlannerRepository.reconcilePlannerDays(
+        plannerState,
+        this.solidDataLayerState.requireMutationContext(action),
+      ),
       ...(shouldPersistTaskAndTagSideEffects
         ? [
-            ...(affectedTask ? [this.solidTaskRepository.saveTask(affectedTask)] : []),
-            ...(todayTag ? [this.solidTagRepository.saveTag(todayTag)] : []),
+            ...(affectedTask
+              ? [
+                  this.solidTaskRepository.saveTask(
+                    affectedTask,
+                    this.solidDataLayerState.requireMutationContext(action),
+                  ),
+                ]
+              : []),
+            ...(todayTag
+              ? [
+                  this.solidTagRepository.saveTag(
+                    todayTag,
+                    this.solidDataLayerState.requireMutationContext(action),
+                  ),
+                ]
+              : []),
           ]
         : []),
     ]);
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidPlannerPersistenceEffects: failed to persist planner state',
     });
   }

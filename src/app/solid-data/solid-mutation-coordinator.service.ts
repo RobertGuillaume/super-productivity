@@ -1,5 +1,8 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { SolidMutationIntentRegistry } from './solid-mutation-intent-registry.service';
+import {
+  SolidMutationIntentContext,
+  SolidMutationIntentRegistry,
+} from './solid-mutation-intent-registry.service';
 
 const GLOBAL_MUTATION_KEY = 'solid:*';
 
@@ -11,64 +14,99 @@ export class SolidMutationCoordinator {
   private readonly idleWaiters = new Set<() => void>();
   private readonly failedIntentReleases = new Map<object, Set<() => void>>();
   private readonly failedErrorReleases = new WeakMap<object, () => void>();
+  private readonly failedReservations = new WeakSet<Promise<void>>();
   private readonly inFlightCountSignal = signal(0);
 
   readonly inFlightCount = this.inFlightCountSignal.asReadonly();
   readonly hasInFlight = computed(() => this.inFlightCountSignal() > 0);
 
+  systemContext(
+    actionType: string,
+    entityKeys: readonly string[] = [],
+  ): SolidMutationIntentContext {
+    return this.intents.createSystemContext(actionType, entityKeys);
+  }
+
   run<Result>(
     resourceKeys: string | readonly string[],
+    context: SolidMutationIntentContext,
     operation: () => Promise<Result>,
   ): Promise<Result> {
     const keys = normalizeKeys(resourceKeys);
-    const intent = this.intents.latest();
-    const predecessors = keys.map((key) =>
-      (this.tails.get(key) ?? Promise.resolve()).catch(() => undefined),
-    );
-    const ready = Promise.all(predecessors).then(() => undefined);
+    const predecessors = keys
+      .map((key) => this.tails.get(key))
+      .filter((tail): tail is Promise<void> => tail !== undefined);
+    const ready = Promise.all(predecessors).then(() => {
+      if (predecessors.some((tail) => this.failedReservations.has(tail))) {
+        throw new SolidMutationDependencyError();
+      }
+    });
     let releaseReservation: (() => void) | undefined;
     const reservationComplete = new Promise<void>((resolve) => {
       releaseReservation = resolve;
     });
-    const reservation = ready.then(() => reservationComplete);
+    const reservation = ready.then(
+      () => reservationComplete,
+      () => reservationComplete,
+    );
 
     for (const key of keys) {
       this.tails.set(key, reservation);
     }
-    return ready.then(async () => {
-      this.inFlightCountSignal.update((count) => count + 1);
-      let didFail = false;
-      try {
-        return await operation();
-      } catch (error) {
-        didFail = true;
-        this.intents.associateFailure(error, intent);
-        if (intent !== null) {
-          const releases = this.failedIntentReleases.get(intent.action) ?? new Set();
-          releases.add(() => releaseReservation?.());
-          this.failedIntentReleases.set(intent.action, releases);
-        } else if (typeof error === 'object' && error !== null) {
-          this.failedErrorReleases.set(error, () => releaseReservation?.());
+    const holdFailedReservation = (error: unknown): void => {
+      this.failedReservations.add(reservation);
+      const release = (): void => {
+        releaseReservation?.();
+        for (const key of keys) {
+          if (this.tails.get(key) === reservation) this.tails.delete(key);
         }
-        throw error;
-      } finally {
-        this.inFlightCountSignal.update((count) => count - 1);
-        if (!didFail) {
-          releaseReservation?.();
-          for (const key of keys) {
-            if (this.tails.get(key) === reservation) {
-              this.tails.delete(key);
+      };
+      if (context.action !== null) {
+        const releases = this.failedIntentReleases.get(context.action) ?? new Set();
+        releases.add(release);
+        this.failedIntentReleases.set(context.action, releases);
+      } else if (typeof error === 'object' && error !== null) {
+        this.failedErrorReleases.set(error, release);
+      }
+    };
+    return ready.then(
+      async () => {
+        if (!this.intents.isCurrent(context)) {
+          const error = new SolidStaleMutationContextError();
+          holdFailedReservation(error);
+          throw error;
+        }
+        this.inFlightCountSignal.update((count) => count + 1);
+        let didFail = false;
+        try {
+          return await operation();
+        } catch (error) {
+          didFail = true;
+          holdFailedReservation(error);
+          throw error;
+        } finally {
+          this.inFlightCountSignal.update((count) => count - 1);
+          if (!didFail) {
+            releaseReservation?.();
+            for (const key of keys) {
+              if (this.tails.get(key) === reservation) {
+                this.tails.delete(key);
+              }
             }
           }
-        }
-        if (this.inFlightCountSignal() === 0) {
-          for (const resolve of this.idleWaiters) {
-            resolve();
+          if (this.inFlightCountSignal() === 0) {
+            for (const resolve of this.idleWaiters) {
+              resolve();
+            }
+            this.idleWaiters.clear();
           }
-          this.idleWaiters.clear();
         }
-      }
-    });
+      },
+      (error: unknown) => {
+        holdFailedReservation(error);
+        throw error;
+      },
+    );
   }
 
   completeFailedIntent(action: object | null, error: unknown): void {
@@ -89,6 +127,22 @@ export class SolidMutationCoordinator {
       return Promise.resolve();
     }
     return new Promise((resolve) => this.idleWaiters.add(resolve));
+  }
+}
+
+export class SolidStaleMutationContextError extends Error {
+  override readonly name = 'SolidStaleMutationContextError';
+
+  constructor() {
+    super('Solid mutation context belongs to an inactive runtime binding');
+  }
+}
+
+export class SolidMutationDependencyError extends Error {
+  override readonly name = 'SolidMutationDependencyError';
+
+  constructor() {
+    super('Solid mutation canceled because a predecessor requires recovery');
   }
 }
 

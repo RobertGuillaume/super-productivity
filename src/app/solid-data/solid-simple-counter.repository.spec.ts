@@ -7,6 +7,7 @@ import {
 import { RDF_JSON_DATATYPE, SP_SIMPLE_COUNTER } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -81,6 +82,8 @@ describe('SolidSimpleCounterRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

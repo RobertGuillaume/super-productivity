@@ -51,7 +51,7 @@ export class SolidTaskProjectMovePersistenceEffects {
             concatMap(({ tasks, projects, sections }) =>
               from(this.persistMove(action, tasks, projects, sections)),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -73,17 +73,33 @@ export class SolidTaskProjectMovePersistenceEffects {
     );
 
     await settleSolidMutations([
-      ...movedTasks.map((task) => this.solidTaskRepository.saveTask(task)),
-      ...projects.map((project) => this.solidProjectRepository.saveProject(project)),
-      ...sections.map((section) => this.solidSectionRepository.saveSection(section)),
+      ...movedTasks.map((task) =>
+        this.solidTaskRepository.saveTask(
+          task,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...projects.map((project) =>
+        this.solidProjectRepository.saveProject(
+          project,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...sections.map((section) =>
+        this.solidSectionRepository.saveSection(
+          section,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
     ]);
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidTaskProjectMovePersistenceEffects: failed to persist project move',
     });
   }

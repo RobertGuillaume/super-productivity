@@ -12,6 +12,7 @@ import {
   solidThingToArchivedTask,
 } from './solid-archived-task.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -50,29 +51,55 @@ export class SolidArchivedTaskRepository {
     );
   }
 
-  saveArchivedTask(task: Task, bucket: SolidArchiveBucket = 'young'): Promise<Task> {
-    return this.mutationCoordinator.run(solidMutationKey('archivedTask', task.id), () =>
-      this.saveArchivedTaskNow(task, bucket),
+  saveArchivedTask(
+    task: Task,
+    bucket: SolidArchiveBucket = 'young',
+    context = this.systemContext(task.id),
+  ): Promise<Task> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('archivedTask', task.id),
+      context,
+      () => this.saveArchivedTaskNow(task, bucket),
     );
   }
 
-  deleteArchivedTask(taskId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('archivedTask', taskId), () =>
-      this.deleteArchivedTaskNow(taskId),
+  deleteArchivedTask(
+    taskId: string,
+    context = this.systemContext(taskId),
+  ): Promise<void> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('archivedTask', taskId),
+      context,
+      () => this.deleteArchivedTaskNow(taskId),
     );
   }
 
-  deleteArchivedTasks(taskIds: readonly string[]): Promise<void> {
+  deleteArchivedTasks(
+    taskIds: readonly string[],
+    context = this.mutationCoordinator.systemContext('archived-task-repository'),
+  ): Promise<void> {
     return this.mutationCoordinator.run(
       taskIds.map((taskId) => solidMutationKey('archivedTask', taskId)),
+      context,
       () => this.deleteArchivedTasksNow(taskIds),
     );
   }
 
-  replaceArchivedTasks(archivedTasks: readonly SolidArchivedTask[]): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('archivedTask', '*'), () =>
-      this.replaceArchivedTasksNow(archivedTasks),
+  replaceArchivedTasks(
+    archivedTasks: readonly SolidArchivedTask[],
+    context = this.mutationCoordinator.systemContext('archived-task-repository'),
+  ): Promise<void> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('archivedTask', '*'),
+      context,
+      () => this.replaceArchivedTasksNow(archivedTasks),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('archived-task-repository', [
+      solidMutationKey('archivedTask', id),
+    ]);
   }
 
   private async saveArchivedTaskNow(

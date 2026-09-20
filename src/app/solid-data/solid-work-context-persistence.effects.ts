@@ -40,36 +40,54 @@ export class SolidWorkContextPersistenceEffects {
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
           action.workContextType === WorkContextType.PROJECT
-            ? this.persistProjectTaskOrder(action.workContextId)
-            : this.persistTagTaskOrder(action.workContextId),
+            ? this.persistProjectTaskOrder(action.workContextId, action)
+            : this.persistTagTaskOrder(action.workContextId, action),
         ),
       ),
     { dispatch: false },
   );
 
-  private persistProjectTaskOrder(projectId: string): Observable<unknown> {
+  private persistProjectTaskOrder(
+    projectId: string,
+    action: object,
+  ): Observable<unknown> {
     return this.store.select(selectProjectById, { id: projectId }).pipe(
       take(1),
       filter((project): project is Project => !!project),
-      concatMap((project) => from(this.solidProjectRepository.saveProject(project))),
-      catchError((error) => this.handlePersistenceError(error)),
+      concatMap((project) =>
+        from(
+          this.solidProjectRepository.saveProject(
+            project,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
+      ),
+      catchError((error) => this.handlePersistenceError(error, action)),
     );
   }
 
-  private persistTagTaskOrder(tagId: string): Observable<unknown> {
+  private persistTagTaskOrder(tagId: string, action: object): Observable<unknown> {
     return this.store.select(selectTagById, { id: tagId }).pipe(
       take(1),
       filter((tag): tag is Tag => !!tag),
-      concatMap((tag) => from(this.solidTagRepository.saveTag(tag))),
-      catchError((error) => this.handlePersistenceError(error)),
+      concatMap((tag) =>
+        from(
+          this.solidTagRepository.saveTag(
+            tag,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
+      ),
+      catchError((error) => this.handlePersistenceError(error, action)),
     );
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidWorkContextPersistenceEffects: failed to persist work-context order',
     });
   }

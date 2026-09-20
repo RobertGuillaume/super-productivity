@@ -73,39 +73,55 @@ export class SolidPlannerRepository {
     );
   }
 
-  async savePlannerState(plannerState: PlannerState): Promise<PlannerState> {
-    await this.replacePlannerState(plannerState);
+  async savePlannerState(
+    plannerState: PlannerState,
+    context = this.mutationCoordinator.systemContext('planner-repository'),
+  ): Promise<PlannerState> {
+    await this.replacePlannerState(plannerState, context);
     return plannerState;
   }
 
-  replacePlannerState(plannerState: PlannerState): Promise<PlannerState> {
-    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+  replacePlannerState(
+    plannerState: PlannerState,
+    context = this.mutationCoordinator.systemContext('planner-repository'),
+  ): Promise<PlannerState> {
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), context, () =>
       this.replacePlannerStateNow(plannerState),
     );
   }
 
-  reconcilePlannerDays(plannerState: PlannerState): Promise<PlannerState> {
-    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+  reconcilePlannerDays(
+    plannerState: PlannerState,
+    context = this.mutationCoordinator.systemContext('planner-repository'),
+  ): Promise<PlannerState> {
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), context, () =>
       this.reconcilePlannerDaysNow(plannerState),
     );
   }
 
-  savePlannerDay(plannerDay: SolidPlannerDay): Promise<SolidPlannerDay> {
-    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+  savePlannerDay(
+    plannerDay: SolidPlannerDay,
+    context = this.mutationCoordinator.systemContext('planner-repository'),
+  ): Promise<SolidPlannerDay> {
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), context, () =>
       this.savePlannerDayNow(plannerDay),
     );
   }
 
-  deletePlannerDay(day: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+  deletePlannerDay(
+    day: string,
+    context = this.mutationCoordinator.systemContext('planner-repository'),
+  ): Promise<void> {
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), context, () =>
       this.deletePlannerDayNow(day),
     );
   }
 
   savePlannerDialogState(
     addPlannedTasksDialogLastShown: string | undefined,
+    context = this.mutationCoordinator.systemContext('planner-repository'),
   ): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), () =>
+    return this.mutationCoordinator.run(solidMutationKey('planner', '*'), context, () =>
       this.savePlannerDialogStateNow(addPlannedTasksDialogLastShown),
     );
   }

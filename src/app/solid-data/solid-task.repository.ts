@@ -18,6 +18,7 @@ import {
   SolidRepositoryMutation,
   SolidRepositoryOperations,
 } from './solid-repository-operations.service';
+import { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 
 @Injectable({ providedIn: 'root' })
 export class SolidTaskRepository {
@@ -38,26 +39,26 @@ export class SolidTaskRepository {
     );
   }
 
-  saveTask(task: Task): Promise<Task> {
-    return this.mutationCoordinator.run(solidMutationKey('task', task.id), () =>
+  saveTask(task: Task, context = this.systemContext(task.id)): Promise<Task> {
+    return this.mutationCoordinator.run(solidMutationKey('task', task.id), context, () =>
       this.saveTaskNow(task),
     );
   }
 
-  createTask(task: Task): Promise<Task> {
-    return this.mutationCoordinator.run(solidMutationKey('task', task.id), () =>
+  createTask(task: Task, context = this.systemContext(task.id)): Promise<Task> {
+    return this.mutationCoordinator.run(solidMutationKey('task', task.id), context, () =>
       this.createTaskNow(task),
     );
   }
 
-  updateTask(task: Task): Promise<Task> {
-    return this.mutationCoordinator.run(solidMutationKey('task', task.id), () =>
+  updateTask(task: Task, context = this.systemContext(task.id)): Promise<Task> {
+    return this.mutationCoordinator.run(solidMutationKey('task', task.id), context, () =>
       this.updateTaskNow(task),
     );
   }
 
-  deleteTask(taskId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('task', taskId), () =>
+  deleteTask(taskId: string, context = this.systemContext(taskId)): Promise<void> {
+    return this.mutationCoordinator.run(solidMutationKey('task', taskId), context, () =>
       this.operations.delete('task', taskId, this.solidRuntime.taskProfile, taskId),
     );
   }
@@ -101,5 +102,11 @@ export class SolidTaskRepository {
     const task = solidThingToTask(thing);
     this.taskAccess.registerThing(task.id, thing);
     return this.operations.remember('task', task.id, thing, task);
+  }
+
+  private systemContext(taskId: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('task-repository', [
+      solidMutationKey('task', taskId),
+    ]);
   }
 }

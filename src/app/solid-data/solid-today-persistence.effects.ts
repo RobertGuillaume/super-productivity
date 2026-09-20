@@ -49,12 +49,20 @@ export class SolidTodayPersistenceEffects {
             concatMap(({ tasks, todayTag }) =>
               from(
                 settleSolidMutations([
-                  ...tasks.map((task) => this.solidTaskRepository.saveTask(task)),
-                  this.solidTagRepository.saveTag(todayTag),
+                  ...tasks.map((task) =>
+                    this.solidTaskRepository.saveTask(
+                      task,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
+                  ),
+                  this.solidTagRepository.saveTag(
+                    todayTag,
+                    this.solidDataLayerState.requireMutationContext(action),
+                  ),
                 ]),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -70,10 +78,17 @@ export class SolidTodayPersistenceEffects {
             !(action as PersistentAction).meta?.isRemote,
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
-        concatMap(() =>
+        concatMap((action) =>
           this.selectTodayTag().pipe(
-            concatMap((todayTag) => from(this.solidTagRepository.saveTag(todayTag))),
-            catchError((error) => this.handlePersistenceError(error)),
+            concatMap((todayTag) =>
+              from(
+                this.solidTagRepository.saveTag(
+                  todayTag,
+                  this.solidDataLayerState.requireMutationContext(action),
+                ),
+              ),
+            ),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -88,11 +103,12 @@ export class SolidTodayPersistenceEffects {
     );
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidTodayPersistenceEffects: failed to persist Today changes',
     });
   }

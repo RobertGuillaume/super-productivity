@@ -8,6 +8,7 @@ import { RDF_JSON_DATATYPE, SP_TASK_REPEAT_CFG } from './solid-productivity-voca
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SolidTaskRepeatCfgRepository } from './solid-task-repeat-cfg.repository';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -75,6 +76,8 @@ describe('SolidTaskRepeatCfgRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

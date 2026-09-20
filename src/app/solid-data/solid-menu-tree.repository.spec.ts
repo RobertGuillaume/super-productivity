@@ -6,6 +6,7 @@ import { SOLID_MENU_TREE_ID, SolidMenuTree } from './solid-menu-tree.mapper';
 import { SolidMenuTreeRepository } from './solid-menu-tree.repository';
 import { SolidRuntimeService } from './solid-runtime.service';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -87,6 +88,8 @@ describe('SolidMenuTreeRepository', () => {
       providers: [{ provide: SolidRuntimeService, useValue: solidRuntime }],
     });
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

@@ -37,9 +37,14 @@ export class SolidMenuTreeRepository {
     return solidRepositoryRead(menuTree, result.metadata);
   }
 
-  saveMenuTree(menuTree: MenuTreeState): Promise<MenuTreeState> {
-    return this.mutationCoordinator.run(solidMutationKey('menuTree', 'root'), () =>
-      this.saveMenuTreeNow(menuTree),
+  saveMenuTree(
+    menuTree: MenuTreeState,
+    context = this.mutationCoordinator.systemContext('menu-tree-repository'),
+  ): Promise<MenuTreeState> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('menuTree', 'root'),
+      context,
+      () => this.saveMenuTreeNow(menuTree),
     );
   }
 

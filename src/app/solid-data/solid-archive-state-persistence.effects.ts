@@ -52,21 +52,23 @@ export class SolidArchiveStatePersistenceEffects {
             )
           );
         }),
-        concatMap(() =>
-          this.store.select(selectTimeTrackingState).pipe(
+        concatMap((action) => {
+          const sourceAction = solidArchiveStateSourceAction(action);
+          return this.store.select(selectTimeTrackingState).pipe(
             take(1),
             concatMap((timeTrackingState) =>
-              from(this.persistArchiveMirror(timeTrackingState)),
+              from(this.persistArchiveMirror(timeTrackingState, sourceAction)),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
-        ),
+            catchError((error) => this.handlePersistenceError(error, sourceAction)),
+          );
+        }),
       ),
     { dispatch: false },
   );
 
   private async persistArchiveMirror(
     activeTimeTrackingState: TimeTrackingState,
+    action: object,
   ): Promise<void> {
     const [archiveYoung, archiveOld] = await Promise.all([
       this.archiveDbAdapter.loadArchiveYoung(),
@@ -82,20 +84,29 @@ export class SolidArchiveStatePersistenceEffects {
     await settleSolidMutations([
       this.solidArchiveStateRepository.saveArchiveState(
         this.solidArchiveStateRepository.archiveModelToSolidArchiveState('young', young),
+        this.solidDataLayerState.requireMutationContext(action),
       ),
       this.solidArchiveStateRepository.saveArchiveState(
         this.solidArchiveStateRepository.archiveModelToSolidArchiveState('old', old),
+        this.solidDataLayerState.requireMutationContext(action),
       ),
-      this.solidArchivedTaskRepository.replaceArchivedTasks(archivedTasks),
-      this.solidTimeTrackingRepository.replaceTimeTrackingState(activeTimeTrackingState),
+      this.solidArchivedTaskRepository.replaceArchivedTasks(
+        archivedTasks,
+        this.solidDataLayerState.requireMutationContext(action),
+      ),
+      this.solidTimeTrackingRepository.replaceTimeTrackingState(
+        activeTimeTrackingState,
+        this.solidDataLayerState.requireMutationContext(action),
+      ),
     ]);
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidArchiveStatePersistenceEffects: failed to persist archive state',
     });
   }

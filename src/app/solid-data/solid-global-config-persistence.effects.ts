@@ -32,24 +32,30 @@ export class SolidGlobalConfigPersistenceEffects {
             !(action as PersistentAction).meta?.isRemote,
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
-        concatMap(() =>
+        concatMap((action) =>
           this.store.select(selectConfigFeatureState).pipe(
             take(1),
             concatMap((config) =>
-              from(this.solidGlobalConfigRepository.saveGlobalConfig(config)),
+              from(
+                this.solidGlobalConfigRepository.saveGlobalConfig(
+                  config,
+                  this.solidDataLayerState.requireMutationContext(action),
+                ),
+              ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
     { dispatch: false },
   );
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidGlobalConfigPersistenceEffects: failed to persist global config',
     });
   }

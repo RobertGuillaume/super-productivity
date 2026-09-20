@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Tag } from '../features/tag/tag.model';
 import { SP_TAG } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -41,16 +42,22 @@ export class SolidTagRepository {
     );
   }
 
-  saveTag(tag: Tag): Promise<Tag> {
-    return this.mutationCoordinator.run(solidMutationKey('tag', tag.id), () =>
+  saveTag(tag: Tag, context = this.systemContext(tag.id)): Promise<Tag> {
+    return this.mutationCoordinator.run(solidMutationKey('tag', tag.id), context, () =>
       this.saveTagNow(tag),
     );
   }
 
-  deleteTag(tagId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('tag', tagId), () =>
+  deleteTag(tagId: string, context = this.systemContext(tagId)): Promise<void> {
+    return this.mutationCoordinator.run(solidMutationKey('tag', tagId), context, () =>
       this.deleteTagNow(tagId),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('tag-repository', [
+      solidMutationKey('tag', id),
+    ]);
   }
 
   private async saveTagNow(tag: Tag): Promise<Tag> {

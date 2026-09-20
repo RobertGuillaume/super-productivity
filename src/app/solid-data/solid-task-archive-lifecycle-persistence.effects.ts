@@ -60,7 +60,7 @@ export class SolidTaskArchiveLifecyclePersistenceEffects {
             concatMap(({ projects, sections, tags, tasks }) =>
               from(this.persistLifecycle(action, tasks, projects, tags, sections)),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -78,12 +78,36 @@ export class SolidTaskArchiveLifecyclePersistenceEffects {
       const archivedTasks = this.tasksForArchive(action.tasks);
       await settleSolidMutations([
         ...archivedTasks.map((task) =>
-          this.solidArchivedTaskRepository.saveArchivedTask(task, 'young'),
+          this.solidArchivedTaskRepository.saveArchivedTask(
+            task,
+            'young',
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
         ),
-        ...archivedTasks.map((task) => this.solidTaskRepository.deleteTask(task.id)),
-        ...projects.map((project) => this.solidProjectRepository.saveProject(project)),
-        ...tags.map((tag) => this.solidTagRepository.saveTag(tag)),
-        ...sections.map((section) => this.solidSectionRepository.saveSection(section)),
+        ...archivedTasks.map((task) =>
+          this.solidTaskRepository.deleteTask(
+            task.id,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
+        ...projects.map((project) =>
+          this.solidProjectRepository.saveProject(
+            project,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
+        ...tags.map((tag) =>
+          this.solidTagRepository.saveTag(
+            tag,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
+        ...sections.map((section) =>
+          this.solidSectionRepository.saveSection(
+            section,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
       ]);
       return;
     }
@@ -91,12 +115,35 @@ export class SolidTaskArchiveLifecyclePersistenceEffects {
     const restoredArchiveTaskIds = this.restoredArchiveTaskIdsForAction(action);
     await settleSolidMutations([
       ...restoredArchiveTaskIds.map((taskId) =>
-        this.solidArchivedTaskRepository.deleteArchivedTask(taskId),
+        this.solidArchivedTaskRepository.deleteArchivedTask(
+          taskId,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
       ),
-      ...tasks.map((task) => this.solidTaskRepository.saveTask(task)),
-      ...projects.map((project) => this.solidProjectRepository.saveProject(project)),
-      ...tags.map((tag) => this.solidTagRepository.saveTag(tag)),
-      ...sections.map((section) => this.solidSectionRepository.saveSection(section)),
+      ...tasks.map((task) =>
+        this.solidTaskRepository.saveTask(
+          task,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...projects.map((project) =>
+        this.solidProjectRepository.saveProject(
+          project,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...tags.map((tag) =>
+        this.solidTagRepository.saveTag(
+          tag,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
+      ...sections.map((section) =>
+        this.solidSectionRepository.saveSection(
+          section,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
     ]);
   }
 
@@ -135,11 +182,12 @@ export class SolidTaskArchiveLifecyclePersistenceEffects {
     return [action.task.id, ...action.subTasks.map((subTask) => subTask.id)];
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source:
         'SolidTaskArchiveLifecyclePersistenceEffects: failed to persist task lifecycle',
     });

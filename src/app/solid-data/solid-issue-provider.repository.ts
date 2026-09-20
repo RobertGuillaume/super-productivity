@@ -10,6 +10,7 @@ import {
   solidThingToIssueProviderRecord,
 } from './solid-issue-provider.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -50,18 +51,33 @@ export class SolidIssueProviderRepository {
     );
   }
 
-  saveIssueProvider(issueProvider: IssueProvider, order = 0): Promise<IssueProvider> {
+  saveIssueProvider(
+    issueProvider: IssueProvider,
+    order = 0,
+    context = this.systemContext(issueProvider.id),
+  ): Promise<IssueProvider> {
     return this.mutationCoordinator.run(
       solidMutationKey('issueProvider', issueProvider.id),
+      context,
       () => this.saveIssueProviderNow(issueProvider, order),
     );
   }
 
-  deleteIssueProvider(issueProviderId: string): Promise<void> {
+  deleteIssueProvider(
+    issueProviderId: string,
+    context = this.systemContext(issueProviderId),
+  ): Promise<void> {
     return this.mutationCoordinator.run(
       solidMutationKey('issueProvider', issueProviderId),
+      context,
       () => this.deleteIssueProviderNow(issueProviderId),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('issue-provider-repository', [
+      solidMutationKey('issueProvider', id),
+    ]);
   }
 
   private async saveIssueProviderNow(

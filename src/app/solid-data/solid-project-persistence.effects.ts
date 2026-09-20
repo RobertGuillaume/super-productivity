@@ -57,9 +57,12 @@ export class SolidProjectPersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidProjectRepository.saveProject(action.project)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
+          from(
+            this.solidProjectRepository.saveProject(
+              action.project,
+              this.solidDataLayerState.requireMutationContext(action),
+            ),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -81,9 +84,14 @@ export class SolidProjectPersistenceEffects {
               take(1),
               filter((project): project is Project => !!project),
               concatMap((project) =>
-                from(this.solidProjectRepository.saveProject(project)),
+                from(
+                  this.solidProjectRepository.saveProject(
+                    project,
+                    this.solidDataLayerState.requireMutationContext(action),
+                  ),
+                ),
               ),
-              catchError((error) => this.handlePersistenceError(error)),
+              catchError((error) => this.handlePersistenceError(error, action)),
             ),
         ),
       ),
@@ -106,11 +114,12 @@ export class SolidProjectPersistenceEffects {
     return action.id;
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidProjectPersistenceEffects: failed to persist project change',
     });
   }

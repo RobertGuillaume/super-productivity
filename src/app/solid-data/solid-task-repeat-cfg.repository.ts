@@ -9,6 +9,7 @@ import {
   taskRepeatCfgToSolidCreateInput,
 } from './solid-task-repeat-cfg.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -41,18 +42,32 @@ export class SolidTaskRepeatCfgRepository {
     );
   }
 
-  saveTaskRepeatCfg(taskRepeatCfg: TaskRepeatCfg): Promise<TaskRepeatCfg> {
+  saveTaskRepeatCfg(
+    taskRepeatCfg: TaskRepeatCfg,
+    context = this.systemContext(taskRepeatCfg.id),
+  ): Promise<TaskRepeatCfg> {
     return this.mutationCoordinator.run(
       solidMutationKey('taskRepeatCfg', taskRepeatCfg.id),
+      context,
       () => this.saveTaskRepeatCfgNow(taskRepeatCfg),
     );
   }
 
-  deleteTaskRepeatCfg(taskRepeatCfgId: string): Promise<void> {
+  deleteTaskRepeatCfg(
+    taskRepeatCfgId: string,
+    context = this.systemContext(taskRepeatCfgId),
+  ): Promise<void> {
     return this.mutationCoordinator.run(
       solidMutationKey('taskRepeatCfg', taskRepeatCfgId),
+      context,
       () => this.deleteTaskRepeatCfgNow(taskRepeatCfgId),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('task-repeat-cfg-repository', [
+      solidMutationKey('taskRepeatCfg', id),
+    ]);
   }
 
   private async saveTaskRepeatCfgNow(

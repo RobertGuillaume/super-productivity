@@ -32,24 +32,30 @@ export class SolidMenuTreePersistenceEffects {
             !(action as PersistentAction).meta?.isRemote,
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
-        concatMap(() =>
+        concatMap((action) =>
           this.store.select(selectMenuTreeState).pipe(
             take(1),
             concatMap((menuTree) =>
-              from(this.solidMenuTreeRepository.saveMenuTree(menuTree)),
+              from(
+                this.solidMenuTreeRepository.saveMenuTree(
+                  menuTree,
+                  this.solidDataLayerState.requireMutationContext(action),
+                ),
+              ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
     { dispatch: false },
   );
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidMenuTreePersistenceEffects: failed to persist menu tree',
     });
   }

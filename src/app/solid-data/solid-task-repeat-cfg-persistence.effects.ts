@@ -57,13 +57,21 @@ export class SolidTaskRepeatCfgPersistenceEffects {
               from(
                 settleSolidMutations([
                   ...taskRepeatCfgs.map((taskRepeatCfg) =>
-                    this.solidTaskRepeatCfgRepository.saveTaskRepeatCfg(taskRepeatCfg),
+                    this.solidTaskRepeatCfgRepository.saveTaskRepeatCfg(
+                      taskRepeatCfg,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
                   ),
-                  ...tasks.map((task) => this.solidTaskRepository.saveTask(task)),
+                  ...tasks.map((task) =>
+                    this.solidTaskRepository.saveTask(
+                      task,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
+                  ),
                 ]),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -85,13 +93,21 @@ export class SolidTaskRepeatCfgPersistenceEffects {
               from(
                 settleSolidMutations([
                   ...this.taskRepeatCfgIdsForDeleteAction(action).map((id) =>
-                    this.solidTaskRepeatCfgRepository.deleteTaskRepeatCfg(id),
+                    this.solidTaskRepeatCfgRepository.deleteTaskRepeatCfg(
+                      id,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
                   ),
-                  ...tasks.map((task) => this.solidTaskRepository.saveTask(task)),
+                  ...tasks.map((task) =>
+                    this.solidTaskRepository.saveTask(
+                      task,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
+                  ),
                 ]),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -155,11 +171,12 @@ export class SolidTaskRepeatCfgPersistenceEffects {
     return [action.taskRepeatCfgId];
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source:
         'SolidTaskRepeatCfgPersistenceEffects: failed to persist repeat config change',
     });

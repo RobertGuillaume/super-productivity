@@ -61,18 +61,20 @@ export class SolidSimpleCounterPersistenceEffects {
                       simpleCounters.map(
                         (orderedSimpleCounter) => orderedSimpleCounter.simpleCounter,
                       ),
+                      this.solidDataLayerState.requireMutationContext(action),
                     )
                   : settleSolidMutations(
                       simpleCounters.map((orderedSimpleCounter) =>
                         this.solidSimpleCounterRepository.saveSimpleCounter(
                           orderedSimpleCounter.simpleCounter,
                           orderedSimpleCounter.order,
+                          this.solidDataLayerState.requireMutationContext(action),
                         ),
                       ),
                     ),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -92,10 +94,13 @@ export class SolidSimpleCounterPersistenceEffects {
           from(
             settleSolidMutations(
               this.simpleCounterIdsForDeleteAction(action).map((id) =>
-                this.solidSimpleCounterRepository.deleteSimpleCounter(id),
+                this.solidSimpleCounterRepository.deleteSimpleCounter(
+                  id,
+                  this.solidDataLayerState.requireMutationContext(action),
+                ),
               ),
             ),
-          ).pipe(catchError((error) => this.handlePersistenceError(error))),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -173,11 +178,12 @@ export class SolidSimpleCounterPersistenceEffects {
     return action.ids;
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidSimpleCounterPersistenceEffects: failed to persist simple counter',
     });
   }

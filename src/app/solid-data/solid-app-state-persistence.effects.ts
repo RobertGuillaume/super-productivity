@@ -42,19 +42,22 @@ export class SolidAppStatePersistenceEffects {
             !(action as PersistentAction).meta?.isRemote,
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
-        concatMap(() =>
+        concatMap((action) =>
           this.store.select(selectProjectFeatureState).pipe(
             take(1),
             concatMap((state) =>
               from(
-                this.solidAppStateRepository.saveAppStateOrder({
-                  projectOrder: (state.ids as string[]).filter(
-                    (id) => id !== INBOX_PROJECT.id,
-                  ),
-                }),
+                this.solidAppStateRepository.saveAppStateOrder(
+                  {
+                    projectOrder: (state.ids as string[]).filter(
+                      (id) => id !== INBOX_PROJECT.id,
+                    ),
+                  },
+                  this.solidDataLayerState.requireMutationContext(action),
+                ),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -70,17 +73,20 @@ export class SolidAppStatePersistenceEffects {
             !(action as PersistentAction).meta?.isRemote,
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
-        concatMap(() =>
+        concatMap((action) =>
           this.store.select(selectTagFeatureState).pipe(
             take(1),
             concatMap((state) =>
               from(
-                this.solidAppStateRepository.saveAppStateOrder({
-                  tagOrder: state.ids as string[],
-                }),
+                this.solidAppStateRepository.saveAppStateOrder(
+                  {
+                    tagOrder: state.ids as string[],
+                  },
+                  this.solidDataLayerState.requireMutationContext(action),
+                ),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -98,41 +104,55 @@ export class SolidAppStatePersistenceEffects {
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
           action.activeContextType === WorkContextType.PROJECT
-            ? this.persistProjectNoteOrder(action.activeContextId)
-            : this.persistTodayNoteOrder(),
+            ? this.persistProjectNoteOrder(action.activeContextId, action)
+            : this.persistTodayNoteOrder(action),
         ),
       ),
     { dispatch: false },
   );
 
-  private persistProjectNoteOrder(projectId: string): Observable<unknown> {
+  private persistProjectNoteOrder(
+    projectId: string,
+    action: object,
+  ): Observable<unknown> {
     return this.store.select(selectProjectById, { id: projectId }).pipe(
       take(1),
       filter((project): project is Project => !!project),
-      concatMap((project) => from(this.solidProjectRepository.saveProject(project))),
-      catchError((error) => this.handlePersistenceError(error)),
+      concatMap((project) =>
+        from(
+          this.solidProjectRepository.saveProject(
+            project,
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
+        ),
+      ),
+      catchError((error) => this.handlePersistenceError(error, action)),
     );
   }
 
-  private persistTodayNoteOrder(): Observable<unknown> {
+  private persistTodayNoteOrder(action: object): Observable<unknown> {
     return this.store.select(selectNoteTodayOrder).pipe(
       take(1),
       concatMap((noteTodayOrder) =>
         from(
-          this.solidAppStateRepository.saveAppStateOrder({
-            noteTodayOrder,
-          }),
+          this.solidAppStateRepository.saveAppStateOrder(
+            {
+              noteTodayOrder,
+            },
+            this.solidDataLayerState.requireMutationContext(action),
+          ),
         ),
       ),
-      catchError((error) => this.handlePersistenceError(error)),
+      catchError((error) => this.handlePersistenceError(error, action)),
     );
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidAppStatePersistenceEffects: failed to persist app order change',
     });
   }

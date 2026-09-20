@@ -48,12 +48,20 @@ export class SolidTaskDeadlinePersistenceEffects {
             concatMap(({ tasks, todayTag }) =>
               from(
                 settleSolidMutations([
-                  ...tasks.map((task) => this.solidTaskRepository.saveTask(task)),
-                  this.solidTagRepository.saveTag(todayTag),
+                  ...tasks.map((task) =>
+                    this.solidTaskRepository.saveTask(
+                      task,
+                      this.solidDataLayerState.requireMutationContext(action),
+                    ),
+                  ),
+                  this.solidTagRepository.saveTag(
+                    todayTag,
+                    this.solidDataLayerState.requireMutationContext(action),
+                  ),
                 ]),
               ),
             ),
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -80,11 +88,12 @@ export class SolidTaskDeadlinePersistenceEffects {
     );
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidTaskDeadlinePersistenceEffects: failed to persist task deadlines',
     });
   }

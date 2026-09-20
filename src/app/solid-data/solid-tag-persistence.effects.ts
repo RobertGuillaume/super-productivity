@@ -43,9 +43,12 @@ export class SolidTagPersistenceEffects {
         ),
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
-          from(this.solidTagRepository.saveTag(action.tag)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
-          ),
+          from(
+            this.solidTagRepository.saveTag(
+              action.tag,
+              this.solidDataLayerState.requireMutationContext(action),
+            ),
+          ).pipe(catchError((error) => this.handlePersistenceError(error, action))),
         ),
       ),
     { dispatch: false },
@@ -66,8 +69,15 @@ export class SolidTagPersistenceEffects {
             .pipe(
               take(1),
               filter((tag): tag is Tag => !!tag),
-              concatMap((tag) => from(this.solidTagRepository.saveTag(tag))),
-              catchError((error) => this.handlePersistenceError(error)),
+              concatMap((tag) =>
+                from(
+                  this.solidTagRepository.saveTag(
+                    tag,
+                    this.solidDataLayerState.requireMutationContext(action),
+                  ),
+                ),
+              ),
+              catchError((error) => this.handlePersistenceError(error, action)),
             ),
         ),
       ),
@@ -90,7 +100,7 @@ export class SolidTagPersistenceEffects {
         filter((action) => this.solidDataLayerState.ownsPersistentAction(action)),
         concatMap((action) =>
           from(this.deleteTagsForAction(action)).pipe(
-            catchError((error) => this.handlePersistenceError(error)),
+            catchError((error) => this.handlePersistenceError(error, action)),
           ),
         ),
       ),
@@ -110,15 +120,21 @@ export class SolidTagPersistenceEffects {
   ): Promise<void> {
     const tagIds = action.type === ActionType.TAG_DELETE ? [action.id] : action.ids;
     await settleSolidMutations(
-      tagIds.map((tagId) => this.solidTagRepository.deleteTag(tagId)),
+      tagIds.map((tagId) =>
+        this.solidTagRepository.deleteTag(
+          tagId,
+          this.solidDataLayerState.requireMutationContext(action),
+        ),
+      ),
     );
   }
 
-  private handlePersistenceError(error: unknown): typeof EMPTY {
+  private handlePersistenceError(error: unknown, action: object): typeof EMPTY {
     return handleSolidPersistenceError({
       error,
       snackService: this.snackService,
       sessionRecovery: this.solidDataLayerState,
+      action,
       source: 'SolidTagPersistenceEffects: failed to persist tag change',
     });
   }

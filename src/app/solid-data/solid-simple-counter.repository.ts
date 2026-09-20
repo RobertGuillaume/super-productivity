@@ -51,23 +51,37 @@ export class SolidSimpleCounterRepository {
     );
   }
 
-  saveSimpleCounter(simpleCounter: SimpleCounter, order = 0): Promise<SimpleCounter> {
-    return this.mutationCoordinator.run(solidMutationKey('simpleCounter', '*'), () =>
-      this.saveSimpleCounterNow(simpleCounter, order),
+  saveSimpleCounter(
+    simpleCounter: SimpleCounter,
+    order = 0,
+    context = this.mutationCoordinator.systemContext('simple-counter-repository'),
+  ): Promise<SimpleCounter> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('simpleCounter', '*'),
+      context,
+      () => this.saveSimpleCounterNow(simpleCounter, order),
     );
   }
 
   replaceSimpleCounters(
     simpleCounters: readonly SimpleCounter[],
+    context = this.mutationCoordinator.systemContext('simple-counter-repository'),
   ): Promise<SimpleCounter[]> {
-    return this.mutationCoordinator.run(solidMutationKey('simpleCounter', '*'), () =>
-      this.replaceSimpleCountersNow(simpleCounters),
+    return this.mutationCoordinator.run(
+      solidMutationKey('simpleCounter', '*'),
+      context,
+      () => this.replaceSimpleCountersNow(simpleCounters),
     );
   }
 
-  deleteSimpleCounter(simpleCounterId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('simpleCounter', '*'), () =>
-      this.deleteSimpleCounterNow(simpleCounterId),
+  deleteSimpleCounter(
+    simpleCounterId: string,
+    context = this.mutationCoordinator.systemContext('simple-counter-repository'),
+  ): Promise<void> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('simpleCounter', '*'),
+      context,
+      () => this.deleteSimpleCounterNow(simpleCounterId),
     );
   }
 

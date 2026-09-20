@@ -67,13 +67,7 @@ describe('SolidPodRefreshCoordinatorService', () => {
     sessions.isDegraded.and.returnValue(false);
     hydration = jasmine.createSpyObj<SolidTaskHydrationService>(
       'SolidTaskHydrationService',
-      [
-        'reconcileStore',
-        'resetCatalogBaseline',
-        'hasDegradedState',
-        'restoreProjection',
-        'restoreLastPublishedSnapshot',
-      ],
+      ['reconcileStore', 'resetCatalogBaseline', 'hasDegradedState'],
     );
     hydration.reconcileStore.and.resolveTo({} as never);
     hydration.hasDegradedState.and.returnValue(false);
@@ -110,9 +104,9 @@ describe('SolidPodRefreshCoordinatorService', () => {
     access.check.and.resolveTo({ state: 'writable' });
     const intents = jasmine.createSpyObj<SolidMutationIntentRegistry>(
       'SolidMutationIntentRegistry',
-      ['latest', 'clear'],
+      ['clear', 'isCurrent'],
     );
-    intents.latest.and.returnValue(null);
+    intents.isCurrent.and.returnValue(true);
 
     TestBed.configureTestingModule({
       providers: [
@@ -169,7 +163,9 @@ describe('SolidPodRefreshCoordinatorService', () => {
         action: {},
         containerKeys: ['tasks'],
         resourceUris: ['https://pod.example/super-productivity/tasks/one.ttl'],
-        projection: null,
+        runtimeGeneration: 0,
+        storageRoot: 'https://pod.example/',
+        webId,
       } as never,
       new Error('conflict'),
       'task',

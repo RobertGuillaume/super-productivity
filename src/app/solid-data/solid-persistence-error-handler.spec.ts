@@ -1,13 +1,22 @@
-import { EMPTY } from 'rxjs';
+import { Observable } from 'rxjs';
 import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
 import { T } from '../t.const';
 import { handleSolidPersistenceError } from './solid-persistence-error-handler';
 import { SolidSessionRecoveryService } from './solid-session-recovery.service';
+import { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 
 type TestRecovery = SolidSessionRecoveryService & {
-  recoverRejectedMutation(error: unknown, source: string): Promise<void> | void;
-  demoteWriteAccessAfterFailure(error: unknown): void;
+  mutationContextFor(action: object): SolidMutationIntentContext | null;
+  recoverRejectedMutation(
+    context: SolidMutationIntentContext | null,
+    error: unknown,
+    source: string,
+  ): Promise<void> | void;
+  demoteWriteAccessAfterFailure(
+    error: unknown,
+    context: SolidMutationIntentContext | null,
+  ): void;
 };
 
 describe('handleSolidPersistenceError', () => {
@@ -18,26 +27,31 @@ describe('handleSolidPersistenceError', () => {
     snackService = jasmine.createSpyObj<SnackService>('SnackService', ['open']);
     sessionRecovery = jasmine.createSpyObj<TestRecovery>('SolidSessionRecoveryService', [
       'handleAuthenticationError',
+      'mutationContextFor',
       'recoverRejectedMutation',
       'demoteWriteAccessAfterFailure',
     ]);
     sessionRecovery.handleAuthenticationError.and.returnValue(false);
+    sessionRecovery.mutationContextFor.and.returnValue(null);
     spyOn(Log, 'err');
   });
 
-  it('logs only redacted error metadata and keeps the failure loud', () => {
+  it('logs only redacted error metadata and reports recovery after verification', async () => {
     const error = Object.assign(new Error('contains details'), {
       body: 'user content',
     });
+    const action = {};
 
-    const result = handleSolidPersistenceError({
-      error,
-      snackService,
-      sessionRecovery,
-      source: 'SolidTestPersistenceEffects: failed to persist test data',
-    });
+    await complete(
+      handleSolidPersistenceError({
+        error,
+        snackService,
+        sessionRecovery,
+        source: 'SolidTestPersistenceEffects: failed to persist test data',
+        action,
+      }),
+    );
 
-    expect(result).toBe(EMPTY);
     expect(Log.err).toHaveBeenCalledOnceWith(
       'SolidTestPersistenceEffects: failed to persist test data',
       {
@@ -51,27 +65,59 @@ describe('handleSolidPersistenceError', () => {
       msg: T.PS.SOLID.WRITE_RESTORED,
     });
     expect(sessionRecovery.recoverRejectedMutation).toHaveBeenCalledOnceWith(
+      null,
       error,
       'SolidTestPersistenceEffects: failed to persist test data',
     );
-    expect(sessionRecovery.demoteWriteAccessAfterFailure).toHaveBeenCalledOnceWith(error);
+    expect(sessionRecovery.demoteWriteAccessAfterFailure).toHaveBeenCalledOnceWith(
+      error,
+      null,
+    );
   });
 
-  it('delegates authentication failures to session recovery', () => {
+  it('reconciles and releases authentication failures after session recovery', async () => {
     const error = new Error('Authentication session expired');
     sessionRecovery.handleAuthenticationError.and.returnValue(true);
 
-    const result = handleSolidPersistenceError({
-      error,
-      snackService,
-      sessionRecovery,
-      source: 'SolidTestPersistenceEffects: failed to persist test data',
-    });
+    await complete(
+      handleSolidPersistenceError({
+        error,
+        snackService,
+        sessionRecovery,
+        source: 'SolidTestPersistenceEffects: failed to persist test data',
+      }),
+    );
 
-    expect(result).toBe(EMPTY);
     expect(sessionRecovery.handleAuthenticationError).toHaveBeenCalledOnceWith(error);
-    expect(sessionRecovery.recoverRejectedMutation).not.toHaveBeenCalled();
-    expect(snackService.open).not.toHaveBeenCalled();
+    expect(sessionRecovery.recoverRejectedMutation).toHaveBeenCalledOnceWith(
+      null,
+      error,
+      'SolidTestPersistenceEffects: failed to persist test data',
+    );
+    expect(snackService.open).toHaveBeenCalledOnceWith({
+      type: 'ERROR',
+      msg: T.PS.SOLID.WRITE_RESTORED,
+    });
+  });
+
+  it('does not claim restoration when authoritative recovery fails', async () => {
+    sessionRecovery.recoverRejectedMutation.and.rejectWith(
+      new Error('catalog unavailable'),
+    );
+
+    await complete(
+      handleSolidPersistenceError({
+        error: new Error('write failed'),
+        snackService,
+        sessionRecovery,
+        source: 'SolidTestPersistenceEffects: failed to persist test data',
+      }),
+    );
+
+    expect(snackService.open).toHaveBeenCalledOnceWith({
+      type: 'ERROR',
+      msg: T.PS.SOLID.ACTION_FAILED,
+    });
   });
 
   it('deduplicates the notification until shared asynchronous recovery completes', async () => {
@@ -88,14 +134,14 @@ describe('handleSolidPersistenceError', () => {
       source: 'SolidTestPersistenceEffects: failed to persist test data',
     };
 
-    handleSolidPersistenceError(input);
-    handleSolidPersistenceError(input);
+    const first = complete(handleSolidPersistenceError(input));
+    const second = complete(handleSolidPersistenceError(input));
 
-    expect(snackService.open).toHaveBeenCalledTimes(1);
+    expect(snackService.open).not.toHaveBeenCalled();
     finishRecovery?.();
-    await recovery;
-    await Promise.resolve();
-    handleSolidPersistenceError(input);
+    await Promise.all([recovery, first, second]);
+    expect(snackService.open).toHaveBeenCalledTimes(1);
+    await complete(handleSolidPersistenceError(input));
     expect(snackService.open).toHaveBeenCalledTimes(2);
   });
 
@@ -113,12 +159,14 @@ describe('handleSolidPersistenceError', () => {
       ],
     };
 
-    handleSolidPersistenceError({
-      error,
-      snackService,
-      sessionRecovery,
-      source: 'SolidTestPersistenceEffects: failed to persist test data',
-    });
+    const completion = complete(
+      handleSolidPersistenceError({
+        error,
+        snackService,
+        sessionRecovery,
+        source: 'SolidTestPersistenceEffects: failed to persist test data',
+      }),
+    );
     expect(sessionRecovery.recoverRejectedMutation).not.toHaveBeenCalled();
 
     jasmine.clock().tick(999);
@@ -128,6 +176,10 @@ describe('handleSolidPersistenceError', () => {
     jasmine.clock().tick(1);
     await Promise.resolve();
     expect(sessionRecovery.recoverRejectedMutation).toHaveBeenCalledTimes(1);
+    await completion;
     jasmine.clock().uninstall();
   });
 });
+
+const complete = (observable: Observable<never>): Promise<void> =>
+  new Promise((resolve) => observable.subscribe({ complete: resolve }));

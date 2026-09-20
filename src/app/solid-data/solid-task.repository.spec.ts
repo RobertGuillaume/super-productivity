@@ -13,6 +13,7 @@ import {
 import { SolidRuntimeService } from './solid-runtime.service';
 import { SOLID_SEMANTIC_PROFILES } from './solid-semantic-profiles';
 import {
+  activateSolidMutationTestBinding,
   installRuntimeWritePlanBridge,
   updateThingPlan,
 } from './testing/solid-runtime-write-plan.fixture';
@@ -149,6 +150,8 @@ describe('SolidTaskRepository', () => {
     expect(loaded.value).toHaveSize(251);
     expect(loaded.value[250].id).toBe('task-250');
   });
+
+  beforeEach(() => activateSolidMutationTestBinding());
 
   afterEach(() => {
     TestBed.resetTestingModule();

@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Project } from '../features/project/project.model';
 import { SP_PROJECT } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import {
   SolidRepositoryMutation,
@@ -48,16 +49,32 @@ export class SolidProjectRepository {
     );
   }
 
-  saveProject(project: Project): Promise<Project> {
-    return this.mutationCoordinator.run(solidMutationKey('project', project.id), () =>
-      this.saveProjectNow(project),
+  saveProject(
+    project: Project,
+    context = this.systemContext(project.id),
+  ): Promise<Project> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('project', project.id),
+      context,
+      () => this.saveProjectNow(project),
     );
   }
 
-  deleteProject(projectId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('project', projectId), () =>
-      this.deleteProjectNow(projectId),
+  deleteProject(
+    projectId: string,
+    context = this.systemContext(projectId),
+  ): Promise<void> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('project', projectId),
+      context,
+      () => this.deleteProjectNow(projectId),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('project-repository', [
+      solidMutationKey('project', id),
+    ]);
   }
 
   private async saveProjectNow(project: Project): Promise<Project> {

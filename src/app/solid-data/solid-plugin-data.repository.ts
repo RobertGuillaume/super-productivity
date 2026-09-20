@@ -73,30 +73,46 @@ export class SolidPluginDataRepository {
     );
   }
 
-  savePluginUserData(pluginUserData: PluginUserData): Promise<PluginUserData> {
+  savePluginUserData(
+    pluginUserData: PluginUserData,
+    context = this.mutationCoordinator.systemContext('plugin-data-repository'),
+  ): Promise<PluginUserData> {
     return this.mutationCoordinator.run(
       solidMutationKey('pluginUserData', pluginUserData.id),
+      context,
       () => this.savePluginUserDataNow(pluginUserData),
     );
   }
 
-  savePluginMetadata(pluginMetadata: PluginMetadata): Promise<PluginMetadata> {
+  savePluginMetadata(
+    pluginMetadata: PluginMetadata,
+    context = this.mutationCoordinator.systemContext('plugin-data-repository'),
+  ): Promise<PluginMetadata> {
     return this.mutationCoordinator.run(
       solidMutationKey('pluginMetadata', pluginMetadata.id),
+      context,
       () => this.savePluginMetadataNow(pluginMetadata),
     );
   }
 
-  deletePluginUserData(pluginId: string): Promise<void> {
+  deletePluginUserData(
+    pluginId: string,
+    context = this.mutationCoordinator.systemContext('plugin-data-repository'),
+  ): Promise<void> {
     return this.mutationCoordinator.run(
       solidMutationKey('pluginUserData', pluginId),
+      context,
       () => this.deletePluginUserDataNow(pluginId),
     );
   }
 
-  deletePluginMetadata(pluginId: string): Promise<void> {
+  deletePluginMetadata(
+    pluginId: string,
+    context = this.mutationCoordinator.systemContext('plugin-data-repository'),
+  ): Promise<void> {
     return this.mutationCoordinator.run(
       solidMutationKey('pluginMetadata', pluginId),
+      context,
       () => this.deletePluginMetadataNow(pluginId),
     );
   }

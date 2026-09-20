@@ -3,6 +3,7 @@ import type { RuntimeScope, Thing, Unsubscribe } from '@solid-intents/runtime';
 import { Note } from '../features/note/note.model';
 import { SP_NOTE } from './solid-productivity-vocab';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -41,16 +42,22 @@ export class SolidNoteRepository {
     );
   }
 
-  saveNote(note: Note): Promise<Note> {
-    return this.mutationCoordinator.run(solidMutationKey('note', note.id), () =>
+  saveNote(note: Note, context = this.systemContext(note.id)): Promise<Note> {
+    return this.mutationCoordinator.run(solidMutationKey('note', note.id), context, () =>
       this.saveNoteNow(note),
     );
   }
 
-  deleteNote(noteId: string): Promise<void> {
-    return this.mutationCoordinator.run(solidMutationKey('note', noteId), () =>
+  deleteNote(noteId: string, context = this.systemContext(noteId)): Promise<void> {
+    return this.mutationCoordinator.run(solidMutationKey('note', noteId), context, () =>
       this.deleteNoteNow(noteId),
     );
+  }
+
+  private systemContext(id: string): SolidMutationIntentContext {
+    return this.mutationCoordinator.systemContext('note-repository', [
+      solidMutationKey('note', id),
+    ]);
   }
 
   private async saveNoteNow(note: Note): Promise<Note> {

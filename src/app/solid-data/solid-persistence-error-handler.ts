@@ -1,13 +1,23 @@
-import { EMPTY } from 'rxjs';
+import { EMPTY, from, Observable } from 'rxjs';
+import { catchError, finalize, ignoreElements, tap } from 'rxjs/operators';
 import { Log } from '../core/log';
 import { SnackService } from '../core/snack/snack.service';
 import { T } from '../t.const';
 import { classifySolidRuntimeOutcomes, outcomesFromError } from './solid-runtime-outcome';
+import { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 
 interface SolidAuthenticationErrorHandler {
   handleAuthenticationError?(error: unknown): boolean;
-  recoverRejectedMutation?(error: unknown, source: string): Promise<void> | void;
-  demoteWriteAccessAfterFailure?(error: unknown): void;
+  mutationContextFor?(action: object): SolidMutationIntentContext | null;
+  recoverRejectedMutation?(
+    context: SolidMutationIntentContext | null,
+    error: unknown,
+    source: string,
+  ): Promise<void> | void;
+  demoteWriteAccessAfterFailure?(
+    error: unknown,
+    context: SolidMutationIntentContext | null,
+  ): void;
 }
 
 const noticedRecoveries = new Set<Promise<void>>();
@@ -17,44 +27,58 @@ export const handleSolidPersistenceError = ({
   snackService,
   sessionRecovery,
   source,
+  action,
 }: {
   error: unknown;
   snackService: SnackService;
   sessionRecovery?: SolidAuthenticationErrorHandler;
   source: string;
-}): typeof EMPTY => {
+  action?: object;
+}): Observable<never> => {
   const fields = structuredErrorFields(error, source);
   Log.err(source, {
     ...fields,
   });
-  sessionRecovery?.demoteWriteAccessAfterFailure?.(error);
-  const authenticationHandled =
-    sessionRecovery?.handleAuthenticationError?.(error) === true;
+  const context = action ? (sessionRecovery?.mutationContextFor?.(action) ?? null) : null;
+  sessionRecovery?.demoteWriteAccessAfterFailure?.(error, context);
+  sessionRecovery?.handleAuthenticationError?.(error);
   const classification = classifySolidRuntimeOutcomes(outcomesFromError(error));
   const recover = (): Promise<void> => {
-    const result = sessionRecovery?.recoverRejectedMutation?.(error, source);
+    const result = sessionRecovery?.recoverRejectedMutation?.(context, error, source);
     return result instanceof Promise ? result : Promise.resolve();
   };
-  if (authenticationHandled) {
-    return EMPTY;
-  }
   const recovery =
     classification.state === 'deferred' &&
     classification.retryAt !== undefined &&
     classification.retryAt.getTime() > Date.now()
       ? waitUntil(classification.retryAt).then(recover)
       : recover();
-  if (!noticedRecoveries.has(recovery)) {
-    noticedRecoveries.add(recovery);
-    snackService.open({
-      type: 'ERROR',
-      msg: T.PS.SOLID.WRITE_RESTORED,
-    });
-    void recovery
-      .catch((recoveryError) => logRecoveryFailure(recoveryError, source))
-      .finally(() => noticedRecoveries.delete(recovery));
-  }
-  return EMPTY;
+  const shouldNotify = !noticedRecoveries.has(recovery);
+  if (shouldNotify) noticedRecoveries.add(recovery);
+  return from(recovery).pipe(
+    tap(() => {
+      if (shouldNotify) {
+        snackService.open({
+          type: 'ERROR',
+          msg: T.PS.SOLID.WRITE_RESTORED,
+        });
+      }
+    }),
+    catchError((recoveryError) => {
+      logRecoveryFailure(recoveryError, source);
+      if (shouldNotify) {
+        snackService.open({
+          type: 'ERROR',
+          msg: T.PS.SOLID.ACTION_FAILED,
+        });
+      }
+      return EMPTY;
+    }),
+    finalize(() => {
+      if (shouldNotify) noticedRecoveries.delete(recovery);
+    }),
+    ignoreElements(),
+  );
 };
 
 const waitUntil = (retryAt: Date): Promise<void> =>

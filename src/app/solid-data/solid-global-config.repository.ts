@@ -37,9 +37,14 @@ export class SolidGlobalConfigRepository {
     return solidRepositoryRead(config, result.metadata);
   }
 
-  saveGlobalConfig(config: GlobalConfigState): Promise<GlobalConfigState> {
-    return this.mutationCoordinator.run(solidMutationKey('globalConfig', 'root'), () =>
-      this.saveGlobalConfigNow(config),
+  saveGlobalConfig(
+    config: GlobalConfigState,
+    context = this.mutationCoordinator.systemContext('global-config-repository'),
+  ): Promise<GlobalConfigState> {
+    return this.mutationCoordinator.run(
+      solidMutationKey('globalConfig', 'root'),
+      context,
+      () => this.saveGlobalConfigNow(config),
     );
   }
 

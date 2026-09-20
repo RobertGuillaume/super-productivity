@@ -12,6 +12,7 @@ import {
   solidThingToAppState,
 } from './solid-app-state.mapper';
 import { SolidRuntimeService } from './solid-runtime.service';
+import type { SolidMutationIntentContext } from './solid-mutation-intent-registry.service';
 import { SolidRepositoryRead, solidRepositoryRead } from './solid-repository-read';
 import { SolidRepositoryOperations } from './solid-repository-operations.service';
 import {
@@ -47,9 +48,14 @@ export class SolidAppStateRepository {
     changes: Partial<
       Pick<SolidAppState, 'noteTodayOrder' | 'projectOrder' | 'sectionOrder' | 'tagOrder'>
     >,
+    context: SolidMutationIntentContext = this.mutationCoordinator.systemContext(
+      'app-state-repository',
+    ),
   ): Promise<SolidAppState> {
-    return this.mutationCoordinator.run(solidMutationKey('appState', 'order'), () =>
-      this.saveAppStateOrderNow(changes),
+    return this.mutationCoordinator.run(
+      solidMutationKey('appState', 'order'),
+      context,
+      () => this.saveAppStateOrderNow(changes),
     );
   }
 
